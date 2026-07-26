@@ -1,8 +1,8 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "cd ../.. && npm install && npm run build -w @wrike-clone/shared && npm run build -w @wrike-clone/frontend",
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
-  "installCommand": "npm install",
+  "installCommand": "npm install --workspace-root --include-workspace-root",
   "framework": "vite",
   "rewrites": [
     {
