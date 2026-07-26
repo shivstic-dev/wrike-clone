@@ -74,7 +74,7 @@ apiClient.interceptors.response.use(
       try {
         // G7: Refresh token is sent automatically via httpOnly cookie
         const response = await axios.post(
-          '/api/v1/auth/refresh',
+          `${API_BASE_URL}/auth/refresh`,
           {},
           { withCredentials: true },
         );
