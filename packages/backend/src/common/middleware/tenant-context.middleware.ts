@@ -3,9 +3,15 @@
  * Extracts tenant information from the authenticated request and initializes
  * the AsyncLocalStorage context so services can access it without passing
  * it through every function call.
+ *
+ * NOTE: Middleware runs BEFORE guards. req.user is NOT available here.
+ * This middleware decodes the JWT directly from the Authorization header
+ * to populate the AsyncLocalStorage context as early as possible.
+ * If JWT decoding fails (invalid token, missing header), the interceptor
+ * will set up the context as a fallback after guards run.
  */
 
-import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { verify } from 'jsonwebtoken';
 import { loadAuthConfig } from '../../config/app.config';
@@ -13,62 +19,58 @@ import { tenantContext, TenantContextData } from '../tenant-context';
 
 @Injectable()
 export class TenantContextMiddleware implements NestMiddleware {
+  private readonly logger = new Logger(TenantContextMiddleware.name);
+
   use(req: Request, _res: Response, next: NextFunction): void {
-    let ctx: TenantContextData | undefined = undefined;
+    const authHeader = req.headers.authorization;
 
-    // First check if req.user has already been set
-    const reqUser = req.user as
-      | { tenantId?: string; userId?: string; membershipId?: string; role?: string; permissions?: string[] }
-      | undefined;
-
-    if (reqUser?.tenantId) {
-      ctx = {
-        tenantId: reqUser.tenantId,
-        userId: reqUser.userId || '',
-        membershipId: reqUser.membershipId || '',
-        role: reqUser.role || '',
-        permissions: reqUser.permissions || [],
-      };
-    } else {
-      // Decode Bearer token directly from Authorization header
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          const token = authHeader.substring(7);
-          const config = loadAuthConfig();
-          const payload = verify(token, config.jwtSecret) as any;
-          if (payload && payload.tenantId) {
-            ctx = {
-              tenantId: payload.tenantId,
-              userId: payload.sub || payload.userId || '',
-              membershipId: payload.membershipId || '',
-              role: payload.role || '',
-              permissions: payload.permissions || [],
-            };
-            // Also attach user to req.user for AuthGuard & @CurrentUser()
-            req.user = {
-              userId: ctx.userId,
-              tenantId: ctx.tenantId,
-              membershipId: ctx.membershipId,
-              email: payload.email || '',
-              role: ctx.role,
-              permissions: ctx.permissions,
-            } as any;
-          }
-        } catch {
-          // Token verification failed or unauthenticated route — proceed without context
-        }
-      }
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // No token — proceed without context (login, health, public routes)
+      next();
+      return;
     }
 
-    if (ctx && ctx.tenantId) {
-      (req as any).tenantContext = ctx;
-      (req as any).__tenantId = ctx.tenantId;
+    try {
+      const token = authHeader.substring(7);
+      const config = loadAuthConfig();
+      const payload = verify(token, config.jwtSecret) as any;
 
-      tenantContext.run(ctx, () => {
+      if (payload && payload.tenantId) {
+        const ctx: TenantContextData = {
+          tenantId: payload.tenantId,
+          userId: payload.sub || payload.userId || '',
+          membershipId: payload.membershipId || '',
+          role: payload.role || '',
+          permissions: payload.permissions || [],
+        };
+
+        // Attach user info to req.user for AuthGuard & @CurrentUser()
+        req.user = {
+          userId: ctx.userId,
+          tenantId: ctx.tenantId,
+          membershipId: ctx.membershipId,
+          email: payload.email || '',
+          role: ctx.role,
+          permissions: ctx.permissions,
+        } as any;
+
+        (req as any).tenantContext = ctx;
+
+        // Use enterWith() for reliable context propagation.
+        // This sets the store for the current async execution context,
+        // surviving across all subsequent sync/async operations including
+        // guards, interceptors, controllers, and services.
+        tenantContext.enterWith(ctx);
         next();
-      });
-    } else {
+      } else {
+        this.logger.warn(`JWT payload missing tenantId for ${req.method} ${req.url}`);
+        next();
+      }
+    } catch (err) {
+      // Token verification failed — let the AuthGuard handle rejection.
+      // The interceptor (which runs after guards) will set up context
+      // if the guard lets the request through.
+      this.logger.debug(`JWT decode skipped in middleware for ${req.method} ${req.url}: ${(err as Error).message}`);
       next();
     }
   }

@@ -4,7 +4,7 @@
  * Redis/BullMQ are conditionally loaded only when REDIS_HOST is set.
  */
 
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 
@@ -96,6 +96,6 @@ if (process.env['REDIS_HOST']) {
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(TenantContextMiddleware).forRoutes('*');
+    consumer.apply(TenantContextMiddleware).forRoutes({ path: '(.*)', method: RequestMethod.ALL });
   }
 }
