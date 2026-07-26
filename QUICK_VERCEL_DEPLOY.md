@@ -10,6 +10,7 @@ Follow these steps to deploy your frontend to Vercel in under 5 minutes:
 ## Step 2: Import Repository
 1. Find and select: `shivstic-dev/wrike-clone`
 2. Click "Import"
+3. **If there's an existing deployment**, click "Redeploy" to use the updated configuration
 
 ## Step 3: Configure Project
 
