@@ -3,8 +3,9 @@ node_modules/
 .pnp
 .pnp.js
 
-# Build outputs
+# Build outputs - exclude shared/dist so Railway can use pre-built
 dist/
+!packages/shared/dist/
 build/
 *.tsbuildinfo
 
