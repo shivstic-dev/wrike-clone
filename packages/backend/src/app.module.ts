@@ -4,11 +4,12 @@
  * Redis/BullMQ are conditionally loaded only when REDIS_HOST is set.
  */
 
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 
 import { DatabaseModule } from './database/database.module';
+import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
 import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { EventsService } from './common/events.service';
@@ -85,8 +86,6 @@ if (process.env['REDIS_HOST']) {
       provide: APP_FILTER,
       useClass: GlobalExceptionFilter,
     },
-    // Establishes the AsyncLocalStorage tenant context after guards have run
-    // (see TenantContextInterceptor for why this can't be middleware).
     {
       provide: APP_INTERCEPTOR,
       useClass: TenantContextInterceptor,
@@ -95,4 +94,8 @@ if (process.env['REDIS_HOST']) {
   ],
   exports: [EventsService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(TenantContextMiddleware).forRoutes('*');
+  }
+}

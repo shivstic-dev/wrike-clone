@@ -26,6 +26,11 @@ export class TenantContextInterceptor implements NestInterceptor {
       | { tenantId?: string; userId?: string; membershipId?: string; role?: string; permissions?: string[] }
       | undefined;
 
+    // If middleware already established the AsyncLocalStorage context, pass through
+    if (tenantContext.getStore()) {
+      return next.handle();
+    }
+
     if (user?.tenantId) {
       const ctx: TenantContextData = {
         tenantId: user.tenantId,
@@ -40,13 +45,12 @@ export class TenantContextInterceptor implements NestInterceptor {
 
       return new Observable((subscriber) => {
         tenantContext.run(ctx, () => {
-          next.handle().subscribe(subscriber);
+          const subscription = next.handle().subscribe(subscriber);
+          return () => subscription.unsubscribe();
         });
       });
     }
 
-    // Unauthenticated / public route (health check, login, etc.) — no tenant
-    // context to establish; let the request proceed with an empty store.
     return next.handle();
   }
 }

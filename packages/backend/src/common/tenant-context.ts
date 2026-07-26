@@ -5,6 +5,7 @@
  */
 
 import { AsyncLocalStorage } from 'async_hooks';
+import { UnauthorizedException } from '@nestjs/common';
 
 export interface TenantContextData {
   tenantId: string;
@@ -23,9 +24,9 @@ export function getTenantContext(): TenantContextData | undefined {
 export function requireTenantContext(): TenantContextData {
   const ctx = tenantContext.getStore();
   if (!ctx) {
-    // AsyncLocalStorage context can be lost in certain async patterns
-    // Log warning but don't fail - services should handle gracefully
-    throw new Error('Tenant context not available. Ensure TenantContextMiddleware is applied and request is authenticated.');
+    throw new UnauthorizedException(
+      'Tenant context not available. Ensure request is authenticated with a valid Authorization header.',
+    );
   }
   return ctx;
 }
