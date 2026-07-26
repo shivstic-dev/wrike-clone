@@ -33,8 +33,8 @@ export function clearAuthState() {
   inMemoryTenantId = null;
 }
 
-// Use VITE_API_BASE_URL in production (Vercel), default to '/api/v1' for Vite dev proxy
-const API_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) || '/api/v1';
+// Use VITE_API_URL in production (Vercel), default to '/api/v1' for Vite dev proxy
+const API_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) || '/api/v1';
 
 export { API_BASE_URL };
 
