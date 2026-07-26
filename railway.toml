@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install && npm run build -w @wrike-clone/shared && npm run build -w @wrike-clone/backend"
+buildCommand = "npm install --include=dev && npm run build -w @wrike-clone/shared && npm run build -w @wrike-clone/backend"
 
 [deploy]
 startCommand = "cd packages/backend && npm run start:prod"
