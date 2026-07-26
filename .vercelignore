@@ -1,7 +1,0 @@
-# Vercel ignore file
-# This ensures Vercel doesn't deploy these folders
-/api/
-/packages/backend/
-/docker/
-*.md
-!packages/frontend/
