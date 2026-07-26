@@ -107,6 +107,7 @@ export class AuthService {
     const mustChangePassword = user.must_change_password === true;
 
     // Generate tokens
+    const permissions = this.getPermissionsForRole(membership.role);
     const payload = {
       sub: user.id,
       userId: user.id,
@@ -114,6 +115,7 @@ export class AuthService {
       membershipId: membership.id,
       email: user.email,
       role: membership.role,
+      permissions,
     };
 
     const accessToken = sign(payload, config.jwtSecret, {
@@ -192,6 +194,7 @@ export class AuthService {
 
     const user = await this.db('users').where({ id: session.user_id }).first();
 
+    const permissions = this.getPermissionsForRole(membership.role);
     const payload = {
       sub: user.id,
       userId: user.id,
@@ -199,6 +202,7 @@ export class AuthService {
       membershipId: session.membership_id,
       email: user.email,
       role: membership.role,
+      permissions,
     };
 
     const accessToken = sign(payload, config.jwtSecret, {
