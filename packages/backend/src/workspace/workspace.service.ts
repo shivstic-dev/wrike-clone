@@ -34,11 +34,15 @@ export class WorkspaceService {
   }
 
   async findAllForUser(user: any) {
-    const tenantId = user?.tenantId || getTenantContext()?.tenantId;
-    const userId = user?.userId || getTenantContext()?.userId;
-    const role = user?.role || getTenantContext()?.role;
+    const ctx = getTenantContext();
+    const tenantId = user?.tenantId || ctx?.tenantId;
+    const userId = user?.userId || ctx?.userId;
+    const role = user?.role || ctx?.role;
+
+    this.logger.debug(`findAllForUser called - user: ${JSON.stringify(user)}, ctx: ${JSON.stringify(ctx)}, resolved: tenantId=${tenantId}, userId=${userId}, role=${role}`);
 
     if (!tenantId || !userId) {
+      this.logger.error(`Missing context - user keys: ${user ? Object.keys(user).join(',') : 'null'}, ctx: ${ctx ? 'present' : 'null'}`);
       throw new ForbiddenException('User information missing from request context');
     }
 
