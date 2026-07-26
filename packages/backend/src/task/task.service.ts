@@ -383,7 +383,7 @@ export class TaskService {
           return trx('tasks')
             .whereIn('id', input.taskIds)
             .andWhere('tenant_id', ctx.tenantId)
-            .andWhere('deleted_at', null)
+            .whereNull('deleted_at')
             .update(dbUpdates)
             .returning('*');
         });

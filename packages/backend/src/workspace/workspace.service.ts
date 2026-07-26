@@ -34,25 +34,31 @@ export class WorkspaceService {
   }
 
   async findAllForUser(user: any) {
-    if (!user?.tenantId || !user?.userId) {
-      throw new Error('User information missing from token');
+    const tenantId = user?.tenantId || getTenantContext()?.tenantId;
+    const userId = user?.userId || getTenantContext()?.userId;
+    const role = user?.role || getTenantContext()?.role;
+
+    if (!tenantId || !userId) {
+      throw new ForbiddenException('User information missing from request context');
     }
 
     let query = this.db('workspaces')
-      .where({ tenant_id: user.tenantId, deleted_at: null })
-      .orderBy('sort_order', 'asc');
+      .where('workspaces.tenant_id', tenantId)
+      .whereNull('workspaces.deleted_at')
+      .orderBy('workspaces.sort_order', 'asc');
 
     // Apply visibility: non-admin users only see workspaces they're members of
-    if (user.role !== 'admin') {
+    if (role !== 'admin') {
       query = query.where((b) =>
-        b.whereIn('id', function () {
-          this.select('workspace_id').from('workspace_members').where('user_id', user.userId);
-        }).orWhereIn('id', function () {
+        b.whereIn('workspaces.id', function () {
+          this.select('workspace_id').from('workspace_members').where('user_id', userId);
+        }).orWhereIn('workspaces.id', function () {
           this.select('folders.workspace_id')
             .from('folders')
             .join('projects', 'projects.folder_id', 'folders.id')
             .where('projects.visibility', 'organization')
-            .andWhere('projects.deleted_at', null);
+            .whereNull('projects.deleted_at')
+            .whereNull('folders.deleted_at');
         }),
       );
     }
@@ -63,21 +69,23 @@ export class WorkspaceService {
   async findAll() {
     const ctx = this.getContext();
     let query = this.db('workspaces')
-      .where({ tenant_id: ctx.tenantId, deleted_at: null })
-      .orderBy('sort_order', 'asc');
+      .where('workspaces.tenant_id', ctx.tenantId)
+      .whereNull('workspaces.deleted_at')
+      .orderBy('workspaces.sort_order', 'asc');
 
     // Apply visibility: non-admin users only see workspaces they're members of,
     // or workspaces that contain at least one organization-visible project
     if (ctx.role !== 'admin') {
       query = query.where((b) =>
-        b.whereIn('id', function () {
+        b.whereIn('workspaces.id', function () {
           this.select('workspace_id').from('workspace_members').where('user_id', ctx.userId);
-        }).orWhereIn('id', function () {
+        }).orWhereIn('workspaces.id', function () {
           this.select('folders.workspace_id')
             .from('folders')
             .join('projects', 'projects.folder_id', 'folders.id')
             .where('projects.visibility', 'organization')
-            .andWhere('projects.deleted_at', null);
+            .whereNull('projects.deleted_at')
+            .whereNull('folders.deleted_at');
         }),
       );
     }

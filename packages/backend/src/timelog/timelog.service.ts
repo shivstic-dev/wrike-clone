@@ -26,7 +26,7 @@ export class TimelogService {
       .join('users', 'time_entries.user_id', 'users.id')
       .where('time_entries.task_id', taskId)
       .andWhere('time_entries.tenant_id', ctx.tenantId)
-      .andWhere('time_entries.deleted_at', null)
+      .whereNull('time_entries.deleted_at')
       .select('time_entries.*', 'users.display_name', 'users.avatar_url')
       .orderBy('time_entries.logged_date', 'desc')
       .limit(perPage)
