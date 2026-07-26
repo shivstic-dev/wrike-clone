@@ -3,39 +3,31 @@
  * Phase 1: Added workspace_members endpoints for department-based access control.
  */
 
-import { Injectable, NotFoundException, Inject, Logger, ForbiddenException, Scope } from '@nestjs/common';
-import { REQUEST } from '@nestjs/core';
-import { Request } from 'express';
+import { Injectable, NotFoundException, Inject, Logger, ForbiddenException } from '@nestjs/common';
 import { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
 import { hash } from 'bcrypt';
 import { DATABASE_PROVIDER } from '../database/database.module';
-import { requireTenantContext, getTenantContext, TenantContextData } from '../common/tenant-context';
+import { getTenantContext, TenantContextData } from '../common/tenant-context';
 import { applyVisibilityScope } from '../common/visibility.scope';
 import type { CreateWorkspaceInput, UpdateWorkspaceRequest } from '@wrike-clone/shared';
 
 const SALT_ROUNDS = 12;
 
-@Injectable({ scope: Scope.REQUEST })
+@Injectable()
 export class WorkspaceService {
   private readonly logger = new Logger(WorkspaceService.name);
 
   constructor(
     @Inject(DATABASE_PROVIDER) private readonly db: Knex,
-    @Inject(REQUEST) private readonly request: Request,
   ) {}
 
   private getContext(): TenantContextData {
-    // Try AsyncLocalStorage first
-    let ctx = getTenantContext();
-    
-    // Fallback to request object if AsyncLocalStorage lost context
-    if (!ctx && (this.request as any).tenantContext) {
-      ctx = (this.request as any).tenantContext;
-    }
+    const ctx = getTenantContext();
     
     if (!ctx) {
-      throw new Error('Tenant context not available');
+      this.logger.error('Tenant context not available - AsyncLocalStorage context lost');
+      throw new Error('Tenant context not available. Please try logging in again.');
     }
     
     return ctx;
