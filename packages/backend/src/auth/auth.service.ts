@@ -107,7 +107,7 @@ export class AuthService {
     const mustChangePassword = user.must_change_password === true;
 
     // Generate tokens
-    const permissions = this.getPermissionsForRole(membership.role);
+    const permissions = DEFAULT_ROLE_PERMISSIONS[membership.role] || DEFAULT_ROLE_PERMISSIONS['member'] || [];
     const payload = {
       sub: user.id,
       userId: user.id,
@@ -194,7 +194,7 @@ export class AuthService {
 
     const user = await this.db('users').where({ id: session.user_id }).first();
 
-    const permissions = this.getPermissionsForRole(membership.role);
+    const permissions = DEFAULT_ROLE_PERMISSIONS[membership.role] || DEFAULT_ROLE_PERMISSIONS['member'] || [];
     const payload = {
       sub: user.id,
       userId: user.id,
@@ -335,12 +335,5 @@ export class AuthService {
     });
 
     this.logger.log(`User ${input.email} registered in tenant ${input.tenantSlug}`);
-  }
-
-  /**
-   * Get permissions for a given role from the RBAC config.
-   */
-  private getPermissionsForRole(role: string): string[] {
-    return DEFAULT_ROLE_PERMISSIONS[role] || DEFAULT_ROLE_PERMISSIONS['member'] || [];
   }
 }
