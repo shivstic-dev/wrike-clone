@@ -19,17 +19,19 @@ import type { TenantContextData } from './tenant-context';
  * @param qb - The Knex query builder
  * @param ctx - The tenant context (user info)
  * @param workspaceIdColumn - The column name for workspace_id (default: 'workspace_id')
+ * @param visibilityColumn - The qualified visibility column (default: 'visibility')
  */
 export function applyVisibilityScope(
   qb: Knex.QueryBuilder,
   ctx: TenantContextData,
   workspaceIdColumn = 'workspace_id',
+  visibilityColumn = 'visibility',
 ): Knex.QueryBuilder {
   // Org admin sees all
   if (ctx.role === 'admin') return qb;
 
   return qb.where((b) =>
-    b.where('visibility', 'organization')
+    b.where(visibilityColumn, 'organization')
       .orWhereIn(workspaceIdColumn, function () {
         this.select('workspace_id')
           .from('workspace_members')

@@ -27,7 +27,7 @@ export class WorkspaceService {
     
     if (!ctx) {
       this.logger.error('Tenant context not available - AsyncLocalStorage context lost');
-      throw new Error('Tenant context not available. Please try logging in again.');
+      throw new ForbiddenException('Tenant context not available. Please try logging in again.');
     }
     
     return ctx;

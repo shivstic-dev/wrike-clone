@@ -29,7 +29,7 @@ export class ProjectService {
       .leftJoin('folders', 'projects.folder_id', 'folders.id')
       .select('projects.*'); // re-select after join
 
-    query = applyVisibilityScope(query, ctx, 'folders.workspace_id');
+    query = applyVisibilityScope(query, ctx, 'folders.workspace_id', 'projects.visibility');
 
     if (folderId) query = query.andWhere('projects.folder_id', folderId);
     if (status) query = query.andWhere('projects.status', status);
@@ -55,7 +55,7 @@ export class ProjectService {
       .whereNull('projects.deleted_at')
       .select('projects.*')
       .modify((qb: any) => {
-        if (ctx.role !== 'admin') applyVisibilityScope(qb, ctx, 'folders.workspace_id');
+        if (ctx.role !== 'admin') applyVisibilityScope(qb, ctx, 'folders.workspace_id', 'projects.visibility');
       })
       .first();
 

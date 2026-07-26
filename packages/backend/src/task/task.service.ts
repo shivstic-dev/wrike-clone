@@ -80,7 +80,7 @@ export class TaskService {
       .leftJoin('projects', 'tasks.project_id', 'projects.id')
       .leftJoin('folders', 'projects.folder_id', 'folders.id');
 
-    query = applyVisibilityScope(query, ctx, 'folders.workspace_id');
+    query = applyVisibilityScope(query, ctx, 'folders.workspace_id', 'tasks.visibility');
 
     // Apply filters
     if (projectId) query = query.andWhere('tasks.project_id', projectId);
@@ -142,7 +142,7 @@ export class TaskService {
       .whereNull('tasks.deleted_at')
       .select('tasks.*')
       .modify((qb: any) => {
-        if (ctx.role !== 'admin') applyVisibilityScope(qb, ctx, 'folders.workspace_id');
+        if (ctx.role !== 'admin') applyVisibilityScope(qb, ctx, 'folders.workspace_id', 'tasks.visibility');
       })
       .first();
 
