@@ -28,6 +28,23 @@ import { TaskStatus, TaskPriority } from '@wrike-clone/shared';
 export class TaskService {
   private readonly logger = new Logger(TaskService.name);
 
+  // Whitelist of columns the task list may be sorted by, mapped to their
+  // fully-qualified form. findAll() joins tasks -> projects -> folders -> users,
+  // several of which share column names (e.g. created_at), so an unqualified
+  // ORDER BY column is ambiguous to Postgres and throws a 500. Qualifying via
+  // this whitelist also prevents passing an arbitrary column name straight
+  // from the query string into the query builder.
+  private static readonly SORTABLE_COLUMNS: Record<string, string> = {
+    created_at: 'tasks.created_at',
+    updated_at: 'tasks.updated_at',
+    due_date: 'tasks.due_date',
+    start_date: 'tasks.start_date',
+    priority: 'tasks.priority',
+    status: 'tasks.status',
+    title: 'tasks.title',
+    sort_order: 'tasks.sort_order',
+  };
+
   constructor(@Inject(DATABASE_PROVIDER) private readonly db: Knex) {}
 
   /**
@@ -49,6 +66,9 @@ export class TaskService {
       sortBy = 'created_at',
       sortDirection = 'desc',
     } = filter as typeof filter & { sortBy?: string; sortDirection?: string };
+
+    const sortColumn = TaskService.SORTABLE_COLUMNS[sortBy] ?? 'tasks.created_at';
+    const sortDir = sortDirection === 'asc' ? 'asc' : 'desc';
 
     let query = this.db('tasks')
       .where('tasks.tenant_id', ctx.tenantId)
@@ -94,7 +114,7 @@ export class TaskService {
         ),
       )
       .leftJoin({ u: 'users' }, 'tasks.assignee_id', 'u.id')
-      .orderBy(sortBy, sortDirection)
+      .orderBy(sortColumn, sortDir)
       .limit(perPage)
       .offset((page - 1) * perPage);
 
