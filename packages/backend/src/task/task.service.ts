@@ -6,6 +6,7 @@
 import {
   Injectable,
   NotFoundException,
+  BadRequestException,
   Inject,
   Logger,
 } from '@nestjs/common';
@@ -208,7 +209,7 @@ export class TaskService {
       .first();
 
     if (!member) {
-      throw new Error('Assignee must be a member of the project\'s workspace (department)');
+      throw new BadRequestException('Assignee must be a member of the project\'s workspace (department)');
     }
   }
 
@@ -460,7 +461,7 @@ export class TaskService {
 
     // Prevent self-dependency
     if (input.taskId === input.dependsOnTaskId) {
-      throw new Error('A task cannot depend on itself');
+      throw new BadRequestException('A task cannot depend on itself');
     }
 
     const [dependency] = await this.db('task_dependencies')
