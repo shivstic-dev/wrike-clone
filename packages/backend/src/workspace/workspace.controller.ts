@@ -13,8 +13,8 @@ export class WorkspaceController {
 
   @Get()
   @Permissions('workspace:read')
-  async findAll() {
-    return this.workspaceService.findAll();
+  async findAll(@CurrentUser() user: any) {
+    return this.workspaceService.findAllForUser(user);
   }
 
   @Get(':id')

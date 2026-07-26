@@ -33,6 +33,33 @@ export class WorkspaceService {
     return ctx;
   }
 
+  async findAllForUser(user: any) {
+    if (!user?.tenantId || !user?.userId) {
+      throw new Error('User information missing from token');
+    }
+
+    let query = this.db('workspaces')
+      .where({ tenant_id: user.tenantId, deleted_at: null })
+      .orderBy('sort_order', 'asc');
+
+    // Apply visibility: non-admin users only see workspaces they're members of
+    if (user.role !== 'admin') {
+      query = query.where((b) =>
+        b.whereIn('id', function () {
+          this.select('workspace_id').from('workspace_members').where('user_id', user.userId);
+        }).orWhereIn('id', function () {
+          this.select('folders.workspace_id')
+            .from('folders')
+            .join('projects', 'projects.folder_id', 'folders.id')
+            .where('projects.visibility', 'organization')
+            .andWhere('projects.deleted_at', null);
+        }),
+      );
+    }
+
+    return query;
+  }
+
   async findAll() {
     const ctx = this.getContext();
     let query = this.db('workspaces')
