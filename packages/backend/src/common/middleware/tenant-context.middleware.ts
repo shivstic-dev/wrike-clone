@@ -23,6 +23,9 @@ export class TenantContextMiddleware implements NestMiddleware {
         permissions: user.permissions || [],
       };
 
+      // Set tenant context and also attach to request for fallback
+      (req as any).tenantContext = ctx;
+      
       tenantContext.run(ctx, () => {
         // Also set the Postgres session variable for RLS
         if (ctx.tenantId) {

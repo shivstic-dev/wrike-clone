@@ -3,25 +3,46 @@
  * Phase 1: Added workspace_members endpoints for department-based access control.
  */
 
-import { Injectable, NotFoundException, Inject, Logger, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, Logger, ForbiddenException, Scope } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
 import { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
 import { hash } from 'bcrypt';
 import { DATABASE_PROVIDER } from '../database/database.module';
-import { requireTenantContext } from '../common/tenant-context';
+import { requireTenantContext, getTenantContext, TenantContextData } from '../common/tenant-context';
 import { applyVisibilityScope } from '../common/visibility.scope';
 import type { CreateWorkspaceInput, UpdateWorkspaceRequest } from '@wrike-clone/shared';
 
 const SALT_ROUNDS = 12;
 
-@Injectable()
+@Injectable({ scope: Scope.REQUEST })
 export class WorkspaceService {
   private readonly logger = new Logger(WorkspaceService.name);
 
-  constructor(@Inject(DATABASE_PROVIDER) private readonly db: Knex) {}
+  constructor(
+    @Inject(DATABASE_PROVIDER) private readonly db: Knex,
+    @Inject(REQUEST) private readonly request: Request,
+  ) {}
+
+  private getContext(): TenantContextData {
+    // Try AsyncLocalStorage first
+    let ctx = getTenantContext();
+    
+    // Fallback to request object if AsyncLocalStorage lost context
+    if (!ctx && (this.request as any).tenantContext) {
+      ctx = (this.request as any).tenantContext;
+    }
+    
+    if (!ctx) {
+      throw new Error('Tenant context not available');
+    }
+    
+    return ctx;
+  }
 
   async findAll() {
-    const ctx = requireTenantContext();
+    const ctx = this.getContext();
     let query = this.db('workspaces')
       .where({ tenant_id: ctx.tenantId, deleted_at: null })
       .orderBy('sort_order', 'asc');
@@ -46,7 +67,7 @@ export class WorkspaceService {
   }
 
   async findById(id: string) {
-    const ctx = requireTenantContext();
+    const ctx = this.getContext();
     const ws = await this.db('workspaces')
       .where({ id, tenant_id: ctx.tenantId, deleted_at: null })
       .first();
@@ -55,7 +76,7 @@ export class WorkspaceService {
   }
 
   async create(input: CreateWorkspaceInput) {
-    const ctx = requireTenantContext();
+    const ctx = this.getContext();
     const id = uuidv4();
     const [ws] = await this.db('workspaces')
       .insert({
@@ -72,7 +93,7 @@ export class WorkspaceService {
   }
 
   async update(id: string, input: UpdateWorkspaceRequest) {
-    const ctx = requireTenantContext();
+    const ctx = this.getContext();
     await this.findById(id); // ensure exists
     const updates: Record<string, unknown> = {};
     if (input.name !== undefined) updates['name'] = input.name;
@@ -87,7 +108,7 @@ export class WorkspaceService {
   }
 
   async remove(id: string): Promise<void> {
-    const ctx = requireTenantContext();
+    const ctx = this.getContext();
     await this.findById(id);
     await this.db('workspaces').where({ id, tenant_id: ctx.tenantId }).update({ deleted_at: new Date() });
     this.logger.log(`Workspace ${id} deleted`);
@@ -99,7 +120,7 @@ export class WorkspaceService {
    * List members of a workspace (department).
    */
   async findMembers(workspaceId: string) {
-    const ctx = requireTenantContext();
+    const ctx = this.getContext();
     // Verify workspace exists
     await this.findById(workspaceId);
 
@@ -135,7 +156,7 @@ export class WorkspaceService {
       role: string;
     },
   ) {
-    const ctx = requireTenantContext();
+    const ctx = this.getContext();
     await this.findById(workspaceId);
 
     // Find or create user
@@ -218,7 +239,7 @@ export class WorkspaceService {
    * Update a workspace member's role.
    */
   async updateMemberRole(workspaceId: string, userId: string, role: string) {
-    const ctx = requireTenantContext();
+    const ctx = this.getContext();
     await this.findById(workspaceId);
 
     const member = await this.db('workspace_members')
@@ -241,7 +262,7 @@ export class WorkspaceService {
    * Also invalidates their refresh tokens for security.
    */
   async removeMember(workspaceId: string, userId: string): Promise<void> {
-    const ctx = requireTenantContext();
+    const ctx = this.getContext();
     await this.findById(workspaceId);
 
     const member = await this.db('workspace_members')
@@ -273,7 +294,7 @@ export class WorkspaceService {
    * Check if a user is a dept_admin of a workspace.
    */
   async isDeptAdmin(workspaceId: string, userId: string): Promise<boolean> {
-    const ctx = requireTenantContext();
+    const ctx = this.getContext();
     const member = await this.db('workspace_members')
       .where({ workspace_id: workspaceId, user_id: userId, role: 'dept_admin', tenant_id: ctx.tenantId })
       .first();
@@ -291,7 +312,7 @@ export class WorkspaceService {
     changes: Record<string, unknown>,
   ): Promise<void> {
     try {
-      const ctx = requireTenantContext();
+      const ctx = this.getContext();
       await this.db('activity_logs').insert({
         id: uuidv4(),
         tenant_id: ctx.tenantId,
