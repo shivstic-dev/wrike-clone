@@ -58,6 +58,9 @@ export class AuthService {
 
     // Resolve tenant slug — use DEFAULT_TENANT_SLUG if set (single-tenant deployment)
     const tenantSlug = appConfig.defaultTenantSlug || input.tenantSlug;
+    if (!tenantSlug) {
+      throw new UnauthorizedException('Tenant slug is required');
+    }
 
     // First, find the tenant by slug
     const tenant = await this.db('tenants').where({ slug: tenantSlug, deleted_at: null }).first();

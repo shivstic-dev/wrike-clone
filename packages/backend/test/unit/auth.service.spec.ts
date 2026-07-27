@@ -89,6 +89,24 @@ describe('AuthService', () => {
         .rejects.toThrow(UnauthorizedException);
     });
 
+    it('rejects a missing tenant slug without querying the database', async () => {
+      const previousDefaultTenant = process.env.DEFAULT_TENANT_SLUG;
+      delete process.env.DEFAULT_TENANT_SLUG;
+
+      try {
+        await expect(
+          service.login({ email: 'admin@acme.com', password: 'password123' }),
+        ).rejects.toThrow('Tenant slug is required');
+        expect(mockDb).not.toHaveBeenCalled();
+      } finally {
+        if (previousDefaultTenant === undefined) {
+          delete process.env.DEFAULT_TENANT_SLUG;
+        } else {
+          process.env.DEFAULT_TENANT_SLUG = previousDefaultTenant;
+        }
+      }
+    });
+
     it('rejects invalid email', async () => {
       qb.first.mockResolvedValueOnce({ id: 'tenant-1', settings: '{}' }).mockResolvedValueOnce(null);
       await expect(service.login({ email: 'wrong@email.com', password: 'pwd', tenantSlug: 'acme' }))

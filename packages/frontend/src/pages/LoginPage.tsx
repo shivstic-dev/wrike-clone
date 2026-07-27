@@ -2,6 +2,14 @@ import { useState, type FormEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTenant } from '../contexts/TenantContext';
 import toast from 'react-hot-toast';
+
+export function resolveLoginTenantSlug(
+  enteredSlug: string,
+  savedTenantSlug: string,
+): string | undefined {
+  return enteredSlug.trim() || savedTenantSlug.trim() || undefined;
+}
+
 export default function LoginPage() {
   const { login } = useAuth();
   const { tenantSlug, setTenantSlug } = useTenant();
@@ -22,7 +30,9 @@ export default function LoginPage() {
 
     setIsSubmitting(true);
     try {
-      const finalSlug = showSlugField ? slug.trim() : undefined;
+      // A saved tenant hides the field, but the API still needs its slug when
+      // DEFAULT_TENANT_SLUG is not configured on the backend.
+      const finalSlug = resolveLoginTenantSlug(slug, tenantSlug);
       if (finalSlug) setTenantSlug(finalSlug);
       await login({
         ...(finalSlug ? { tenantSlug: finalSlug } : {}),

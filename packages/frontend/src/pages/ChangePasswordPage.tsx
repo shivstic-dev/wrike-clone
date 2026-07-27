@@ -38,8 +38,11 @@ export default function ChangePasswordPage() {
         currentPassword,
         newPassword,
       });
-      toast.success('Password changed successfully');
-      navigate('/dashboard');
+      // The backend revokes every existing session after a password change.
+      // End the now-invalid frontend session and establish a fresh login.
+      await logout();
+      toast.success('Password changed. Sign in with your new password.');
+      navigate('/login', { replace: true });
     } catch (err: unknown) {
       const message =
         err instanceof Object && 'response' in err
