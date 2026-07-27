@@ -50,6 +50,8 @@ COPY --from=builder /app/packages/shared/package.json packages/shared/package.js
 COPY --from=builder /app/packages/shared/dist packages/shared/dist
 COPY --from=builder /app/packages/backend/package.json packages/backend/package.json
 COPY --from=builder /app/packages/backend/dist packages/backend/dist
+# The last database migrations load their SQL from this repository directory.
+COPY supabase/migrations supabase/migrations
 
 # Drop privileges
 USER appuser

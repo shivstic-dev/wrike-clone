@@ -43,12 +43,14 @@ export class EmailService {
 
   constructor() {
     this.fromAddress = process.env['EMAIL_FROM'] || 'noreply@wrikeclone.app';
-    this.enabled = !!(process.env['SMTP_HOST'] && process.env['SMTP_PORT']);
+    this.enabled = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'EMAIL_FROM'].every(
+      (name) => Boolean(process.env[name]),
+    );
 
     if (this.enabled) {
       this.initTransporter();
     } else {
-      this.logger.warn('SMTP not configured (SMTP_HOST/SMTP_PORT). Emails will be logged only.');
+      this.logger.warn('SMTP is incomplete or not configured. Emails will be logged only.');
     }
   }
 

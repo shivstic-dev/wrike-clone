@@ -55,15 +55,28 @@ export interface SupabaseStorageConfig {
   bucket: string;
 }
 
+export function parseCorsOrigins(
+  rawValue = process.env['CORS_ORIGINS'] || 'http://localhost:5173',
+): string[] {
+  return rawValue
+    .split(',')
+    .map((value) => value.trim().replace(/^['"]+|['"]+$/g, ''))
+    .filter(Boolean)
+    .map((value) => {
+      try {
+        return new URL(value).origin;
+      } catch {
+        return value.replace(/\/+$/, '');
+      }
+    });
+}
+
 export function loadAppConfig(): AppConfig {
   return {
     nodeEnv: process.env['NODE_ENV'] || 'development',
     port: parseInt(process.env['APP_PORT'] || process.env['PORT'] || '4000', 10),
     apiPrefix: process.env['API_PREFIX'] || '/api/v1',
-    corsOrigins: (process.env['CORS_ORIGINS'] || 'http://localhost:5173')
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean),
+    corsOrigins: parseCorsOrigins(),
     encryptionKey: process.env['ENCRYPTION_KEY'] || 'dev-key-change-in-prod',
     defaultTenantSlug: process.env['DEFAULT_TENANT_SLUG'] || undefined,
   };
@@ -80,10 +93,7 @@ export function validateProductionConfig(): void {
   const problems: string[] = [];
   const jwtSecret = process.env['JWT_SECRET'] || '';
   const encryptionKey = process.env['ENCRYPTION_KEY'] || '';
-  const corsOrigins = (process.env['CORS_ORIGINS'] || '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+  const corsOrigins = parseCorsOrigins(process.env['CORS_ORIGINS'] || '');
 
   if (!process.env['DATABASE_URL']) problems.push('DATABASE_URL is required');
   if (jwtSecret.length < 32) problems.push('JWT_SECRET must be at least 32 characters');
@@ -102,17 +112,8 @@ export function validateProductionConfig(): void {
     problems.push('DB_APP_ROLE must be set to openwork_app');
   }
   if (process.env['DB_SSL'] !== 'true') problems.push('DB_SSL must be true');
-  if (!process.env['SUPABASE_URL']?.startsWith('https://')) {
-    problems.push('SUPABASE_URL must be an HTTPS URL');
-  }
-  if (!process.env['SUPABASE_SERVICE_ROLE_KEY']) {
-    problems.push('SUPABASE_SERVICE_ROLE_KEY is required');
-  }
   if (!process.env['APP_PUBLIC_URL']?.startsWith('https://')) {
     problems.push('APP_PUBLIC_URL must be an HTTPS URL');
-  }
-  for (const name of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'EMAIL_FROM']) {
-    if (!process.env[name]) problems.push(`${name} is required`);
   }
 
   if (problems.length > 0) {

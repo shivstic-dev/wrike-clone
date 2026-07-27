@@ -11,6 +11,7 @@ WORKDIR /app
 
 # Copy dependency manifests
 COPY package.json package-lock.json ./
+COPY packages/shared/package.json packages/shared/package.json
 COPY packages/frontend/package.json packages/frontend/package.json
 
 # Install dependencies (workspace root install)
@@ -18,10 +19,13 @@ RUN npm ci --include-workspace-root --no-audit --no-fund
 
 # Copy source code
 COPY tsconfig.base.json ./
+COPY packages/shared/tsconfig.json packages/shared/tsconfig.json
+COPY packages/shared/src packages/shared/src
 COPY packages/frontend/tsconfig.json packages/frontend/tsconfig.json
 COPY packages/frontend/ packages/frontend/
 
-# Build the frontend
+# Build the shared workspace before the frontend that imports it
+RUN npm run build -w packages/shared
 RUN npm run build -w packages/frontend
 
 # ──────────────────────────────────────────────
