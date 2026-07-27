@@ -86,23 +86,3 @@ CREATE POLICY tenant_isolation ON role_change_log FOR ALL TO openwork_app
   WITH CHECK (tenant_id = current_tenant_id());
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON task_assignees, role_change_log TO openwork_app;
-
--- Knex's bookkeeping tables live in public but are never application data.
--- Hide them from PostgREST roles while retaining access for the migration
--- connection (the Supabase postgres role bypasses RLS).
-DO $$
-BEGIN
-  IF to_regclass('public.knex_migrations') IS NOT NULL THEN
-    ALTER TABLE knex_migrations ENABLE ROW LEVEL SECURITY;
-    ALTER TABLE knex_migrations FORCE ROW LEVEL SECURITY;
-    CREATE POLICY knex_migrations_no_api_access ON knex_migrations
-      FOR ALL USING (false) WITH CHECK (false);
-  END IF;
-  IF to_regclass('public.knex_migrations_lock') IS NOT NULL THEN
-    ALTER TABLE knex_migrations_lock ENABLE ROW LEVEL SECURITY;
-    ALTER TABLE knex_migrations_lock FORCE ROW LEVEL SECURITY;
-    CREATE POLICY knex_migrations_lock_no_api_access ON knex_migrations_lock
-      FOR ALL USING (false) WITH CHECK (false);
-  END IF;
-END
-$$;
