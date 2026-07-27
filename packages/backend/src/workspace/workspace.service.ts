@@ -293,21 +293,28 @@ export class WorkspaceService {
   ) {
     const ctx = this.getContext();
     await this.findById(workspaceId);
+    const email = input.email.trim().toLowerCase();
 
     // Find or create user
-    let user = await this.db('users').where({ email: input.email }).first();
+    let user = await this.db('users').where({ email }).first();
     if (!user) {
       const id = uuidv4();
       const passwordHash = await hash(input.tempPassword, SALT_ROUNDS);
-      [user] = await this.db('users')
-        .insert({
-          id,
-          email: input.email,
-          display_name: input.displayName,
-          password_hash: passwordHash,
-          must_change_password: true,
-        })
-        .returning('*');
+      // Do not use RETURNING here. The users SELECT policy only exposes users
+      // after their tenant_memberships row exists, so RETURNING would make
+      // Postgres reject this otherwise-authorized bootstrap insert under RLS.
+      await this.db('users').insert({
+        id,
+        email,
+        display_name: input.displayName,
+        password_hash: passwordHash,
+        must_change_password: true,
+      });
+      user = {
+        id,
+        email,
+        display_name: input.displayName,
+      };
     }
 
     // Ensure tenant membership exists
@@ -354,11 +361,11 @@ export class WorkspaceService {
       .returning('*');
     await this.setDepartmentHead(workspaceId, user.id, input.role === 'department_head');
 
-    this.logger.log(`User ${input.email} added to workspace ${workspaceId} as ${input.role}`);
+    this.logger.log(`User ${email} added to workspace ${workspaceId} as ${input.role}`);
 
     // Log activity
     await this.logActivity(ctx.userId, 'workspace_member', member.id, 'workspace:member:added', {
-      email: input.email,
+      email,
       workspaceId,
       role: input.role,
     });
