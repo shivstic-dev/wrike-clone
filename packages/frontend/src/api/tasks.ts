@@ -48,8 +48,10 @@ export function useTask(id: string) {
   return useQuery({
     queryKey: taskKeys.detail(id),
     queryFn: async () => {
-      const { data } = await apiClient.get<{ data: Task }>(`/tasks/${id}`);
-      return data.data;
+      const response = await apiClient.get(`/tasks/${id}`);
+      // Backend returns task object directly, not wrapped in { data: ... }
+      if (response.data?.data) return response.data.data as Task;
+      return response.data as Task;
     },
     enabled: !!id,
   });

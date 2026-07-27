@@ -6,6 +6,7 @@ import { ErrorDisplay } from '../components/common/ErrorDisplay';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { EmptyState } from '../components/common/EmptyState';
 import CustomizationPanel from '../components/Customization/CustomizationPanel';
+import WebhooksPanel from '../components/Webhooks/WebhooksPanel';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 
@@ -177,7 +178,7 @@ function WorkspaceMembers({ workspaceId }: { workspaceId: string }) {
 // ---- Main Admin Page ----
 
 export default function AdminPage() {
-  const [activeSection, setActiveSection] = useState<'members' | 'customization'>('members');
+  const [activeSection, setActiveSection] = useState<'members' | 'customization' | 'webhooks'>('members');
   const { data: workspaces, isLoading: wsLoading, error: wsError } = useWorkspaces();
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
 
@@ -216,6 +217,17 @@ export default function AdminPage() {
           )}
         >
           Customization
+        </button>
+        <button
+          onClick={() => setActiveSection('webhooks')}
+          className={clsx(
+            'pb-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
+            activeSection === 'webhooks'
+              ? 'border-primary-600 text-primary-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700',
+          )}
+        >
+          Webhooks
         </button>
       </div>
 
@@ -274,6 +286,12 @@ export default function AdminPage() {
       {activeSection === 'customization' && (
         <div className="card p-6">
           <CustomizationPanel />
+        </div>
+      )}
+
+      {activeSection === 'webhooks' && (
+        <div className="card p-6">
+          <WebhooksPanel />
         </div>
       )}
     </div>

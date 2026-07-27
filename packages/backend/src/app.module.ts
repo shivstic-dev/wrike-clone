@@ -32,6 +32,7 @@ import { HealthModule } from './health/health.module';
 import { CustomizationModule } from './customization/customization.module';
 import { EmailModule } from './email/email.module';
 import { ScheduleModule } from './schedule/schedule.module';
+import { CopilotModule } from './copilot/copilot.module';
 
 // Conditionally register BullMQ only when Redis is configured
 const queueImports: any[] = [];
@@ -86,6 +87,7 @@ if (process.env['REDIS_HOST']) {
     CustomizationModule,
     EmailModule,
     ScheduleModule,
+    CopilotModule,
   ],
   providers: [
     {

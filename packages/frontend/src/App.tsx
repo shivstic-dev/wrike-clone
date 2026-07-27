@@ -19,6 +19,7 @@ import TimesheetsPage from './pages/TimesheetsPage';
 import SearchPage from './pages/SearchPage';
 import SchedulePage from './pages/SchedulePage';
 import PublicFormPage from './pages/PublicFormPage';
+import CopilotWidget from './components/Copilot/CopilotWidget';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 
 const queryClient = new QueryClient({
@@ -71,6 +72,7 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <DashboardLayout />
+                    <CopilotWidget />
                   </ProtectedRoute>
                 }
               >

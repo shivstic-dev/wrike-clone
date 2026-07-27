@@ -35,8 +35,12 @@ export function useWorkspaces() {
   return useQuery({
     queryKey: workspaceKeys.list(),
     queryFn: async () => {
-      const { data } = await apiClient.get<{ data: Workspace[] }>('/workspaces');
-      return data.data;
+      const response = await apiClient.get('/workspaces');
+      // Backend returns raw array directly, not wrapped in { data: [...] }
+      const data = response.data;
+      if (Array.isArray(data)) return data as Workspace[];
+      if (data && Array.isArray(data.data)) return data.data as Workspace[];
+      return [];
     },
   });
 }
@@ -45,8 +49,9 @@ export function useWorkspace(id: string) {
   return useQuery({
     queryKey: workspaceKeys.detail(id),
     queryFn: async () => {
-      const { data } = await apiClient.get<{ data: Workspace }>(`/workspaces/${id}`);
-      return data.data;
+      const response = await apiClient.get(`/workspaces/${id}`);
+      // Backend returns the workspace object directly (not wrapped in { data })
+      return response.data as Workspace;
     },
     enabled: !!id,
   });
@@ -89,10 +94,11 @@ export function useFolderTree(workspaceId: string) {
   return useQuery({
     queryKey: folderKeys.tree(workspaceId),
     queryFn: async () => {
-      const { data } = await apiClient.get<{ data: Folder[] }>(
-        `/workspaces/${workspaceId}/folders`,
-      );
-      return data.data;
+      const response = await apiClient.get(`/workspaces/${workspaceId}/folders`);
+      const data = response.data;
+      if (Array.isArray(data)) return data as Folder[];
+      if (data && Array.isArray(data.data)) return data.data as Folder[];
+      return [];
     },
     enabled: !!workspaceId,
   });
@@ -104,10 +110,11 @@ export function useWorkspaceProjects(workspaceId: string) {
   return useQuery({
     queryKey: workspaceKeys.projects(workspaceId),
     queryFn: async () => {
-      const { data } = await apiClient.get<{ data: Project[] }>(
-        `/workspaces/${workspaceId}/projects`,
-      );
-      return data.data;
+      const response = await apiClient.get(`/workspaces/${workspaceId}/projects`);
+      const data = response.data;
+      if (Array.isArray(data)) return data as Project[];
+      if (data && Array.isArray(data.data)) return data.data as Project[];
+      return [];
     },
     enabled: !!workspaceId,
   });
@@ -117,8 +124,10 @@ export function useProject(id: string) {
   return useQuery({
     queryKey: projectKeys.detail(id),
     queryFn: async () => {
-      const { data } = await apiClient.get<{ data: Project }>(`/projects/${id}`);
-      return data.data;
+      const response = await apiClient.get(`/projects/${id}`);
+      // Backend returns project object directly (not wrapped in { data })
+      if (response.data?.data) return response.data.data as Project;
+      return response.data as Project;
     },
     enabled: !!id,
   });
