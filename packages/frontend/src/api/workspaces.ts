@@ -6,6 +6,8 @@ import type {
   Project,
   CreateWorkspaceRequest,
   UpdateWorkspaceRequest,
+  CreateFolderRequest,
+  CreateProjectRequest,
 } from '@wrike-clone/shared';
 
 // ---- Query key factory ----
@@ -173,6 +175,23 @@ export function useFolderTree(workspaceId: string) {
   });
 }
 
+export function useCreateFolder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: CreateFolderRequest) => {
+      const { data } = await apiClient.post<Folder>('/folders', input);
+      return data;
+    },
+    onSuccess: (folder) => {
+      queryClient.setQueryData<Folder[]>(folderKeys.tree(folder.workspaceId), (current = []) =>
+        current.some((item) => item.id === folder.id) ? current : [...current, folder],
+      );
+      queryClient.invalidateQueries({ queryKey: folderKeys.tree(folder.workspaceId) });
+    },
+  });
+}
+
 // ---- Project Hooks ----
 
 export function useWorkspaceProjects(workspaceId: string) {
@@ -201,5 +220,22 @@ export function useProject(id: string) {
       return response.data as Project;
     },
     enabled: !!id,
+  });
+}
+
+export function useCreateProject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      workspaceId,
+      ...input
+    }: CreateProjectRequest & { workspaceId: string }) => {
+      const { data } = await apiClient.post<Project>('/projects', input);
+      return data;
+    },
+    onSuccess: (_project, variables) => {
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.projects(variables.workspaceId) });
+    },
   });
 }
