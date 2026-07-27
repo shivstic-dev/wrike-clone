@@ -46,28 +46,35 @@ export class WorkspaceService {
       throw new ForbiddenException('User information missing from request context');
     }
 
-    let query = this.db('workspaces')
-      .where('workspaces.tenant_id', tenantId)
-      .whereNull('workspaces.deleted_at')
-      .orderBy('workspaces.sort_order', 'asc');
+    try {
+      let query = this.db('workspaces')
+        .where('workspaces.tenant_id', tenantId)
+        .whereNull('workspaces.deleted_at')
+        .orderBy('workspaces.sort_order', 'asc');
 
-    // Apply visibility: non-admin users only see workspaces they're members of
-    if (role !== 'admin') {
-      query = query.where((b) =>
-        b.whereIn('workspaces.id', function () {
-          this.select('workspace_id').from('workspace_members').where('user_id', userId);
-        }).orWhereIn('workspaces.id', function () {
-          this.select('folders.workspace_id')
-            .from('folders')
-            .join('projects', 'projects.folder_id', 'folders.id')
-            .where('projects.visibility', 'organization')
-            .whereNull('projects.deleted_at')
-            .whereNull('folders.deleted_at');
-        }),
-      );
+      // Apply visibility: admin users see all workspaces, others see only their workspaces
+      if (role !== 'admin') {
+        query = query.where((b) =>
+          b.whereIn('workspaces.id', function () {
+            this.select('workspace_id').from('workspace_members').where('user_id', userId);
+          }).orWhereIn('workspaces.id', function () {
+            this.select('folders.workspace_id')
+              .from('folders')
+              .join('projects', 'projects.folder_id', 'folders.id')
+              .where('projects.visibility', 'organization')
+              .whereNull('projects.deleted_at')
+              .whereNull('folders.deleted_at');
+          }),
+        );
+      }
+
+      const result = await query;
+      this.logger.debug(`findAllForUser returned ${result.length} workspaces`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Error in findAllForUser: ${error.message}`, error.stack);
+      throw error;
     }
-
-    return query;
   }
 
   async findAll() {
