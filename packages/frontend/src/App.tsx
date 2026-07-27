@@ -12,6 +12,13 @@ import TaskDetailPage from './pages/TaskDetailPage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
 import MyTasksPage from './pages/MyTasksPage';
 import AdminPage from './pages/AdminPage';
+import CalendarPage from './pages/CalendarPage';
+import ReportsPage from './pages/ReportsPage';
+import PortfolioPage from './pages/PortfolioPage';
+import TimesheetsPage from './pages/TimesheetsPage';
+import SearchPage from './pages/SearchPage';
+import SchedulePage from './pages/SchedulePage';
+import PublicFormPage from './pages/PublicFormPage';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 
 const queryClient = new QueryClient({
@@ -71,10 +78,19 @@ export default function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/my-tasks" element={<MyTasksPage />} />
                 <Route path="/admin" element={<AdminPage />} />
+                <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/reports" element={<ReportsPage />} />
+                <Route path="/portfolio" element={<PortfolioPage />} />
+                <Route path="/timesheets" element={<TimesheetsPage />} />
+                <Route path="/schedule" element={<SchedulePage />} />
                 <Route path="/workspaces/:workspaceId" element={<WorkspacePage />} />
                 <Route path="/projects/:projectId" element={<ProjectPage />} />
+                <Route path="/search" element={<SearchPage />} />
                 <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
               </Route>
+
+              {/* Public routes (no auth required) */}
+              <Route path="/forms/:formId" element={<PublicFormPage />} />
 
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

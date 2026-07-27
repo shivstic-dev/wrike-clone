@@ -563,6 +563,12 @@ ALTER TABLE webhooks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE file_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE file_annotations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace_statuses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE request_forms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE working_hours ENABLE ROW LEVEL SECURITY;
+ALTER TABLE time_off ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_holidays ENABLE ROW LEVEL SECURITY;
 
 -- Generic RLS policy: rows visible only if tenant_id matches the session setting.
 -- Application sets `app.current_tenant_id` at login; all subsequent queries
@@ -581,7 +587,9 @@ DECLARE
     'task_comments', 'activity_logs', 'time_entries',
     'custom_field_definitions', 'item_types', 'approval_chains', 'approval_steps',
     'approval_requests', 'approval_votes', 'notifications', 'webhooks', 
-    'files', 'file_versions', 'file_annotations'
+    'files', 'file_versions', 'file_annotations',
+    'workspace_statuses', 'project_templates', 'request_forms',
+    'working_hours', 'time_off', 'tenant_holidays'
   ];
   t TEXT;
 BEGIN
@@ -602,7 +610,9 @@ DECLARE
   tables_with_updated_at TEXT[] := ARRAY[
     'tenants', 'users', 'workspaces', 'folders', 'projects', 'tasks',
     'task_comments', 'time_entries', 'custom_field_definitions', 'item_types',
-    'approval_chains', 'automation_rules', 'webhooks', 'files'
+    'approval_chains', 'automation_rules', 'webhooks', 'files',
+    'workspace_statuses', 'project_templates', 'request_forms',
+    'working_hours', 'time_off', 'tenant_holidays'
   ];
   t TEXT;
 BEGIN

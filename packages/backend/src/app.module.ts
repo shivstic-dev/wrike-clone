@@ -29,6 +29,9 @@ import { TimelogModule } from './timelog/timelog.module';
 import { WebhookModule } from './webhook/webhook.module';
 import { SearchModule } from './search/search.module';
 import { HealthModule } from './health/health.module';
+import { CustomizationModule } from './customization/customization.module';
+import { EmailModule } from './email/email.module';
+import { ScheduleModule } from './schedule/schedule.module';
 
 // Conditionally register BullMQ only when Redis is configured
 const queueImports: any[] = [];
@@ -80,6 +83,9 @@ if (process.env['REDIS_HOST']) {
     TimelogModule,
     WebhookModule,
     SearchModule,
+    CustomizationModule,
+    EmailModule,
+    ScheduleModule,
   ],
   providers: [
     {

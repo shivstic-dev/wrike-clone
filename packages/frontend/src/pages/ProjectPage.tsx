@@ -7,14 +7,17 @@ import { KanbanBoard } from '../components/Kanban/KanbanBoard';
 import { ErrorDisplay } from '../components/common/ErrorDisplay';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { EmptyState } from '../components/common/EmptyState';
+import { GanttChart } from '../components/Gantt/GanttChart';
+import { CalendarView } from '../components/Calendar/CalendarView';
 import { clsx } from 'clsx';
 
-type Tab = 'tasks' | 'board' | 'timeline' | 'files';
+type Tab = 'tasks' | 'board' | 'timeline' | 'calendar' | 'files';
 
 const tabs: { key: Tab; label: string }[] = [
   { key: 'tasks', label: 'Tasks' },
   { key: 'board', label: 'Board' },
   { key: 'timeline', label: 'Timeline' },
+  { key: 'calendar', label: 'Calendar' },
   { key: 'files', label: 'Files' },
 ];
 
@@ -55,7 +58,7 @@ export default function ProjectPage() {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">{project.folderId}</h1>
+            <h1 className="text-2xl font-bold text-slate-900">{project.name || project.folderId}</h1>
             {project.dueDate && (
               <p className="mt-1 text-sm text-slate-500">
                 Due {new Date(project.dueDate).toLocaleDateString()}
@@ -118,7 +121,23 @@ export default function ProjectPage() {
       )}
 
       {activeTab === 'timeline' && (
-        <EmptyState title="Timeline view" description="Timeline and Gantt chart view coming soon." />
+        <div>
+          {tasks.length > 0 ? (
+            <GanttChart tasks={tasks} />
+          ) : (
+            <EmptyState title="No tasks to display" description="Add tasks to see them on the timeline." />
+          )}
+        </div>
+      )}
+
+      {activeTab === 'calendar' && (
+        <div>
+          {tasks.length > 0 ? (
+            <CalendarView tasks={tasks} />
+          ) : (
+            <EmptyState title="No tasks to display" description="Add tasks to see them on the calendar." />
+          )}
+        </div>
       )}
 
       {activeTab === 'files' && (

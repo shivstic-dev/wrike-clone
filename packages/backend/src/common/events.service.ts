@@ -12,6 +12,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AutomationService } from '../automation/automation.service';
 import { NotificationService } from '../notification/notification.service';
+import { WebhookService } from '../webhook/webhook.service';
 
 export interface TriggerEvent {
   event: string;
@@ -29,12 +30,14 @@ export class EventsService {
   constructor(
     private readonly automationService: AutomationService,
     private readonly notificationService: NotificationService,
+    private readonly webhookService: WebhookService,
   ) {}
 
   /**
    * Emit a trigger event. In v1 this runs synchronously:
    * 1. Evaluates automation rules and executes matching actions.
    * 2. Fans out in-app notifications.
+   * 3. Fires webhook events to external integrations.
    *
    * In Phase 6 this will push to BullMQ queues instead.
    */
@@ -51,6 +54,13 @@ export class EventsService {
       await this.notificationService.fanOutSync(event, payload);
     } catch (err) {
       this.logger.warn(`Notification fan-out failed for event ${event}: ${(err as Error).message}`);
+    }
+
+    try {
+      // Deliver webhook events to external integrations
+      await this.webhookService.fireEvent(event, payload);
+    } catch (err) {
+      this.logger.warn(`Webhook delivery failed for event ${event}: ${(err as Error).message}`);
     }
   }
 }

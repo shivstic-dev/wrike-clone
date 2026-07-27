@@ -71,8 +71,8 @@ export class WorkspaceService {
       const result = await query;
       this.logger.debug(`findAllForUser returned ${result.length} workspaces`);
       return result;
-    } catch (error) {
-      this.logger.error(`Error in findAllForUser: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      this.logger.error(`Error in findAllForUser: ${(error as Error).message}`, (error as Error).stack);
       throw error;
     }
   }

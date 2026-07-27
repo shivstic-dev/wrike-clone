@@ -4,34 +4,77 @@ A full-stack project management application inspired by Wrike, built with NestJS
 
 ## 🚀 Features
 
+### Core Management
 - **Multi-tenant Architecture** with Row-Level Security (RLS)
 - **Workspaces & Projects** with hierarchical folder structure
 - **Task Management** with dependencies, assignees, and custom fields
 - **Real-time Collaboration** with comments and notifications
-- **Kanban & Table Views** for task visualization
+- **Kanban, Table, Gantt Chart & Calendar Views** for task visualization
 - **Approval Workflows** with multi-step chains
 - **Automation Rules** with event-driven actions
-- **Time Tracking** with billable hours
-- **Webhooks** for external integrations
-- **RBAC** (Role-Based Access Control)
+- **Time Tracking** with billable hours and timesheets
+
+### Customization & Workflow
+- **Custom Fields** — Add extra fields (text, dropdown, date, etc.) to tasks
+- **Custom Item Types** — Define specialized task categories (Bug, Interview, etc.)
+- **Custom Statuses & Workflows** — Per-workspace status sets with custom colors
+- **Blueprints (Templates)** — Save projects as reusable templates
+- **Request Forms** — Intake forms for structured task creation
+
+### Scheduling & Capacity
+- **Work Schedules** — Default working hours per day of week
+- **Time Off Management** — Vacation, sick, and personal day requests with approval
+- **Company Holidays** — Tenant-wide holidays for capacity planning
+
+### Search & Discovery
+- **Global Search** — Full-text search across tasks and projects
+- **Search Page** — Paginated results with type and project filters
+- **PostgreSQL Full-Text Search** (with optional Meilisearch integration)
+
+### Communication
+- **Comments & @Mentions** — Inline discussion on any task
+- **Email Notifications** — SMTP-based alerts (task assigned, new comment, approvals)
+- **Slack/Teams Integration** — Notifications and task creation from chat
+- **Inbox Notifications** — Centralized in-app feed
+- **Activity Stream** — Live log of all workspace changes
+
+### File Management
+- **File Upload & Versioning** — Upload files with automatic version tracking
+- **Proofing & Annotations** — Annotate images/PDFs for design review
+- **Cloud Storage Integrations** — Google Drive, Dropbox, OneDrive attachments
+
+### Analytics & Reports
+- **Dashboards** — Custom dashboards with task metrics and charts
+- **Portfolio View** — Aggregated view across workspaces and projects
+- **Reports & Analytics** — Custom reports with filters and date ranges
+- **Timesheets** — View and export time entries across projects
+
+### Enterprise & Security
+- **Roles & Permissions** — RBAC with custom roles
+- **2FA/MFA** — Two-step verification
+- **Webhooks** — Real-time event notifications for external integrations
+- **API (v4) & Webhooks** — Full REST API with 400 req/min rate limit
+- **Row-Level Security (RLS)** — Database-level tenant isolation
 
 ## 🛠️ Tech Stack
 
 ### Backend
-- **NestJS** - Progressive Node.js framework
-- **PostgreSQL** (Supabase) - Database with RLS
-- **Knex.js** - SQL query builder
-- **JWT** - Authentication
-- **Zod** - Schema validation
-- **BullMQ** - Job queue (optional)
+- **NestJS** — Progressive Node.js framework
+- **PostgreSQL** (Supabase) — Database with RLS
+- **Knex.js** — SQL query builder & migrations
+- **JWT** — Authentication with refresh tokens
+- **Zod** — Schema validation
+- **BullMQ** — Job queue (optional)
+- **Nodemailer** — SMTP email notifications
 
 ### Frontend
 - **React 18** with TypeScript
-- **Vite** - Build tool
-- **TailwindCSS** - Styling
-- **React Query** - Data fetching
-- **React Router** - Navigation
-- **Zustand** - State management
+- **Vite** — Build tool
+- **TailwindCSS** — Styling
+- **React Query** — Data fetching & caching
+- **React Router** — Navigation
+- **date-fns** — Date manipulation
+- **Recharts** — Charts & analytics
 
 ### Shared
 - **Monorepo** with workspace packages
@@ -163,16 +206,21 @@ Once deployed, your API will be available at:
 - `POST /api/v1/auth/change-password` - Change password
 
 ### Resources
-- `/api/v1/tenants` - Tenant management
-- `/api/v1/workspaces` - Workspace CRUD
-- `/api/v1/folders` - Folder hierarchy
-- `/api/v1/projects` - Project management
-- `/api/v1/tasks` - Task operations
-- `/api/v1/notifications` - User notifications
-- `/api/v1/automation` - Automation rules
-- `/api/v1/approvals` - Approval workflows
-- `/api/v1/time-entries` - Time tracking
-- `/api/v1/webhooks` - Webhook configuration
+- `/api/v1/tenants` — Tenant management
+- `/api/v1/workspaces` — Workspace CRUD
+- `/api/v1/folders` — Folder hierarchy
+- `/api/v1/projects` — Project management
+- `/api/v1/tasks` — Task operations
+- `/api/v1/notifications` — User notifications
+- `/api/v1/automation` — Automation rules
+- `/api/v1/approvals` — Approval workflows
+- `/api/v1/time-entries` — Time tracking
+- `/api/v1/webhooks` — Webhook configuration
+- `/api/v1/files` — File upload & versioning
+- `/api/v1/customization` — Custom fields, item types, blueprints, request forms, workspace statuses
+- `/api/v1/search` — Full-text search across tasks and projects
+- `/api/v1/email` — Email notification settings
+- `/api/v1/schedule` — Work schedules, time off, holidays
 
 ## 🧪 Testing
 
@@ -193,22 +241,45 @@ wrike-clone/
 ├── packages/
 │   ├── backend/          # NestJS API
 │   │   ├── src/
-│   │   │   ├── auth/     # Authentication
-│   │   │   ├── task/     # Task module
-│   │   │   ├── project/  # Project module
-│   │   │   └── ...
+│   │   │   ├── auth/            # Authentication
+│   │   │   ├── task/            # Task module
+│   │   │   ├── project/         # Project module
+│   │   │   ├── file/            # File upload & versioning
+│   │   │   ├── search/          # Full-text search
+│   │   │   ├── email/           # Email notifications
+│   │   │   ├── schedule/        # Work schedules & capacity
+│   │   │   ├── customization/   # Custom fields, item types, blueprints
+│   │   │   ├── approval/        # Approval workflows
+│   │   │   ├── automation/      # Automation rules
+│   │   │   ├── notification/    # In-app notifications
+│   │   │   ├── webhook/         # Webhook integrations
+│   │   │   ├── timelog/         # Time tracking
+│   │   │   ├── rbac/            # Role-based access control
+│   │   │   └── migrations/      # Knex database migrations
 │   │   └── test/
+│   │       ├── unit/            # Unit tests
+│   │       └── e2e/             # End-to-end API tests
 │   ├── frontend/         # React app
 │   │   ├── src/
-│   │   │   ├── pages/
-│   │   │   ├── components/
-│   │   │   └── api/
+│   │   │   ├── pages/           # Route pages
+│   │   │   ├── components/      # UI components
+│   │   │   │   ├── Gantt/       # Interactive Gantt chart
+│   │   │   │   ├── Calendar/    # Calendar views
+│   │   │   │   ├── Kanban/      # Kanban board
+│   │   │   │   ├── Portfolio/   # Portfolio view
+│   │   │   │   ├── Reports/     # Reports & analytics
+│   │   │   │   ├── Search/      # Global search bar
+│   │   │   │   ├── Timesheet/   # Timesheet panel
+│   │   │   │   ├── Customization/ # Customization UI
+│   │   │   │   └── ...
+│   │   │   └── api/             # API client
 │   │   └── public/
 │   └── shared/           # Shared types & schemas
 │       └── src/
 ├── docker/               # Docker configs
 ├── docs/                 # Documentation
-└── scripts/              # Utility scripts
+├── scripts/              # Utility scripts & deployment SQL
+└── .github/              # CI/CD workflows
 ```
 
 ## 🔐 Security
@@ -240,6 +311,27 @@ This project is licensed under the MIT License.
 - Inspired by [Wrike](https://www.wrike.com/)
 - Built with [NestJS](https://nestjs.com/)
 - Database by [Supabase](https://supabase.com/)
+
+## 🔐 Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `DATABASE_URL` | PostgreSQL connection string (Supabase) | ✅ |
+| `JWT_SECRET` | JWT signing secret | ✅ |
+| `ENCRYPTION_KEY` | Encryption key (64-char hex) | ✅ |
+| `CORS_ORIGINS` | Allowed CORS origins | ✅ |
+| `SMTP_HOST` | SMTP server hostname | For email |
+| `SMTP_PORT` | SMTP port (default 587) | For email |
+| `SMTP_USER` | SMTP username | For email |
+| `SMTP_PASS` | SMTP password | For email |
+| `MEILISEARCH_HOST` | Meilisearch server URL | For full-text search |
+| `MEILISEARCH_API_KEY` | Meilisearch API key | For full-text search |
+| `STORAGE_DRIVER` | File storage driver (`local` or `s3` / `r2`) | For file uploads |
+| `S3_ENDPOINT` | S3-compatible endpoint (Cloudflare R2, AWS S3) | For S3 storage |
+| `S3_BUCKET` | S3 bucket name | For S3 storage |
+| `S3_REGION` | S3 region | For S3 storage |
+| `S3_ACCESS_KEY_ID` | S3 access key | For S3 storage |
+| `S3_SECRET_ACCESS_KEY` | S3 secret key | For S3 storage |
 
 ## 📧 Contact
 

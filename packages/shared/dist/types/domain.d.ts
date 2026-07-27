@@ -84,6 +84,8 @@ export interface TaskFolderLink {
 export interface Project extends BaseEntity {
     folderId: string;
     ownerId: string;
+    name: string;
+    description: string | null;
     status: 'active' | 'on_hold' | 'completed' | 'cancelled';
     startDate: Timestamp | null;
     dueDate: Timestamp | null;
@@ -91,6 +93,11 @@ export interface Project extends BaseEntity {
     priority: TaskPriority;
     budget: number | null;
     actualCost: number | null;
+    visibility: 'organization' | 'department';
+    taskCounts?: Array<{
+        status: string;
+        count: number | string;
+    }>;
 }
 export interface Task extends BaseEntity {
     projectId: string;
