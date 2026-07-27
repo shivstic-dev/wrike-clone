@@ -30,7 +30,9 @@ function WorkingHoursPanel() {
   return (
     <div className="card p-4">
       <h3 className="text-sm font-semibold text-slate-700 mb-3">My Working Hours</h3>
-      <p className="text-xs text-slate-400 mb-4">Your default working hours per day of the week for capacity planning.</p>
+      <p className="text-xs text-slate-400 mb-4">
+        Your default working hours per day of the week for capacity planning.
+      </p>
       {!userId ? (
         <p className="text-sm text-slate-400">Log in to see your working hours.</p>
       ) : isLoading ? (
@@ -38,13 +40,17 @@ function WorkingHoursPanel() {
       ) : (
         <div className="space-y-2">
           {[1, 2, 3, 4, 5].map((day) => {
-            const dayHours = Array.isArray(hours) ? hours.find((h: any) => h.day_of_week === day) : null;
+            const dayHours = Array.isArray(hours)
+              ? hours.find((h: any) => h.day_of_week === day)
+              : null;
             const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
             return (
               <div key={day} className="flex items-center gap-3 text-sm">
                 <span className="w-12 font-medium text-slate-600">{dayNames[day - 1]}</span>
                 <span className="text-slate-700">
-                  {dayHours ? `${dayHours.start_time} - ${dayHours.end_time}` : 'Not set (default 9:00-17:00)'}
+                  {dayHours
+                    ? `${dayHours.start_time} - ${dayHours.end_time}`
+                    : 'Not set (default 9:00-17:00)'}
                 </span>
               </div>
             );
@@ -61,7 +67,11 @@ function HolidaysPanel() {
   const [holidayName, setHolidayName] = useState('');
   const [holidayDate, setHolidayDate] = useState('');
 
-  const { data: holidays, isLoading, error } = useQuery({
+  const {
+    data: holidays,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['tenant-holidays'],
     queryFn: async () => {
       const { data } = await apiClient.get('/schedule/holidays');
@@ -106,7 +116,10 @@ function HolidaysPanel() {
       ) : isLoading ? (
         <LoadingSpinner />
       ) : !holidays || holidays.length === 0 ? (
-        <EmptyState title="No holidays" description="Add company-wide holidays for capacity planning." />
+        <EmptyState
+          title="No holidays"
+          description="Add company-wide holidays for capacity planning."
+        />
       ) : (
         <div className="divide-y divide-slate-100">
           {holidays.map((h: any) => (
@@ -116,10 +129,18 @@ function HolidaysPanel() {
                 <p className="text-xs text-slate-400">{format(new Date(h.date), 'MMM d, yyyy')}</p>
               </div>
               <button
-                onClick={() => { if (confirm('Remove this holiday?')) removeHoliday.mutate(h.id); }}
+                onClick={() => {
+                  if (confirm('Remove this holiday?')) removeHoliday.mutate(h.id);
+                }}
                 className="p-1 text-slate-400 hover:text-red-500"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -151,7 +172,9 @@ function HolidaysPanel() {
             >
               {addHoliday.isPending ? '...' : 'Add'}
             </button>
-            <button onClick={() => setShowAdd(false)} className="btn-secondary btn-sm">Cancel</button>
+            <button onClick={() => setShowAdd(false)} className="btn-secondary btn-sm">
+              Cancel
+            </button>
           </div>
         </div>
       )}
@@ -166,7 +189,11 @@ function TimeOffPanel() {
   const [requestType, setRequestType] = useState('vacation');
   const [requestReason, setRequestReason] = useState('');
 
-  const { data: timeOff, isLoading, error } = useQuery({
+  const {
+    data: timeOff,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['time-off'],
     queryFn: async () => {
       const { data } = await apiClient.get('/schedule/time-off');
@@ -215,7 +242,10 @@ function TimeOffPanel() {
       ) : isLoading ? (
         <LoadingSpinner />
       ) : !timeOff || timeOff.length === 0 ? (
-        <EmptyState title="No time off requests" description="Request vacation, sick, or personal days here." />
+        <EmptyState
+          title="No time off requests"
+          description="Request vacation, sick, or personal days here."
+        />
       ) : (
         <div className="divide-y divide-slate-100">
           {timeOff.map((entry: any) => (
@@ -228,19 +258,32 @@ function TimeOffPanel() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className={clsx(
-                  'badge',
-                  entry.status === 'approved' ? 'badge-done' :
-                  entry.status === 'rejected' ? 'badge-cancelled' : 'badge-backlog',
-                )}>
+                <span
+                  className={clsx(
+                    'badge',
+                    entry.status === 'approved'
+                      ? 'badge-done'
+                      : entry.status === 'rejected'
+                        ? 'badge-cancelled'
+                        : 'badge-backlog',
+                  )}
+                >
                   {entry.status}
                 </span>
                 {entry.status === 'pending' && (
                   <>
-                    <button onClick={() => approveTimeOff.mutate({ id: entry.id, action: 'approve' })}
-                      className="text-xs text-green-600 hover:text-green-700 font-medium">Approve</button>
-                    <button onClick={() => approveTimeOff.mutate({ id: entry.id, action: 'reject' })}
-                      className="text-xs text-red-600 hover:text-red-700 font-medium">Reject</button>
+                    <button
+                      onClick={() => approveTimeOff.mutate({ id: entry.id, action: 'approve' })}
+                      className="text-xs text-green-600 hover:text-green-700 font-medium"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => approveTimeOff.mutate({ id: entry.id, action: 'reject' })}
+                      className="text-xs text-red-600 hover:text-red-700 font-medium"
+                    >
+                      Reject
+                    </button>
                   </>
                 )}
               </div>
@@ -252,19 +295,39 @@ function TimeOffPanel() {
       {showRequest && (
         <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
           <div className="space-y-2">
-            <input type="date" className="input text-sm" value={requestDate} onChange={(e) => setRequestDate(e.target.value)} />
-            <select className="input text-sm" value={requestType} onChange={(e) => setRequestType(e.target.value)}>
+            <input
+              type="date"
+              className="input text-sm"
+              value={requestDate}
+              onChange={(e) => setRequestDate(e.target.value)}
+            />
+            <select
+              className="input text-sm"
+              value={requestType}
+              onChange={(e) => setRequestType(e.target.value)}
+            >
               <option value="vacation">Vacation</option>
               <option value="sick">Sick Day</option>
               <option value="personal">Personal Day</option>
             </select>
-            <textarea className="input text-sm resize-none" rows={2} placeholder="Reason (optional)"
-              value={requestReason} onChange={(e) => setRequestReason(e.target.value)} />
+            <textarea
+              className="input text-sm resize-none"
+              rows={2}
+              placeholder="Reason (optional)"
+              value={requestReason}
+              onChange={(e) => setRequestReason(e.target.value)}
+            />
             <div className="flex gap-2">
-              <button onClick={() => requestTimeOff.mutate()} disabled={!requestDate || requestTimeOff.isPending} className="btn-primary btn-sm">
+              <button
+                onClick={() => requestTimeOff.mutate()}
+                disabled={!requestDate || requestTimeOff.isPending}
+                className="btn-primary btn-sm"
+              >
                 {requestTimeOff.isPending ? '...' : 'Submit'}
               </button>
-              <button onClick={() => setShowRequest(false)} className="btn-secondary btn-sm">Cancel</button>
+              <button onClick={() => setShowRequest(false)} className="btn-secondary btn-sm">
+                Cancel
+              </button>
             </div>
           </div>
         </div>

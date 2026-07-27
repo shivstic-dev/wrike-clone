@@ -20,7 +20,11 @@ function ItemTypesManager() {
   const [name, setName] = useState('');
   const [color, setColor] = useState('#6366f1');
 
-  const { data: types, isLoading, error } = useQuery({
+  const {
+    data: types,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['custom-item-types'],
     queryFn: async () => {
       const { data } = await apiClient.get('/customization/item-types');
@@ -71,11 +75,17 @@ function ItemTypesManager() {
       ) : isLoading ? (
         <LoadingSpinner />
       ) : !types || types.length === 0 ? (
-        <EmptyState title="No custom item types" description="Create item types to categorize tasks beyond standard statuses." />
+        <EmptyState
+          title="No custom item types"
+          description="Create item types to categorize tasks beyond standard statuses."
+        />
       ) : (
         <div className="space-y-2">
           {types.map((t: any) => (
-            <div key={t.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+            <div
+              key={t.id}
+              className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3"
+            >
               <div className="flex items-center gap-3">
                 <span
                   className="flex h-6 w-6 items-center justify-center rounded text-xs text-white font-bold"
@@ -87,10 +97,18 @@ function ItemTypesManager() {
                 <span className="text-xs text-slate-400">{t.icon}</span>
               </div>
               <button
-                onClick={() => { if (confirm('Delete this item type?')) deleteType.mutate(t.id); }}
+                onClick={() => {
+                  if (confirm('Delete this item type?')) deleteType.mutate(t.id);
+                }}
                 className="p-1 text-slate-400 hover:text-red-500"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -128,7 +146,9 @@ function ItemTypesManager() {
             >
               {addType.isPending ? '...' : 'Create'}
             </button>
-            <button onClick={() => setShowAdd(false)} className="btn-secondary btn-sm">Cancel</button>
+            <button onClick={() => setShowAdd(false)} className="btn-secondary btn-sm">
+              Cancel
+            </button>
           </div>
         </div>
       )}
@@ -147,7 +167,11 @@ function BlueprintsManager() {
   const [showSave, setShowSave] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
 
-  const { data: blueprints, isLoading, error } = useQuery({
+  const {
+    data: blueprints,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['blueprints'],
     queryFn: async () => {
       const { data } = await apiClient.get('/customization/blueprints');
@@ -216,10 +240,22 @@ function BlueprintsManager() {
             </p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => { setShowSave(true); setShowCreate(false); }} className="btn-secondary btn-sm text-xs">
+            <button
+              onClick={() => {
+                setShowSave(true);
+                setShowCreate(false);
+              }}
+              className="btn-secondary btn-sm text-xs"
+            >
               + Save as Blueprint
             </button>
-            <button onClick={() => { setShowCreate(true); setShowSave(false); }} className="btn-primary btn-sm text-xs">
+            <button
+              onClick={() => {
+                setShowCreate(true);
+                setShowSave(false);
+              }}
+              className="btn-primary btn-sm text-xs"
+            >
               + Create from Blueprint
             </button>
           </div>
@@ -230,7 +266,10 @@ function BlueprintsManager() {
         ) : isLoading ? (
           <LoadingSpinner />
         ) : !blueprints || blueprints.length === 0 ? (
-          <EmptyState title="No blueprints yet" description="Save an existing project as a reusable blueprint template." />
+          <EmptyState
+            title="No blueprints yet"
+            description="Save an existing project as a reusable blueprint template."
+          />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {blueprints.map((bp: any) => (
@@ -255,10 +294,16 @@ function BlueprintsManager() {
           <div className="flex items-end gap-3">
             <div className="flex-1">
               <label className="label text-xs">Select Project</label>
-              <select className="input text-sm" value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)}>
+              <select
+                className="input text-sm"
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+              >
                 <option value="">-- Choose a project --</option>
                 {(projects || []).map((p: any) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -269,7 +314,9 @@ function BlueprintsManager() {
             >
               {saveBlueprint.isPending ? 'Saving...' : 'Save'}
             </button>
-            <button onClick={() => setShowSave(false)} className="btn-secondary btn-sm">Cancel</button>
+            <button onClick={() => setShowSave(false)} className="btn-secondary btn-sm">
+              Cancel
+            </button>
           </div>
         </div>
       )}
@@ -277,27 +324,47 @@ function BlueprintsManager() {
       {/* Create from Blueprint form */}
       {showCreate && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <h5 className="text-sm font-semibold text-slate-700 mb-3">Create Project from Blueprint</h5>
+          <h5 className="text-sm font-semibold text-slate-700 mb-3">
+            Create Project from Blueprint
+          </h5>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="label text-xs">Blueprint</label>
-              <select className="input text-sm" value={selectedBlueprintId} onChange={(e) => setSelectedBlueprintId(e.target.value)}>
+              <select
+                className="input text-sm"
+                value={selectedBlueprintId}
+                onChange={(e) => setSelectedBlueprintId(e.target.value)}
+              >
                 <option value="">-- Choose --</option>
                 {(blueprints || []).map((bp: any) => (
-                  <option key={bp.id} value={bp.id}>{bp.name}</option>
+                  <option key={bp.id} value={bp.id}>
+                    {bp.name}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="label text-xs">Project Name</label>
-              <input type="text" className="input text-sm" placeholder="My New Project" value={createName} onChange={(e) => setCreateName(e.target.value)} />
+              <input
+                type="text"
+                className="input text-sm"
+                placeholder="My New Project"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+              />
             </div>
             <div>
               <label className="label text-xs">Target Folder</label>
-              <select className="input text-sm" value={targetFolderId} onChange={(e) => setTargetFolderId(e.target.value)}>
+              <select
+                className="input text-sm"
+                value={targetFolderId}
+                onChange={(e) => setTargetFolderId(e.target.value)}
+              >
                 <option value="">-- Choose --</option>
                 {(folders || []).map((f: any) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -305,12 +372,19 @@ function BlueprintsManager() {
           <div className="flex gap-2 mt-3">
             <button
               onClick={() => createFromBlueprint.mutate()}
-              disabled={!selectedBlueprintId || !createName.trim() || !targetFolderId || createFromBlueprint.isPending}
+              disabled={
+                !selectedBlueprintId ||
+                !createName.trim() ||
+                !targetFolderId ||
+                createFromBlueprint.isPending
+              }
               className="btn-primary btn-sm"
             >
               {createFromBlueprint.isPending ? 'Creating...' : 'Create Project'}
             </button>
-            <button onClick={() => setShowCreate(false)} className="btn-secondary btn-sm">Cancel</button>
+            <button onClick={() => setShowCreate(false)} className="btn-secondary btn-sm">
+              Cancel
+            </button>
           </div>
         </div>
       )}
@@ -336,7 +410,11 @@ function RequestFormsManager() {
     enabled: showAdd,
   });
 
-  const { data: forms, isLoading, error } = useQuery({
+  const {
+    data: forms,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['request-forms'],
     queryFn: async () => {
       const { data } = await apiClient.get('/customization/request-forms');
@@ -386,15 +464,23 @@ function RequestFormsManager() {
       ) : isLoading ? (
         <LoadingSpinner />
       ) : !forms || forms.length === 0 ? (
-        <EmptyState title="No request forms" description="Create intake forms so team members and external stakeholders can submit structured requests." />
+        <EmptyState
+          title="No request forms"
+          description="Create intake forms so team members and external stakeholders can submit structured requests."
+        />
       ) : (
         <div className="space-y-2">
           {forms.map((f: any) => (
-            <div key={f.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+            <div
+              key={f.id}
+              className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3"
+            >
               <div>
                 <p className="text-sm font-medium text-slate-700">{f.name}</p>
                 {f.description && <p className="text-xs text-slate-400 mt-0.5">{f.description}</p>}
-                <p className="text-xs text-slate-400 mt-0.5">Fields: {Array.isArray(f.form_fields) ? f.form_fields.length : 0}</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Fields: {Array.isArray(f.form_fields) ? f.form_fields.length : 0}
+                </p>
               </div>
             </div>
           ))}
@@ -406,18 +492,36 @@ function RequestFormsManager() {
           <div className="space-y-3">
             <div>
               <label className="label text-xs">Form Name</label>
-              <input type="text" className="input text-sm" placeholder="e.g. Grant Request Form" value={formName} onChange={(e) => setFormName(e.target.value)} />
+              <input
+                type="text"
+                className="input text-sm"
+                placeholder="e.g. Grant Request Form"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+              />
             </div>
             <div>
               <label className="label text-xs">Description</label>
-              <textarea className="input text-sm resize-none" rows={2} placeholder="Optional description" value={formDesc} onChange={(e) => setFormDesc(e.target.value)} />
+              <textarea
+                className="input text-sm resize-none"
+                rows={2}
+                placeholder="Optional description"
+                value={formDesc}
+                onChange={(e) => setFormDesc(e.target.value)}
+              />
             </div>
             <div>
               <label className="label text-xs">Target Folder (where tasks are created)</label>
-              <select className="input text-sm" value={folderId} onChange={(e) => setFolderId(e.target.value)}>
+              <select
+                className="input text-sm"
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value)}
+              >
                 <option value="">-- Choose --</option>
                 {(folders || []).map((f: any) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -429,7 +533,9 @@ function RequestFormsManager() {
               >
                 {addForm.isPending ? '...' : 'Create Form'}
               </button>
-              <button onClick={() => setShowAdd(false)} className="btn-secondary btn-sm">Cancel</button>
+              <button onClick={() => setShowAdd(false)} className="btn-secondary btn-sm">
+                Cancel
+              </button>
             </div>
           </div>
         </div>

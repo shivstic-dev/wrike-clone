@@ -12,21 +12,17 @@ interface KanbanColumnProps {
 }
 
 const columnColors: Record<string, string> = {
-  backlog: 'border-t-slate-300',
   todo: 'border-t-slate-400',
   in_progress: 'border-t-blue-500',
-  in_review: 'border-t-amber-500',
-  done: 'border-t-green-500',
-  cancelled: 'border-t-red-500',
+  completed: 'border-t-green-500',
+  blocked: 'border-t-red-500',
 };
 
 const columnBg: Record<string, string> = {
-  backlog: 'bg-slate-50',
   todo: 'bg-slate-50',
   in_progress: 'bg-blue-50/50',
-  in_review: 'bg-amber-50/50',
-  done: 'bg-green-50/50',
-  cancelled: 'bg-red-50/50',
+  completed: 'bg-green-50/50',
+  blocked: 'bg-red-50/50',
 };
 
 export function KanbanColumn({ status, title, tasks, color }: KanbanColumnProps) {

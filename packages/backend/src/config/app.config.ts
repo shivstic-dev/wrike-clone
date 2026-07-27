@@ -36,6 +36,8 @@ export interface AuthConfig {
   jwtSecret: string;
   accessTokenTtlSec: number;
   refreshTokenTtlSec: number;
+  issuer: string;
+  audience: string;
 }
 
 export interface S3Config {
@@ -47,15 +49,75 @@ export interface S3Config {
   useSsl: boolean;
 }
 
+export interface SupabaseStorageConfig {
+  url: string;
+  serviceRoleKey: string;
+  bucket: string;
+}
+
 export function loadAppConfig(): AppConfig {
   return {
     nodeEnv: process.env['NODE_ENV'] || 'development',
-    port: parseInt(process.env['APP_PORT'] || '4000', 10),
+    port: parseInt(process.env['APP_PORT'] || process.env['PORT'] || '4000', 10),
     apiPrefix: process.env['API_PREFIX'] || '/api/v1',
-    corsOrigins: (process.env['CORS_ORIGINS'] || 'http://localhost:5173').split(','),
+    corsOrigins: (process.env['CORS_ORIGINS'] || 'http://localhost:5173')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
     encryptionKey: process.env['ENCRYPTION_KEY'] || 'dev-key-change-in-prod',
     defaultTenantSlug: process.env['DEFAULT_TENANT_SLUG'] || undefined,
   };
+}
+
+/**
+ * Refuse to boot production with development secrets or missing controls.
+ * A loud startup failure is safer than silently exposing tenant creation or
+ * issuing tokens with a public fallback secret.
+ */
+export function validateProductionConfig(): void {
+  if (process.env['NODE_ENV'] !== 'production') return;
+
+  const problems: string[] = [];
+  const jwtSecret = process.env['JWT_SECRET'] || '';
+  const encryptionKey = process.env['ENCRYPTION_KEY'] || '';
+  const corsOrigins = (process.env['CORS_ORIGINS'] || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (!process.env['DATABASE_URL']) problems.push('DATABASE_URL is required');
+  if (jwtSecret.length < 32) problems.push('JWT_SECRET must be at least 32 characters');
+  if (encryptionKey.length < 32) {
+    problems.push('ENCRYPTION_KEY must be at least 32 characters');
+  }
+  if (!process.env['SETUP_KEY'] || process.env['SETUP_KEY']!.length < 24) {
+    problems.push('SETUP_KEY must be at least 24 characters');
+  }
+  if (corsOrigins.length === 0) {
+    problems.push('CORS_ORIGINS is required');
+  } else if (corsOrigins.some((origin) => origin === '*' || !origin.startsWith('https://'))) {
+    problems.push('CORS_ORIGINS must contain only explicit HTTPS origins');
+  }
+  if (process.env['DB_APP_ROLE'] !== 'openwork_app') {
+    problems.push('DB_APP_ROLE must be set to openwork_app');
+  }
+  if (process.env['DB_SSL'] !== 'true') problems.push('DB_SSL must be true');
+  if (!process.env['SUPABASE_URL']?.startsWith('https://')) {
+    problems.push('SUPABASE_URL must be an HTTPS URL');
+  }
+  if (!process.env['SUPABASE_SERVICE_ROLE_KEY']) {
+    problems.push('SUPABASE_SERVICE_ROLE_KEY is required');
+  }
+  if (!process.env['APP_PUBLIC_URL']?.startsWith('https://')) {
+    problems.push('APP_PUBLIC_URL must be an HTTPS URL');
+  }
+  for (const name of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'EMAIL_FROM']) {
+    if (!process.env[name]) problems.push(`${name} is required`);
+  }
+
+  if (problems.length > 0) {
+    throw new Error(`Unsafe production configuration:\n- ${problems.join('\n- ')}`);
+  }
 }
 
 export function loadDatabaseConfig(): DatabaseConfig {
@@ -106,12 +168,14 @@ export function loadAuthConfig(): AuthConfig {
     jwtSecret: process.env['JWT_SECRET'] || 'dev-jwt-secret-change-in-prod',
     accessTokenTtlSec: parseInt(process.env['ACCESS_TOKEN_TTL_SEC'] || '900', 10),
     refreshTokenTtlSec: parseInt(process.env['REFRESH_TOKEN_TTL_SEC'] || '2592000', 10),
+    issuer: process.env['JWT_ISSUER'] || 'openwork-api',
+    audience: process.env['JWT_AUDIENCE'] || 'openwork-web',
   };
 }
 
 /**
  * Returns S3 config or null if S3 is not configured.
- * File storage is deferred to Phase 6 (Supabase Storage).
+ * Legacy S3-compatible storage configuration.
  */
 export function loadS3Config(): S3Config | null {
   if (!process.env['S3_ENDPOINT']) return null;
@@ -122,5 +186,17 @@ export function loadS3Config(): S3Config | null {
     secretKey: process.env['S3_SECRET_KEY'] || 'minioadmin',
     bucket: process.env['S3_BUCKET'] || 'wrike-files',
     useSsl: process.env['S3_USE_SSL'] === 'true',
+  };
+}
+
+export function loadSupabaseStorageConfig(): SupabaseStorageConfig | null {
+  const url = process.env['SUPABASE_URL']?.replace(/\/+$/, '');
+  const serviceRoleKey = process.env['SUPABASE_SERVICE_ROLE_KEY'];
+  if (!url || !serviceRoleKey) return null;
+
+  return {
+    url,
+    serviceRoleKey,
+    bucket: process.env['SUPABASE_STORAGE_BUCKET'] || 'work-management-files',
   };
 }

@@ -17,10 +17,10 @@ export class UserService {
 
   async findAll(page = 1, perPage = 25) {
     const ctx = requireTenantContext();
-    const countResult = await this.db('tenant_memberships')
+    const countResult = (await this.db('tenant_memberships')
       .where({ tenant_id: ctx.tenantId, is_active: true })
       .count()
-      .first() as { count?: string | number } | undefined;
+      .first()) as { count?: string | number } | undefined;
 
     const users = await this.db('tenant_memberships')
       .join('users', 'tenant_memberships.user_id', 'users.id')
@@ -102,9 +102,7 @@ export class UserService {
       .first();
     if (!membership) throw new NotFoundException('User not in tenant');
 
-    await this.db('tenant_memberships')
-      .where({ id: membership.id })
-      .update({ role: input.role });
+    await this.db('tenant_memberships').where({ id: membership.id }).update({ role: input.role });
 
     return { message: 'Role updated' };
   }

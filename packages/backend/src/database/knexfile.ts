@@ -1,4 +1,5 @@
 import type { Knex } from 'knex';
+import { resolve } from 'path';
 
 /**
  * Build connection config, supporting both DATABASE_URL (single connection string)
@@ -27,12 +28,12 @@ const config: Knex.Config = {
   client: 'pg',
   connection: buildConnection(),
   pool: {
-    min: 2,
-    max: parseInt(process.env['DB_MAX_CONNECTIONS'] || '25', 10),
+    min: 0,
+    max: parseInt(process.env['DB_MAX_CONNECTIONS'] || '10', 10),
   },
   migrations: {
-    directory: '../migrations',
-    extension: 'ts',
+    directory: resolve(__dirname, '../migrations'),
+    extension: __filename.endsWith('.ts') ? 'ts' : 'js',
   },
   seeds: {
     directory: './seeds',

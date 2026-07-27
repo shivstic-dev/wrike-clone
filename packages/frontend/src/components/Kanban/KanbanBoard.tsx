@@ -23,12 +23,10 @@ interface KanbanBoardProps {
 }
 
 const COLUMNS: { status: string; title: string; color: string }[] = [
-  { status: TASK_STATUS.BACKLOG, title: 'Backlog', color: 'bg-slate-400' },
   { status: TASK_STATUS.TODO, title: 'To Do', color: 'bg-slate-500' },
   { status: TASK_STATUS.IN_PROGRESS, title: 'In Progress', color: 'bg-blue-500' },
-  { status: TASK_STATUS.IN_REVIEW, title: 'In Review', color: 'bg-amber-500' },
-  { status: TASK_STATUS.DONE, title: 'Done', color: 'bg-green-500' },
-  { status: TASK_STATUS.CANCELLED, title: 'Cancelled', color: 'bg-red-500' },
+  { status: TASK_STATUS.COMPLETED, title: 'Completed', color: 'bg-green-500' },
+  { status: TASK_STATUS.BLOCKED, title: 'Blocked', color: 'bg-red-500' },
 ];
 
 export function KanbanBoard({ tasks }: KanbanBoardProps) {
@@ -52,11 +50,14 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
     }),
   );
 
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    const taskId = event.active.id as string;
-    const task = tasks.find((t) => t.id === taskId);
-    if (task) setActiveTask(task);
-  }, [tasks]);
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const taskId = event.active.id as string;
+      const task = tasks.find((t) => t.id === taskId);
+      if (task) setActiveTask(task);
+    },
+    [tasks],
+  );
 
   const handleDragEnd = useCallback(
     async (event: DragEndEvent) => {
@@ -101,9 +102,7 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
         ))}
       </div>
 
-      <DragOverlay>
-        {activeTask ? <TaskCard task={activeTask} /> : null}
-      </DragOverlay>
+      <DragOverlay>{activeTask ? <TaskCard task={activeTask} /> : null}</DragOverlay>
     </DndContext>
   );
 }

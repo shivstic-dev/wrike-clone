@@ -2,7 +2,7 @@
  * Visibility Scope — reusable query scopes for department-based access control.
  *
  * Applies filters ensuring users can only see items that belong to workspaces
- * (departments) they are members of, or that are `organization`-visible.
+ * (departments) they are members of, or that are `global`-visible.
  *
  * Org admins bypass all filters and see everything.
  */
@@ -14,7 +14,7 @@ import type { TenantContextData } from './tenant-context';
  * Apply visibility scope to a Knex query builder for tables that have a
  * `visibility` column (tasks, projects).
  *
- * Filters: visibility = 'organization' OR workspace_id IN (user's workspaces)
+ * Filters: visibility = 'global' OR workspace_id IN (user's workspaces)
  *
  * @param qb - The Knex query builder
  * @param ctx - The tenant context (user info)
@@ -31,12 +31,9 @@ export function applyVisibilityScope(
   if (ctx.role === 'admin') return qb;
 
   return qb.where((b) =>
-    b.where(visibilityColumn, 'organization')
-      .orWhereIn(workspaceIdColumn, function () {
-        this.select('workspace_id')
-          .from('workspace_members')
-          .where('user_id', ctx.userId);
-      }),
+    b.where(visibilityColumn, 'global').orWhereIn(workspaceIdColumn, function () {
+      this.select('workspace_id').from('workspace_members').where('user_id', ctx.userId);
+    }),
   );
 }
 
@@ -55,8 +52,6 @@ export function applyFolderVisibilityScope(
   if (ctx.role === 'admin') return qb;
 
   return qb.whereIn('workspace_id', function () {
-    this.select('workspace_id')
-      .from('workspace_members')
-      .where('user_id', ctx.userId);
+    this.select('workspace_id').from('workspace_members').where('user_id', ctx.userId);
   });
 }

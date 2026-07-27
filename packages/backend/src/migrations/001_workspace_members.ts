@@ -1,10 +1,17 @@
 import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
+  if (await knex.schema.hasTable('workspace_members')) return;
+
   await knex.schema.createTable('workspace_members', (table) => {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
     table.uuid('tenant_id').notNullable().references('id').inTable('tenants').onDelete('CASCADE');
-    table.uuid('workspace_id').notNullable().references('id').inTable('workspaces').onDelete('CASCADE');
+    table
+      .uuid('workspace_id')
+      .notNullable()
+      .references('id')
+      .inTable('workspaces')
+      .onDelete('CASCADE');
     table.uuid('user_id').notNullable().references('id').inTable('users').onDelete('CASCADE');
     table.text('role').notNullable().checkIn(['dept_admin', 'member']);
     table.timestamps(true, true);

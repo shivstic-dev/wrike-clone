@@ -7,6 +7,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Inject,
   Logger,
 } from '@nestjs/common';
@@ -24,6 +25,7 @@ import type {
   CreateCommentInput,
 } from '@wrike-clone/shared';
 import { TaskStatus, TaskPriority } from '@wrike-clone/shared';
+import { DepartmentAccessService } from '../rbac/department-access.service';
 
 @Injectable()
 export class TaskService {
@@ -46,13 +48,17 @@ export class TaskService {
     sort_order: 'tasks.sort_order',
   };
 
-  constructor(@Inject(DATABASE_PROVIDER) private readonly db: Knex) {}
+  constructor(
+    @Inject(DATABASE_PROVIDER) private readonly db: Knex,
+    private readonly departmentAccess: DepartmentAccessService,
+  ) {}
 
   /**
    * Find tasks with filtering, sorting, and pagination.
    */
   async findAll(filter: TaskFilterInput) {
     const ctx = requireTenantContext();
+    const tenantAdmin = await this.departmentAccess.isTenantAdmin();
     const {
       page = 1,
       perPage = 25,
@@ -64,6 +70,7 @@ export class TaskService {
       dueDateBefore,
       dueDateAfter,
       folderId,
+      departmentId,
       sortBy = 'created_at',
       sortDirection = 'desc',
     } = filter as typeof filter & { sortBy?: string; sortDirection?: string };
@@ -79,9 +86,17 @@ export class TaskService {
     // Join through project → folder → workspace to resolve workspace_id
     query = query
       .leftJoin('projects', 'tasks.project_id', 'projects.id')
-      .leftJoin('folders', 'projects.folder_id', 'folders.id');
+      .leftJoin('folders', 'projects.folder_id', 'folders.id')
+      .leftJoin('workspaces', 'tasks.department_id', 'workspaces.id');
 
-    query = applyVisibilityScope(query, ctx, 'folders.workspace_id', 'tasks.visibility');
+    if (!tenantAdmin) {
+      query = applyVisibilityScope(
+        query,
+        { ...ctx, role: 'member' },
+        'tasks.department_id',
+        'tasks.visibility',
+      );
+    }
 
     // Apply filters
     if (projectId) query = query.andWhere('tasks.project_id', projectId);
@@ -95,6 +110,11 @@ export class TaskService {
         .join('task_folder_links', 'tasks.id', 'task_folder_links.task_id')
         .andWhere('task_folder_links.folder_id', folderId);
     }
+    if (departmentId) {
+      query = query.andWhere((builder) =>
+        builder.where('tasks.department_id', departmentId).orWhere('tasks.visibility', 'global'),
+      );
+    }
     if (search) {
       query = query.andWhereRaw(
         `to_tsvector('english', coalesce(tasks.title, '') || ' ' || coalesce(tasks.description, '')) @@ plainto_tsquery('english', ?)`,
@@ -103,13 +123,15 @@ export class TaskService {
     }
 
     // Count total
-    const countResult = await query.clone().clearSelect().count('tasks.id').first() as { count?: string | number } | undefined;
+    const countResult = (await query.clone().clearSelect().count('tasks.id').first()) as
+      { count?: string | number } | undefined;
     const total = Number(countResult?.count || 0);
 
     // Fetch page
     const tasks = await query
       .select(
         'tasks.*',
+        'workspaces.name as department_name',
         this.db.raw(
           `json_build_object('id', u.id, 'display_name', u.display_name, 'avatar_url', u.avatar_url) as assignee`,
         ),
@@ -130,36 +152,50 @@ export class TaskService {
     };
   }
 
+  private async findVisibleTask(id: string) {
+    const ctx = requireTenantContext();
+    const tenantAdmin = await this.departmentAccess.isTenantAdmin();
+    const task = await this.db('tasks')
+      .leftJoin('workspaces', 'tasks.department_id', 'workspaces.id')
+      .where('tasks.id', id)
+      .andWhere('tasks.tenant_id', ctx.tenantId)
+      .whereNull('tasks.deleted_at')
+      .select('tasks.*', 'workspaces.name as department_name')
+      .modify((qb: Knex.QueryBuilder) => {
+        if (!tenantAdmin) {
+          applyVisibilityScope(
+            qb,
+            { ...ctx, role: 'member' },
+            'tasks.department_id',
+            'tasks.visibility',
+          );
+        }
+      })
+      .first();
+    if (!task) throw new NotFoundException('Task not found');
+    return task;
+  }
+
   /**
    * Get a single task by ID with full details.
    */
   async findById(id: string) {
-    const ctx = requireTenantContext();
-    const task = await this.db('tasks')
-      .leftJoin('projects', 'tasks.project_id', 'projects.id')
-      .leftJoin('folders', 'projects.folder_id', 'folders.id')
-      .where('tasks.id', id)
-      .andWhere('tasks.tenant_id', ctx.tenantId)
-      .whereNull('tasks.deleted_at')
-      .select('tasks.*')
-      .modify((qb: any) => {
-        if (ctx.role !== 'admin') applyVisibilityScope(qb, ctx, 'folders.workspace_id', 'tasks.visibility');
-      })
-      .first();
-
-    if (!task) {
-      throw new NotFoundException('Task not found');
-    }
+    const task = await this.findVisibleTask(id);
 
     if (!task) {
       throw new NotFoundException('Task not found');
     }
 
     // Fetch related data
-    const [comments, dependencies, assignees, attachments] = await Promise.all([
-      this.db('task_comments').where({ task_id: id, deleted_at: null }).orderBy('created_at', 'asc'),
+    const [comments, dependencies, assignee, attachments] = await Promise.all([
+      this.findComments(id),
       this.db('task_dependencies').where({ task_id: id }),
-      this.db('task_assignees').where({ task_id: id }),
+      task.assignee_id
+        ? this.db('users')
+            .where({ id: task.assignee_id })
+            .select('id', 'display_name', 'avatar_url')
+            .first()
+        : Promise.resolve(null),
       this.db('file_versions')
         .join('files', 'file_versions.file_id', 'files.id')
         .where('files.task_id', id)
@@ -170,9 +206,19 @@ export class TaskService {
       ...task,
       comments,
       dependencies,
-      assignees,
+      assignees: assignee ? [assignee] : [],
       attachments,
     };
+  }
+
+  async findComments(taskId: string) {
+    const ctx = requireTenantContext();
+    await this.findVisibleTask(taskId);
+
+    return this.db('task_comments')
+      .where({ task_id: taskId, tenant_id: ctx.tenantId })
+      .whereNull('deleted_at')
+      .orderBy('created_at', 'asc');
   }
 
   /**
@@ -182,34 +228,23 @@ export class TaskService {
    * Validate that an assignee is a member of the task's workspace
    * (or the task/project is organization-visible).
    */
-  private async validateAssigneeInWorkspace(projectId: string, assigneeId: string | null): Promise<void> {
+  private async validateAssigneeInDepartment(
+    departmentId: string,
+    assigneeId: string | null,
+  ): Promise<void> {
     if (!assigneeId) return; // unassigned is always ok
 
     const ctx = requireTenantContext();
-
-    // Find the workspace for this project
-    const project = await this.db('projects')
-      .where({ id: projectId, tenant_id: ctx.tenantId })
-      .first();
-
-    if (!project) return; // will be caught by the creating code
-
-    // Organization-visible projects allow any member as assignee
-    if (project.visibility === 'organization') return;
-
-    // For department-visible projects, assignee must be a workspace member
-    const folder = await this.db('folders')
-      .where({ id: project.folder_id, tenant_id: ctx.tenantId })
-      .first();
-
-    if (!folder) return;
-
     const member = await this.db('workspace_members')
-      .where({ workspace_id: folder.workspace_id, user_id: assigneeId })
+      .where({
+        tenant_id: ctx.tenantId,
+        workspace_id: departmentId,
+        user_id: assigneeId,
+      })
       .first();
 
     if (!member) {
-      throw new BadRequestException('Assignee must be a member of the project\'s workspace (department)');
+      throw new BadRequestException('Assignee must be a member of the task department');
     }
   }
 
@@ -219,31 +254,38 @@ export class TaskService {
 
     // Verify project exists and belongs to tenant
     const project = await this.db('projects')
-      .where({ id: input.projectId, tenant_id: ctx.tenantId })
+      .join('folders', 'projects.folder_id', 'folders.id')
+      .where('projects.id', input.projectId)
+      .andWhere('projects.tenant_id', ctx.tenantId)
+      .select('projects.*', 'folders.workspace_id as department_id')
       .first();
     if (!project) {
       throw new NotFoundException('Project not found');
     }
 
-    // Validate assignee belongs to the task's workspace (G8 fix)
-    await this.validateAssigneeInWorkspace(input.projectId, input.assigneeId || null);
+    await this.departmentAccess.assertCanCreateTask(project.department_id);
+    if (input.visibility === 'global') {
+      await this.departmentAccess.assertCanSetVisibility(project.department_id);
+    }
+    await this.validateAssigneeInDepartment(project.department_id, input.assigneeId || null);
 
     const [task] = await this.db('tasks')
       .insert({
         id,
         tenant_id: ctx.tenantId,
         project_id: input.projectId,
+        department_id: project.department_id,
         parent_task_id: input.parentTaskId || null,
         assignee_id: input.assigneeId || null,
         created_by_id: ctx.userId,
         title: input.title,
         description: input.description || null,
         status: input.status || TaskStatus.TODO,
-        priority: input.priority || TaskPriority.NONE,
+        priority: input.priority || TaskPriority.LOW,
         estimated_hours: input.estimatedHours || null,
         start_date: input.startDate || null,
         due_date: input.dueDate || null,
-        visibility: project.visibility || 'department', // inherit from project
+        visibility: input.visibility || 'department',
         custom_fields: input.customFields ? JSON.stringify(input.customFields) : '{}',
         sort_order: 0,
       })
@@ -251,6 +293,12 @@ export class TaskService {
 
     // Log activity
     await this.logActivity(ctx.userId, 'task', id, 'task:created', {});
+    if (task.assignee_id) {
+      await this.logActivity(ctx.userId, 'task', id, 'task:assigned', {
+        assigneeId: { old: null, new: task.assignee_id },
+      });
+      await this.createAssignmentNotification(task);
+    }
 
     this.logger.log(`Task ${id} created in project ${input.projectId}`);
     return task;
@@ -261,11 +309,23 @@ export class TaskService {
    */
   async update(id: string, input: UpdateTaskInput) {
     const ctx = requireTenantContext();
-    const existing = await this.db('tasks')
-      .where({ id, tenant_id: ctx.tenantId, deleted_at: null })
-      .first();
-    if (!existing) {
-      throw new NotFoundException('Task not found');
+    const existing = await this.findVisibleTask(id);
+    const requestedFields = Object.keys(input as Record<string, unknown>);
+    const statusOnly = requestedFields.length === 1 && requestedFields[0] === 'status';
+
+    if (statusOnly) {
+      await this.departmentAccess.assertCanChangeStatus(
+        existing.department_id,
+        existing.assignee_id,
+      );
+    } else {
+      await this.departmentAccess.assertCanManageTask(existing.department_id);
+    }
+    if (input.visibility !== undefined && input.visibility !== existing.visibility) {
+      await this.departmentAccess.assertCanSetVisibility(existing.department_id);
+    }
+    if (input.assigneeId !== undefined && input.assigneeId !== existing.assignee_id) {
+      await this.validateAssigneeInDepartment(existing.department_id, input.assigneeId);
     }
 
     const changes: Record<string, { old: unknown; new: unknown }> = {};
@@ -281,6 +341,7 @@ export class TaskService {
       actualHours: 'actual_hours',
       startDate: 'start_date',
       dueDate: 'due_date',
+      visibility: 'visibility',
       sortOrder: 'sort_order',
       customFields: 'custom_fields',
     };
@@ -305,10 +366,13 @@ export class TaskService {
       updates['custom_fields'] = JSON.stringify(updates['custom_fields']);
     }
 
-    // Auto-set completed_at when moved to done
-    if (updates['status'] === 'done' && existing.status !== 'done') {
+    // Auto-set completed_at when moved to completed.
+    if (updates['status'] === 'completed' && existing.status !== 'completed') {
       updates['completed_at'] = new Date();
+    } else if (updates['status'] && updates['status'] !== 'completed') {
+      updates['completed_at'] = null;
     }
+    updates['updated_at'] = new Date();
 
     const [updated] = await this.db('tasks')
       .where({ id, tenant_id: ctx.tenantId })
@@ -318,6 +382,26 @@ export class TaskService {
     // Log activity
     if (Object.keys(changes).length > 0) {
       await this.logActivity(ctx.userId, 'task', id, 'task:updated', changes);
+      if (changes['status']) {
+        await this.logActivity(ctx.userId, 'task', id, 'task:status:changed', {
+          status: changes['status'],
+        });
+      }
+      if (changes['assigneeId']) {
+        await this.logActivity(ctx.userId, 'task', id, 'task:assigned', {
+          assigneeId: changes['assigneeId'],
+        });
+      }
+    }
+
+    if (changes['assigneeId'] || changes['priority']) {
+      await this.db('notification_log')
+        .where({ tenant_id: ctx.tenantId, task_id: id })
+        .andWhere('rule_type', 'like', 'priority_%')
+        .del();
+      if (updated.assignee_id) {
+        await this.createAssignmentNotification(updated);
+      }
     }
 
     return updated;
@@ -328,12 +412,8 @@ export class TaskService {
    */
   async remove(id: string): Promise<void> {
     const ctx = requireTenantContext();
-    const existing = await this.db('tasks')
-      .where({ id, tenant_id: ctx.tenantId, deleted_at: null })
-      .first();
-    if (!existing) {
-      throw new NotFoundException('Task not found');
-    }
+    const existing = await this.findVisibleTask(id);
+    await this.departmentAccess.assertCanManageTask(existing.department_id);
 
     await this.db('tasks').where({ id }).update({ deleted_at: new Date() });
     await this.logActivity(ctx.userId, 'task', id, 'task:deleted', {});
@@ -346,6 +426,29 @@ export class TaskService {
    */
   async bulkUpdate(input: BulkTaskUpdateInput) {
     const ctx = requireTenantContext();
+    const existingTasks = await this.db('tasks')
+      .whereIn('id', input.taskIds)
+      .andWhere('tenant_id', ctx.tenantId)
+      .whereNull('deleted_at');
+    if (existingTasks.length !== input.taskIds.length) {
+      throw new NotFoundException('One or more tasks were not found');
+    }
+
+    const updateFields = Object.keys(input.updates as Record<string, unknown>);
+    const statusOnly = updateFields.length === 1 && updateFields[0] === 'status';
+    for (const task of existingTasks) {
+      if (statusOnly) {
+        await this.departmentAccess.assertCanChangeStatus(task.department_id, task.assignee_id);
+      } else {
+        await this.departmentAccess.assertCanManageTask(task.department_id);
+      }
+      if (input.updates.visibility !== undefined && input.updates.visibility !== task.visibility) {
+        await this.departmentAccess.assertCanSetVisibility(task.department_id);
+      }
+      if (input.updates.assigneeId !== undefined && input.updates.assigneeId !== task.assignee_id) {
+        await this.validateAssigneeInDepartment(task.department_id, input.updates.assigneeId);
+      }
+    }
 
     // Check if all updates are the same (uniform change — the common case)
     const keys = Object.keys(input.updates);
@@ -364,6 +467,7 @@ export class TaskService {
         startDate: 'start_date',
         dueDate: 'due_date',
         sortOrder: 'sort_order',
+        visibility: 'visibility',
       };
 
       for (const [key, dbField] of Object.entries(fieldMap)) {
@@ -373,10 +477,12 @@ export class TaskService {
         }
       }
 
-      // Auto-set completed_at when moved to done
-      if (dbUpdates['status'] === 'done') {
+      if (dbUpdates['status'] === 'completed') {
         dbUpdates['completed_at'] = new Date();
+      } else if (dbUpdates['status']) {
+        dbUpdates['completed_at'] = null;
       }
+      dbUpdates['updated_at'] = new Date();
 
       // Perform a single batched UPDATE inside a transaction
       if (Object.keys(dbUpdates).length > 0) {
@@ -394,6 +500,23 @@ export class TaskService {
           await this.logActivity(ctx.userId, 'task', task.id, 'task:updated', {
             bulkUpdate: { fields: Object.keys(input.updates) },
           });
+          if (input.updates.status !== undefined) {
+            await this.logActivity(ctx.userId, 'task', task.id, 'task:status:changed', {
+              status: { new: input.updates.status },
+            });
+          }
+          if (input.updates.assigneeId !== undefined) {
+            await this.logActivity(ctx.userId, 'task', task.id, 'task:assigned', {
+              assigneeId: { new: input.updates.assigneeId },
+            });
+          }
+          if (input.updates.assigneeId !== undefined || input.updates.priority !== undefined) {
+            await this.db('notification_log')
+              .where({ tenant_id: ctx.tenantId, task_id: task.id })
+              .andWhere('rule_type', 'like', 'priority_%')
+              .del();
+            if (task.assignee_id) await this.createAssignmentNotification(task);
+          }
         }
 
         return updated;
@@ -416,6 +539,7 @@ export class TaskService {
             priority: 'priority',
             assigneeId: 'assignee_id',
             sortOrder: 'sort_order',
+            visibility: 'visibility',
           })) {
             const value = (input.updates as any)[key];
             if (value !== undefined) {
@@ -424,9 +548,12 @@ export class TaskService {
           }
 
           if (Object.keys(updates).length > 0) {
-            if (updates['status'] === 'done' && existing.status !== 'done') {
+            if (updates['status'] === 'completed' && existing.status !== 'completed') {
               updates['completed_at'] = new Date();
+            } else if (updates['status'] && updates['status'] !== 'completed') {
+              updates['completed_at'] = null;
             }
+            updates['updated_at'] = new Date();
 
             const [updated] = await trx('tasks')
               .where({ id: taskId, tenant_id: ctx.tenantId })
@@ -458,6 +585,8 @@ export class TaskService {
     if (!task || !dependsOn) {
       throw new NotFoundException('Task not found');
     }
+    await this.departmentAccess.assertCanManageTask(task.department_id);
+    await this.departmentAccess.assertCanManageTask(dependsOn.department_id);
 
     // Prevent self-dependency
     if (input.taskId === input.dependsOnTaskId) {
@@ -491,6 +620,7 @@ export class TaskService {
     if (!dep) {
       throw new NotFoundException('Dependency not found');
     }
+    await this.departmentAccess.assertCanManageTask(dep.department_id);
 
     await this.db('task_dependencies').where({ id }).del();
   }
@@ -502,12 +632,7 @@ export class TaskService {
     const ctx = requireTenantContext();
     const id = uuidv4();
 
-    const task = await this.db('tasks')
-      .where({ id: input.taskId, tenant_id: ctx.tenantId })
-      .first();
-    if (!task) {
-      throw new NotFoundException('Task not found');
-    }
+    await this.findVisibleTask(input.taskId);
 
     const [comment] = await this.db('task_comments')
       .insert({
@@ -523,6 +648,34 @@ export class TaskService {
 
     await this.logActivity(ctx.userId, 'task', input.taskId, 'task:comment:added', {});
     return comment;
+  }
+
+  private async createAssignmentNotification(task: Record<string, any>): Promise<void> {
+    const ctx = requireTenantContext();
+    await this.db('notifications').insert({
+      id: uuidv4(),
+      tenant_id: ctx.tenantId,
+      user_id: task.assignee_id,
+      type:
+        task.priority === TaskPriority.HIGH || task.priority === TaskPriority.CRITICAL
+          ? 'priority_task_assigned'
+          : 'task_assigned',
+      title:
+        task.priority === TaskPriority.CRITICAL
+          ? 'Critical task assigned'
+          : task.priority === TaskPriority.HIGH
+            ? 'High-priority task assigned'
+            : 'Task assigned',
+      body: task.title,
+      data: JSON.stringify({
+        entityType: 'task',
+        entityId: task.id,
+        departmentId: task.department_id,
+        priority: task.priority,
+      }),
+      priority:
+        task.priority === TaskPriority.CRITICAL ? 2 : task.priority === TaskPriority.HIGH ? 1 : 0,
+    });
   }
 
   /**

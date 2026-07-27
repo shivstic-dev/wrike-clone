@@ -45,6 +45,22 @@ export function useWorkspaces() {
   });
 }
 
+export function useWorkspaceMembers(workspaceId: string) {
+  return useQuery({
+    queryKey: [...workspaceKeys.detail(workspaceId), 'members'],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/workspaces/${workspaceId}/members`);
+      return (Array.isArray(data) ? data : []) as Array<{
+        userId: string;
+        displayName: string;
+        email: string;
+        role: 'employee' | 'manager' | 'department_head';
+      }>;
+    },
+    enabled: !!workspaceId,
+  });
+}
+
 export function useWorkspace(id: string) {
   return useQuery({
     queryKey: workspaceKeys.detail(id),
@@ -62,8 +78,8 @@ export function useCreateWorkspace() {
 
   return useMutation({
     mutationFn: async (input: CreateWorkspaceRequest) => {
-      const { data } = await apiClient.post<{ data: Workspace }>('/workspaces', input);
-      return data.data;
+      const { data } = await apiClient.post<Workspace>('/workspaces', input);
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.lists() });
@@ -76,11 +92,8 @@ export function useUpdateWorkspace() {
 
   return useMutation({
     mutationFn: async ({ id, ...input }: UpdateWorkspaceRequest & { id: string }) => {
-      const { data } = await apiClient.patch<{ data: Workspace }>(
-        `/workspaces/${id}`,
-        input,
-      );
-      return data.data;
+      const { data } = await apiClient.patch<Workspace>(`/workspaces/${id}`, input);
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: workspaceKeys.lists() });
@@ -94,7 +107,9 @@ export function useFolderTree(workspaceId: string) {
   return useQuery({
     queryKey: folderKeys.tree(workspaceId),
     queryFn: async () => {
-      const response = await apiClient.get(`/workspaces/${workspaceId}/folders`);
+      const response = await apiClient.get('/folders', {
+        params: { workspaceId },
+      });
       const data = response.data;
       if (Array.isArray(data)) return data as Folder[];
       if (data && Array.isArray(data.data)) return data.data as Folder[];
@@ -110,7 +125,9 @@ export function useWorkspaceProjects(workspaceId: string) {
   return useQuery({
     queryKey: workspaceKeys.projects(workspaceId),
     queryFn: async () => {
-      const response = await apiClient.get(`/workspaces/${workspaceId}/projects`);
+      const response = await apiClient.get('/projects', {
+        params: { workspaceId },
+      });
       const data = response.data;
       if (Array.isArray(data)) return data as Project[];
       if (data && Array.isArray(data.data)) return data.data as Project[];

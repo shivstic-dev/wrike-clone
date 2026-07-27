@@ -87,7 +87,9 @@ export class FolderService {
   async remove(id: string): Promise<void> {
     const ctx = requireTenantContext();
     await this.findById(id);
-    await this.db('folders').where({ id, tenant_id: ctx.tenantId }).update({ deleted_at: new Date() });
+    await this.db('folders')
+      .where({ id, tenant_id: ctx.tenantId })
+      .update({ deleted_at: new Date() });
     this.logger.log(`Folder ${id} deleted`);
   }
 }

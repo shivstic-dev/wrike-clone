@@ -46,7 +46,9 @@ export class EventsService {
       // v1: Evaluate automation rules synchronously
       await this.automationService.processEventSync(event, payload);
     } catch (err) {
-      this.logger.warn(`Automation rule evaluation failed for event ${event}: ${(err as Error).message}`);
+      this.logger.warn(
+        `Automation rule evaluation failed for event ${event}: ${(err as Error).message}`,
+      );
     }
 
     try {

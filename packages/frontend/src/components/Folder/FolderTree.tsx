@@ -25,7 +25,10 @@ function FolderTreeNode({ folder, allFolders, depth = 0 }: FolderTreeNodeProps) 
       >
         {hasChildren && (
           <svg
-            className={clsx('h-3 w-3 shrink-0 text-slate-400 transition-transform', isExpanded && 'rotate-90')}
+            className={clsx(
+              'h-3 w-3 shrink-0 text-slate-400 transition-transform',
+              isExpanded && 'rotate-90',
+            )}
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth={2}

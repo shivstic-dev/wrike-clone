@@ -15,10 +15,7 @@ function ErrorFallback() {
         <p className="text-sm text-slate-500">
           An unexpected error occurred. The team has been notified.
         </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-4 btn-primary"
-        >
+        <button onClick={() => window.location.reload()} className="mt-4 btn-primary">
           Reload page
         </button>
       </div>

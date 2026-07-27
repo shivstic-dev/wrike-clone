@@ -12,6 +12,7 @@ import { tenantContext } from '../../src/common/tenant-context';
 function createQb() {
   const qb = {
     where: jest.fn().mockReturnThis(),
+    whereRaw: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     whereNull: jest.fn().mockReturnThis(),
     first: jest.fn(),
@@ -67,6 +68,76 @@ describe('TenantService', () => {
 
       await expect(service.create({ name: 'Acme Corp', slug: 'acme' }))
         .rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('bootstrap', () => {
+    it('atomically creates a tenant and its first administrator', async () => {
+      const tenantQb = createQb();
+      const userQb = createQb();
+      const membershipQb = createQb();
+      tenantQb.first.mockResolvedValue(null);
+      tenantQb.returning.mockResolvedValue([
+        { id: 'tenant-1', name: 'Acme Corp', slug: 'acme' },
+      ]);
+      userQb.first.mockResolvedValue(null);
+
+      const trx = jest.fn((table: string) => {
+        if (table === 'tenants') return tenantQb;
+        if (table === 'users') return userQb;
+        return membershipQb;
+      });
+      (mockDb as jest.Mock & { transaction: jest.Mock }).transaction = jest.fn(
+        async (callback: (transaction: typeof trx) => unknown) => callback(trx),
+      );
+
+      const result = await service.bootstrap({
+        tenant: { name: 'Acme Corp', slug: 'acme' },
+        admin: {
+          email: 'Admin@Example.com',
+          password: 'strong-password-123',
+          displayName: 'Admin User',
+        },
+      });
+
+      expect(result.admin).toMatchObject({
+        email: 'admin@example.com',
+        role: 'admin',
+      });
+      expect(userQb.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'admin@example.com',
+          password_hash: expect.any(String),
+        }),
+      );
+      expect(membershipQb.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenant_id: expect.any(String),
+          role: 'admin',
+        }),
+      );
+      expect(result.admin).not.toHaveProperty('password');
+      expect(result.admin).not.toHaveProperty('passwordHash');
+    });
+
+    it('rejects a duplicate tenant without creating an administrator', async () => {
+      const tenantQb = createQb();
+      tenantQb.first.mockResolvedValue({ id: 'existing', slug: 'acme' });
+      const trx = jest.fn().mockReturnValue(tenantQb);
+      (mockDb as jest.Mock & { transaction: jest.Mock }).transaction = jest.fn(
+        async (callback: (transaction: typeof trx) => unknown) => callback(trx),
+      );
+
+      await expect(
+        service.bootstrap({
+          tenant: { name: 'Acme Corp', slug: 'acme' },
+          admin: {
+            email: 'admin@example.com',
+            password: 'strong-password-123',
+            displayName: 'Admin User',
+          },
+        }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 

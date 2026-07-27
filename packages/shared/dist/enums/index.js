@@ -62,21 +62,18 @@ var Permission;
 /** Task lifecycle statuses. Mappable to per-tenant custom workflows later. */
 var TaskStatus;
 (function (TaskStatus) {
-    TaskStatus["BACKLOG"] = "backlog";
     TaskStatus["TODO"] = "todo";
     TaskStatus["IN_PROGRESS"] = "in_progress";
-    TaskStatus["IN_REVIEW"] = "in_review";
-    TaskStatus["DONE"] = "done";
-    TaskStatus["CANCELLED"] = "cancelled";
+    TaskStatus["COMPLETED"] = "completed";
+    TaskStatus["BLOCKED"] = "blocked";
 })(TaskStatus || (exports.TaskStatus = TaskStatus = {}));
 /** Priority levels for tasks. */
 var TaskPriority;
 (function (TaskPriority) {
-    TaskPriority["NONE"] = "none";
     TaskPriority["LOW"] = "low";
     TaskPriority["MEDIUM"] = "medium";
     TaskPriority["HIGH"] = "high";
-    TaskPriority["URGENT"] = "urgent";
+    TaskPriority["CRITICAL"] = "critical";
 })(TaskPriority || (exports.TaskPriority = TaskPriority = {}));
 /** Task dependency relationship type. */
 var DependencyType;
@@ -96,14 +93,15 @@ var EventVisibility;
 /** Workspace-level role for department-based access control. */
 var WorkspaceRole;
 (function (WorkspaceRole) {
-    WorkspaceRole["DEPT_ADMIN"] = "dept_admin";
-    WorkspaceRole["MEMBER"] = "member";
+    WorkspaceRole["EMPLOYEE"] = "employee";
+    WorkspaceRole["MANAGER"] = "manager";
+    WorkspaceRole["DEPARTMENT_HEAD"] = "department_head";
 })(WorkspaceRole || (exports.WorkspaceRole = WorkspaceRole = {}));
 /** Task/project visibility — who can see this item. */
 var Visibility;
 (function (Visibility) {
-    Visibility["ORGANIZATION"] = "organization";
     Visibility["DEPARTMENT"] = "department";
+    Visibility["GLOBAL"] = "global";
 })(Visibility || (exports.Visibility = Visibility = {}));
 /** Approval chain step outcome. */
 var ApprovalStatus;

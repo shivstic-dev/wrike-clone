@@ -4,7 +4,12 @@ import { AuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { createWorkspaceSchema, updateWorkspaceSchema, addWorkspaceMemberSchema, updateWorkspaceMemberRoleSchema } from '@wrike-clone/shared';
+import {
+  createWorkspaceSchema,
+  updateWorkspaceSchema,
+  addWorkspaceMemberSchema,
+  updateWorkspaceMemberRoleSchema,
+} from '@wrike-clone/shared';
 
 @Controller('workspaces')
 @UseGuards(AuthGuard, RolesGuard)
@@ -53,17 +58,14 @@ export class WorkspaceController {
   }
 
   @Post(':id/members')
-  @Permissions('workspace:invite')
-  async addMember(
-    @Param('id') id: string,
-    @Body() body: unknown,
-  ) {
+  @Permissions('user:role:manage')
+  async addMember(@Param('id') id: string, @Body() body: unknown) {
     const input = addWorkspaceMemberSchema.parse(body);
     return this.workspaceService.addMember(id, input);
   }
 
   @Patch(':id/members/:userId')
-  @Permissions('workspace:manage_members')
+  @Permissions('user:role:manage')
   async updateMemberRole(
     @Param('id') id: string,
     @Param('userId') userId: string,
@@ -74,7 +76,7 @@ export class WorkspaceController {
   }
 
   @Delete(':id/members/:userId')
-  @Permissions('workspace:manage_members')
+  @Permissions('user:role:manage')
   async removeMember(@Param('id') id: string, @Param('userId') userId: string) {
     await this.workspaceService.removeMember(id, userId);
     return { message: 'Member removed from workspace' };

@@ -1,6 +1,8 @@
 import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
+  if (await knex.schema.hasTable('working_hours')) return;
+
   // ── working_hours — per-user default working hours ──
   await knex.schema.createTable('working_hours', (table) => {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
@@ -14,6 +16,7 @@ export async function up(knex: Knex): Promise<void> {
   });
 
   await knex.schema.raw('ALTER TABLE working_hours ENABLE ROW LEVEL SECURITY;');
+  await knex.schema.raw('ALTER TABLE working_hours FORCE ROW LEVEL SECURITY;');
   await knex.schema.raw(`
     CREATE POLICY tenant_isolation ON working_hours FOR ALL
       USING (tenant_id = current_tenant_id())
@@ -28,13 +31,18 @@ export async function up(knex: Knex): Promise<void> {
     table.date('date').notNullable();
     table.string('type', 20).notNullable().checkIn(['vacation', 'sick', 'personal']);
     table.text('reason');
-    table.string('status', 20).notNullable().defaultTo('pending').checkIn(['pending', 'approved', 'rejected']);
+    table
+      .string('status', 20)
+      .notNullable()
+      .defaultTo('pending')
+      .checkIn(['pending', 'approved', 'rejected']);
     table.timestamps(true, true);
   });
 
   await knex.schema.raw('CREATE INDEX idx_to_user ON time_off(user_id);');
   await knex.schema.raw('CREATE INDEX idx_to_tenant ON time_off(tenant_id);');
   await knex.schema.raw('ALTER TABLE time_off ENABLE ROW LEVEL SECURITY;');
+  await knex.schema.raw('ALTER TABLE time_off FORCE ROW LEVEL SECURITY;');
   await knex.schema.raw(`
     CREATE POLICY tenant_isolation ON time_off FOR ALL
       USING (tenant_id = current_tenant_id())
@@ -53,6 +61,7 @@ export async function up(knex: Knex): Promise<void> {
 
   await knex.schema.raw('CREATE INDEX idx_th_tenant ON tenant_holidays(tenant_id);');
   await knex.schema.raw('ALTER TABLE tenant_holidays ENABLE ROW LEVEL SECURITY;');
+  await knex.schema.raw('ALTER TABLE tenant_holidays FORCE ROW LEVEL SECURITY;');
   await knex.schema.raw(`
     CREATE POLICY tenant_isolation ON tenant_holidays FOR ALL
       USING (tenant_id = current_tenant_id())

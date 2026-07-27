@@ -75,12 +75,14 @@ export function PortfolioView() {
               </div>
               <div className="rounded-lg bg-slate-50 p-3">
                 <p className="text-xs text-slate-400">Total Cost</p>
-                <p className={clsx(
-                  'text-lg font-bold',
-                  (portfolio.totalCost || 0) > (portfolio.totalBudget || 0)
-                    ? 'text-red-600'
-                    : 'text-green-600',
-                )}>
+                <p
+                  className={clsx(
+                    'text-lg font-bold',
+                    (portfolio.totalCost || 0) > (portfolio.totalBudget || 0)
+                      ? 'text-red-600'
+                      : 'text-green-600',
+                  )}
+                >
                   ${(portfolio.totalCost || 0).toLocaleString()}
                 </p>
               </div>

@@ -1,22 +1,19 @@
 #!/usr/bin/env bash
-# Railway startup script — runs DB migrations, then starts backend.
+# Railway startup: migrations must succeed before the API starts.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-echo "=== Wrike Clone Railway Startup ==="
+echo "=== Work Management API Railway Startup ==="
 
-# Run Knex migrations against the database
 if [ -z "${DATABASE_URL:-}" ]; then
-  echo "[WARN] DATABASE_URL not set — skipping migrations"
-else
-  echo "[INFO] Running migrations..."
-  cd "$SCRIPT_DIR/packages/backend"
-  npx knex migrate:latest --knexfile src/database/knexfile.ts \
-    && echo "[OK] Migrations applied" \
-    || echo "[WARN] Migration step completed"
+  echo "[ERROR] DATABASE_URL is required"
+  exit 1
 fi
 
-# Start the backend
-echo "[INFO] Starting backend..."
+echo "[INFO] Running migrations..."
 cd "$SCRIPT_DIR/packages/backend"
+npx knex migrate:latest --knexfile dist/database/knexfile.js
+echo "[OK] Migrations applied"
+
+echo "[INFO] Starting backend..."
 npm run start:prod

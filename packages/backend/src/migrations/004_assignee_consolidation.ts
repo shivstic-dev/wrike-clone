@@ -1,6 +1,8 @@
 import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
+  if (!(await knex.schema.hasTable('task_assignees'))) return;
+
   // Copy first task_assignees row into tasks.assignee_id where tasks.assignee_id is null
   await knex.schema.raw(`
     UPDATE tasks

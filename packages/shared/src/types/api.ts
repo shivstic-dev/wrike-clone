@@ -149,7 +149,7 @@ export interface CreateProjectRequest {
   dueDate?: string;
   priority?: TaskPriority;
   budget?: number;
-  visibility?: 'organization' | 'department';
+  visibility?: 'global' | 'department';
 }
 
 export interface UpdateProjectRequest {
@@ -161,7 +161,7 @@ export interface UpdateProjectRequest {
   priority?: TaskPriority;
   budget?: number;
   actualCost?: number;
-  visibility?: 'organization' | 'department';
+  visibility?: 'global' | 'department';
 }
 
 // ── Task ───────────────────────────────────────────────────────
@@ -177,6 +177,7 @@ export interface CreateTaskRequest {
   estimatedHours?: number;
   startDate?: string;
   dueDate?: string;
+  visibility?: 'global' | 'department';
   customFields?: Record<string, unknown>;
 }
 
@@ -190,11 +191,13 @@ export interface UpdateTaskRequest {
   actualHours?: number;
   startDate?: string;
   dueDate?: string;
+  visibility?: 'global' | 'department';
   sortOrder?: number;
   customFields?: Record<string, unknown>;
 }
 
 export interface TaskFilterParams extends PaginationParams {
+  departmentId?: string;
   projectId?: string;
   assigneeId?: string;
   status?: TaskStatus[];

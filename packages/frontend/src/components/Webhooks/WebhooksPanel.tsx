@@ -29,7 +29,11 @@ export default function WebhooksPanel() {
   const [secret, setSecret] = useState('');
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
 
-  const { data: webhooks, isLoading, error } = useQuery({
+  const {
+    data: webhooks,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['webhooks'],
     queryFn: async () => {
       const { data } = await apiClient.get('/webhooks');
@@ -53,7 +57,8 @@ export default function WebhooksPanel() {
       setSelectedEvents([]);
       toast.success('Webhook created');
     },
-    onError: (err: any) => toast.error(err.response?.data?.error?.message || 'Failed to create webhook'),
+    onError: (err: any) =>
+      toast.error(err.response?.data?.error?.message || 'Failed to create webhook'),
   });
 
   const toggleWebhook = useMutation({
@@ -154,7 +159,9 @@ export default function WebhooksPanel() {
               >
                 {createWebhook.isPending ? 'Creating...' : 'Create Webhook'}
               </button>
-              <button onClick={() => setShowCreate(false)} className="btn-secondary btn-sm">Cancel</button>
+              <button onClick={() => setShowCreate(false)} className="btn-secondary btn-sm">
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -191,9 +198,7 @@ export default function WebhooksPanel() {
                         wh.is_active ? 'bg-green-500' : 'bg-slate-300',
                       )}
                     />
-                    <p className="text-sm font-medium text-slate-900 truncate">
-                      {wh.url}
-                    </p>
+                    <p className="text-sm font-medium text-slate-900 truncate">{wh.url}</p>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {(wh.events || []).map((evt: string) => (
@@ -210,9 +215,7 @@ export default function WebhooksPanel() {
                       ? `Last triggered: ${new Date(wh.last_triggered_at).toLocaleString()}`
                       : 'Never triggered'}
                     {wh.failure_count > 0 && (
-                      <span className="ml-2 text-red-500">
-                        · {wh.failure_count} failures
-                      </span>
+                      <span className="ml-2 text-red-500">· {wh.failure_count} failures</span>
                     )}
                   </p>
                 </div>
@@ -229,10 +232,18 @@ export default function WebhooksPanel() {
                     {wh.is_active ? 'Disable' : 'Enable'}
                   </button>
                   <button
-                    onClick={() => { if (confirm('Delete this webhook?')) deleteWebhook.mutate(wh.id); }}
+                    onClick={() => {
+                      if (confirm('Delete this webhook?')) deleteWebhook.mutate(wh.id);
+                    }}
                     className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
                   >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                    >
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>

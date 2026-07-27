@@ -1,10 +1,4 @@
-/**
- * Supabase Deployment Migration — Run this in Supabase SQL Editor
- * to create all new tables (customization + work schedules).
- *
- * This script is idempotent — safe to run multiple times.
- * Run AFTER the base schema.sql and migrations 001-007.
- */
+-- Applied customization and work-schedule tables.
 
 -- =============================================================================
 -- 1. Customization Tables (migration 008)
@@ -26,6 +20,7 @@ CREATE TABLE IF NOT EXISTS workspace_statuses (
 CREATE INDEX IF NOT EXISTS idx_ws_workspace ON workspace_statuses(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_ws_tenant ON workspace_statuses(tenant_id);
 ALTER TABLE workspace_statuses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace_statuses FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON workspace_statuses;
 CREATE POLICY tenant_isolation ON workspace_statuses FOR ALL
   USING (tenant_id = current_tenant_id())
@@ -45,6 +40,7 @@ CREATE TABLE IF NOT EXISTS project_templates (
 
 CREATE INDEX IF NOT EXISTS idx_pt_tenant ON project_templates(tenant_id);
 ALTER TABLE project_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project_templates FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON project_templates;
 CREATE POLICY tenant_isolation ON project_templates FOR ALL
   USING (tenant_id = current_tenant_id())
@@ -66,6 +62,7 @@ CREATE TABLE IF NOT EXISTS request_forms (
 CREATE INDEX IF NOT EXISTS idx_rf_tenant ON request_forms(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_rf_folder ON request_forms(folder_id);
 ALTER TABLE request_forms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE request_forms FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON request_forms;
 CREATE POLICY tenant_isolation ON request_forms FOR ALL
   USING (tenant_id = current_tenant_id())
@@ -89,6 +86,7 @@ CREATE TABLE IF NOT EXISTS working_hours (
 );
 
 ALTER TABLE working_hours ENABLE ROW LEVEL SECURITY;
+ALTER TABLE working_hours FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON working_hours;
 CREATE POLICY tenant_isolation ON working_hours FOR ALL
   USING (tenant_id = current_tenant_id())
@@ -110,6 +108,7 @@ CREATE TABLE IF NOT EXISTS time_off (
 CREATE INDEX IF NOT EXISTS idx_to_user ON time_off(user_id);
 CREATE INDEX IF NOT EXISTS idx_to_tenant ON time_off(tenant_id);
 ALTER TABLE time_off ENABLE ROW LEVEL SECURITY;
+ALTER TABLE time_off FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON time_off;
 CREATE POLICY tenant_isolation ON time_off FOR ALL
   USING (tenant_id = current_tenant_id())
@@ -128,6 +127,7 @@ CREATE TABLE IF NOT EXISTS tenant_holidays (
 
 CREATE INDEX IF NOT EXISTS idx_th_tenant ON tenant_holidays(tenant_id);
 ALTER TABLE tenant_holidays ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_holidays FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON tenant_holidays;
 CREATE POLICY tenant_isolation ON tenant_holidays FOR ALL
   USING (tenant_id = current_tenant_id())
@@ -146,11 +146,19 @@ DECLARE
   t TEXT;
 BEGIN
   FOREACH t IN ARRAY new_tables LOOP
-    EXECUTE format('
-      CREATE TRIGGER IF NOT EXISTS trg_%I_updated_at
-        BEFORE UPDATE ON %I
-        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
-    ', t, t);
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_trigger
+      WHERE tgname = format('trg_%s_updated_at', t)
+        AND tgrelid = to_regclass(t)
+        AND NOT tgisinternal
+    ) THEN
+      EXECUTE format('
+        CREATE TRIGGER trg_%I_updated_at
+          BEFORE UPDATE ON %I
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+      ', t, t);
+    END IF;
   END LOOP;
 END;
 $$ LANGUAGE plpgsql;

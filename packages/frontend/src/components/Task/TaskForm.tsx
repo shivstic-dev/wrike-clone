@@ -8,23 +8,22 @@ interface TaskFormProps {
   onSubmit: (values: Partial<Task> | CreateTaskRequest) => Promise<void>;
   onCancel?: () => void;
   isSubmitting?: boolean;
+  canSetVisibility?: boolean;
+  assignees?: Array<{ userId: string; displayName: string; email: string }>;
 }
 
 const statusOptions: { value: string; label: string }[] = [
-  { value: TASK_STATUS.BACKLOG, label: 'Backlog' },
   { value: TASK_STATUS.TODO, label: 'To Do' },
   { value: TASK_STATUS.IN_PROGRESS, label: 'In Progress' },
-  { value: TASK_STATUS.IN_REVIEW, label: 'In Review' },
-  { value: TASK_STATUS.DONE, label: 'Done' },
-  { value: TASK_STATUS.CANCELLED, label: 'Cancelled' },
+  { value: TASK_STATUS.COMPLETED, label: 'Completed' },
+  { value: TASK_STATUS.BLOCKED, label: 'Blocked' },
 ];
 
 const priorityOptions: { value: string; label: string }[] = [
-  { value: TASK_PRIORITY.NONE, label: 'None' },
   { value: TASK_PRIORITY.LOW, label: 'Low' },
   { value: TASK_PRIORITY.MEDIUM, label: 'Medium' },
   { value: TASK_PRIORITY.HIGH, label: 'High' },
-  { value: TASK_PRIORITY.URGENT, label: 'Urgent' },
+  { value: TASK_PRIORITY.CRITICAL, label: 'Critical' },
 ];
 
 export function TaskForm({
@@ -33,6 +32,8 @@ export function TaskForm({
   onSubmit,
   onCancel,
   isSubmitting = false,
+  canSetVisibility = false,
+  assignees = [],
 }: TaskFormProps) {
   const [title, setTitle] = useState(initialValues?.title || '');
   const [description, setDescription] = useState(initialValues?.description || '');
@@ -44,6 +45,9 @@ export function TaskForm({
   );
   const [startDate, setStartDate] = useState(initialValues?.startDate?.split('T')[0] || '');
   const [dueDate, setDueDate] = useState(initialValues?.dueDate?.split('T')[0] || '');
+  const [visibility, setVisibility] = useState<Task['visibility']>(
+    initialValues?.visibility || 'department',
+  );
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -59,6 +63,7 @@ export function TaskForm({
       estimatedHours: estimatedHours ?? undefined,
       startDate: startDate ? new Date(startDate).toISOString() : undefined,
       dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+      ...(canSetVisibility ? { visibility } : {}),
       projectId: projectId || initialValues?.projectId,
     } as Partial<Task>);
   };
@@ -82,6 +87,23 @@ export function TaskForm({
           required
         />
       </div>
+
+      {canSetVisibility && (
+        <div>
+          <label htmlFor="visibility" className="label">
+            Visibility
+          </label>
+          <select
+            id="visibility"
+            className={inputClasses}
+            value={visibility}
+            onChange={(event) => setVisibility(event.target.value as Task['visibility'])}
+          >
+            <option value="department">Department only</option>
+            <option value="global">Global (all departments)</option>
+          </select>
+        </div>
+      )}
 
       <div>
         <label htmlFor="description" className="label">
@@ -166,16 +188,21 @@ export function TaskForm({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label htmlFor="assigneeId" className="label">
-            Assignee ID
+            Assignee
           </label>
-          <input
+          <select
             id="assigneeId"
-            type="text"
             className={inputClasses}
             value={assigneeId}
-            onChange={(e) => setAssigneeId(e.target.value)}
-            placeholder="User ID"
-          />
+            onChange={(event) => setAssigneeId(event.target.value)}
+          >
+            <option value="">Unassigned</option>
+            {assignees.map((assignee) => (
+              <option key={assignee.userId} value={assignee.userId}>
+                {assignee.displayName || assignee.email}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -206,11 +233,7 @@ export function TaskForm({
             Cancel
           </button>
         )}
-        <button
-          type="submit"
-          disabled={!title.trim() || isSubmitting}
-          className="btn-primary"
-        >
+        <button type="submit" disabled={!title.trim() || isSubmitting} className="btn-primary">
           {isSubmitting ? 'Saving...' : initialValues?.id ? 'Update task' : 'Create task'}
         </button>
       </div>

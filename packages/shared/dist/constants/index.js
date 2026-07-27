@@ -15,25 +15,17 @@ exports.PAGINATION = {
     MIN_PER_PAGE: 1,
 };
 /** Task statuses that count as "in progress" for reporting. */
-exports.ACTIVE_STATUSES = ['in_progress', 'in_review'];
+exports.ACTIVE_STATUSES = ['in_progress', 'blocked'];
 /** Terminal statuses — tasks at these statuses don't advance further. */
-exports.TERMINAL_STATUSES = ['done', 'cancelled'];
+exports.TERMINAL_STATUSES = ['completed'];
 /** Maximum depth of folder nesting to prevent infinite recursion. */
 exports.FOLDER_MAX_DEPTH = 10;
 /** Maximum file upload size (bytes). 100MB. */
 exports.MAX_FILE_SIZE_BYTES = 104_857_600;
 /** Allowed image MIME types for proofing annotations. */
-exports.ALLOWED_IMAGE_TYPES = [
-    'image/png',
-    'image/jpeg',
-    'image/webp',
-    'image/gif',
-];
+exports.ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 /** Allowed video MIME types for frame-level proofing. */
-exports.ALLOWED_VIDEO_TYPES = [
-    'video/mp4',
-    'video/webm',
-];
+exports.ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm'];
 /** Session / Auth. */
 exports.SESSION = {
     ACCESS_TOKEN_TTL_SEC: 900, // 15 min
@@ -74,29 +66,37 @@ exports.CACHE_KEYS = {
 exports.DEFAULT_ROLE_PERMISSIONS = {
     admin: ['*'], // wildcard = all permissions
     manager: [
-        'workspace:read', 'workspace:create', 'workspace:write', 'workspace:delete',
-        'workspace:invite', 'workspace:manage_members',
-        'folder:create', 'folder:read', 'folder:write', 'folder:delete',
-        'project:create', 'project:read', 'project:write', 'project:delete',
-        'task:create', 'task:read', 'task:write', 'task:delete', 'task:assign', 'task:status:update', 'task:comment',
-        'user:invite',
-        'approval:route', 'approval:approve',
-        'workflow:create', 'workflow:manage',
+        'workspace:read',
+        'folder:read',
+        'project:read',
+        'task:create',
+        'task:read',
+        'task:write',
+        'task:delete',
+        'task:assign',
+        'task:status:update',
+        'task:comment',
     ],
     member: [
         'workspace:read',
         'folder:read',
         'project:read',
-        'task:create', 'task:read', 'task:write', 'task:status:update', 'task:comment',
+        'task:read',
+        'task:status:update',
+        'task:comment',
+    ],
+    employee: [
+        'workspace:read',
+        'folder:read',
+        'project:read',
+        'task:read',
+        'task:status:update',
+        'task:comment',
     ],
     guest: [
         'task:read',
         'task:comment', // can comment/proof
     ],
-    collaborator: [
-        'task:read', 'task:write', 'task:comment',
-        'folder:read',
-        'project:read',
-    ],
+    collaborator: ['task:read', 'task:write', 'task:comment', 'folder:read', 'project:read'],
 };
 //# sourceMappingURL=index.js.map

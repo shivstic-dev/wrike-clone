@@ -24,15 +24,16 @@ export default function LoginPage() {
     try {
       const finalSlug = showSlugField ? slug.trim() : undefined;
       if (finalSlug) setTenantSlug(finalSlug);
-      await login({ 
+      await login({
         ...(finalSlug ? { tenantSlug: finalSlug } : {}),
-        email: email.trim(), 
-        password 
+        email: email.trim(),
+        password,
       });
     } catch (err: unknown) {
       const message =
         err instanceof Object && 'response' in err
-          ? (err as { response: { data: { error: { message: string } } } }).response?.data?.error?.message
+          ? (err as { response: { data: { error: { message: string } } } }).response?.data?.error
+              ?.message
           : 'Login failed. Please check your credentials.';
       toast.error(message);
     } finally {
@@ -47,7 +48,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary-600">
             <span className="text-xl font-bold text-white">WC</span>
           </div>
-          <h1 className="text-xl font-bold text-slate-900">Sign in to Wrike Clone</h1>
+          <h1 className="text-xl font-bold text-slate-900">Sign in to OpenWork Hub</h1>
           <p className="mt-1 text-sm text-slate-500">Enter your email to continue</p>
         </div>
 
@@ -101,11 +102,7 @@ export default function LoginPage() {
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="btn-primary w-full"
-          >
+          <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
             {isSubmitting ? (
               <span className="flex items-center gap-2">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />

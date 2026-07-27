@@ -1,29 +1,20 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../api/client';
-import { useWorkspaces } from '../api/workspaces';
+import { useCreateWorkspace, useUpdateWorkspace, useWorkspaces } from '../api/workspaces';
 import { ErrorDisplay } from '../components/common/ErrorDisplay';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
-import { EmptyState } from '../components/common/EmptyState';
-import CustomizationPanel from '../components/Customization/CustomizationPanel';
-import WebhooksPanel from '../components/Webhooks/WebhooksPanel';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
 
 // ---- Add Member Modal ----
 
-function AddMemberModal({
-  workspaceId,
-  onClose,
-}: {
-  workspaceId: string;
-  onClose: () => void;
-}) {
+function AddMemberModal({ workspaceId, onClose }: { workspaceId: string; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [tempPassword, setTempPassword] = useState('');
-  const [role, setRole] = useState('member');
+  const [role, setRole] = useState('employee');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,7 +38,8 @@ function AddMemberModal({
     } catch (err: unknown) {
       const message =
         err instanceof Object && 'response' in err
-          ? (err as { response: { data: { error: { message: string } } } }).response?.data?.error?.message
+          ? (err as { response: { data: { error: { message: string } } } }).response?.data?.error
+              ?.message
           : 'Failed to add member';
       toast.error(message);
     } finally {
@@ -62,25 +54,49 @@ function AddMemberModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="label">Email</label>
-            <input type="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="colleague@company.com" />
+            <input
+              type="email"
+              className="input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="colleague@company.com"
+            />
           </div>
           <div>
             <label className="label">Display name</label>
-            <input type="text" className="input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Jane Smith" />
+            <input
+              type="text"
+              className="input"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Jane Smith"
+            />
           </div>
           <div>
             <label className="label">Temporary password</label>
-            <input type="text" className="input" value={tempPassword} onChange={(e) => setTempPassword(e.target.value)} required minLength={8} placeholder="tempPass123!" />
+            <input
+              type="text"
+              className="input"
+              value={tempPassword}
+              onChange={(e) => setTempPassword(e.target.value)}
+              required
+              minLength={8}
+              placeholder="tempPass123!"
+            />
           </div>
           <div>
             <label className="label">Role</label>
             <select className="input" value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="member">Member</option>
-              <option value="dept_admin">Department Admin</option>
+              <option value="employee">Employee</option>
+              <option value="manager">Manager</option>
+              <option value="department_head">Department Head</option>
             </select>
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+            <button type="button" onClick={onClose} className="btn-secondary">
+              Cancel
+            </button>
             <button type="submit" disabled={isSubmitting} className="btn-primary">
               {isSubmitting ? 'Adding...' : 'Add member'}
             </button>
@@ -94,7 +110,11 @@ function AddMemberModal({
 // ---- Workspace Members Section ----
 
 function WorkspaceMembers({ workspaceId }: { workspaceId: string }) {
-  const { data: members, isLoading, error } = useQuery({
+  const {
+    data: members,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['workspace-members', workspaceId],
     queryFn: async () => {
       const { data } = await apiClient.get(`/workspaces/${workspaceId}/members`);
@@ -112,6 +132,17 @@ function WorkspaceMembers({ workspaceId }: { workspaceId: string }) {
       queryClient.invalidateQueries({ queryKey: ['workspace-members', workspaceId] });
       toast.success('Member removed');
     },
+  });
+  const updateRole = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      await apiClient.patch(`/workspaces/${workspaceId}/members/${userId}`, { role });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspace-members', workspaceId] });
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      toast.success('Department role updated');
+    },
+    onError: () => toast.error('Role update failed'),
   });
 
   if (isLoading) return <LoadingSpinner />;
@@ -139,26 +170,50 @@ function WorkspaceMembers({ workspaceId }: { workspaceId: string }) {
                   {(member.display_name || member.email || '?').charAt(0).toUpperCase()}
                 </span>
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{member.display_name || member.email}</p>
+                  <p className="text-sm font-medium text-slate-900">
+                    {member.display_name || member.email}
+                  </p>
                   <p className="text-xs text-slate-400">{member.email}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className={clsx(
-                  'rounded-full px-2 py-0.5 text-xs font-medium',
-                  member.role === 'dept_admin' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600',
-                )}>
-                  {member.role === 'dept_admin' ? 'Dept Admin' : 'Member'}
-                </span>
+                <select
+                  className={clsx(
+                    'rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium',
+                    member.role === 'department_head'
+                      ? 'bg-amber-50 text-amber-700'
+                      : member.role === 'manager'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'bg-slate-50 text-slate-600',
+                  )}
+                  value={member.role}
+                  disabled={updateRole.isPending}
+                  onChange={(event) =>
+                    updateRole.mutate({
+                      userId: member.userId || member.user_id,
+                      role: event.target.value,
+                    })
+                  }
+                >
+                  <option value="employee">Employee</option>
+                  <option value="manager">Manager</option>
+                  <option value="department_head">Department Head</option>
+                </select>
                 <button
                   onClick={() => {
                     if (confirm('Remove this member from the department?')) {
-                      removeMember.mutate(member.user_id);
+                      removeMember.mutate(member.userId || member.user_id);
                     }
                   }}
                   className="p-1 text-slate-400 hover:text-red-500"
                 >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -178,122 +233,149 @@ function WorkspaceMembers({ workspaceId }: { workspaceId: string }) {
 // ---- Main Admin Page ----
 
 export default function AdminPage() {
-  const [activeSection, setActiveSection] = useState<'members' | 'customization' | 'webhooks'>('members');
   const { data: workspaces, isLoading: wsLoading, error: wsError } = useWorkspaces();
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null);
+  const [newDepartmentName, setNewDepartmentName] = useState('');
+  const [editingDepartmentId, setEditingDepartmentId] = useState<string | null>(null);
+  const [editingDepartmentName, setEditingDepartmentName] = useState('');
+  const createWorkspace = useCreateWorkspace();
+  const updateWorkspace = useUpdateWorkspace();
 
   if (wsLoading) return <LoadingSpinner className="mt-20" size="lg" />;
-  if (wsError) return <div className="p-6"><ErrorDisplay message="Failed to load admin data" /></div>;
+  if (wsError)
+    return (
+      <div className="p-6">
+        <ErrorDisplay message="Failed to load admin data" />
+      </div>
+    );
 
   const wsList = Array.isArray(workspaces) ? workspaces : [];
+
+  async function createDepartment(event: React.FormEvent) {
+    event.preventDefault();
+    if (!newDepartmentName.trim()) return;
+    try {
+      const created = await createWorkspace.mutateAsync({ name: newDepartmentName.trim() });
+      setNewDepartmentName('');
+      setSelectedWorkspace(created.id);
+      toast.success('Department created');
+    } catch {
+      toast.error('Department creation failed');
+    }
+  }
+
+  async function saveDepartmentName() {
+    if (!editingDepartmentId || !editingDepartmentName.trim()) return;
+    try {
+      await updateWorkspace.mutateAsync({
+        id: editingDepartmentId,
+        name: editingDepartmentName.trim(),
+      });
+      setEditingDepartmentId(null);
+      toast.success('Department updated');
+    } catch {
+      toast.error('Department update failed');
+    }
+  }
 
   return (
     <div className="mx-auto max-w-5xl p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Admin Panel</h1>
-        <p className="mt-1 text-sm text-slate-500">Manage departments, members, and workspace customization.</p>
+        <p className="mt-1 text-sm text-slate-500">
+          Create departments, assign scoped roles, and manage members.
+        </p>
       </div>
 
-      {/* Section tabs */}
-      <div className="flex gap-4 mb-6 border-b border-slate-200">
-        <button
-          onClick={() => setActiveSection('members')}
-          className={clsx(
-            'pb-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
-            activeSection === 'members'
-              ? 'border-primary-600 text-primary-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700',
-          )}
-        >
-          Department Members
-        </button>
-        <button
-          onClick={() => setActiveSection('customization')}
-          className={clsx(
-            'pb-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
-            activeSection === 'customization'
-              ? 'border-primary-600 text-primary-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700',
-          )}
-        >
-          Customization
-        </button>
-        <button
-          onClick={() => setActiveSection('webhooks')}
-          className={clsx(
-            'pb-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
-            activeSection === 'webhooks'
-              ? 'border-primary-600 text-primary-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700',
-          )}
-        >
-          Webhooks
-        </button>
-      </div>
-
-      {activeSection === 'members' && (
-        <div className="grid grid-cols-12 gap-6">
-          {/* Department list */}
-          <div className="col-span-4">
-            <div className="card p-4">
-              <h3 className="mb-3 text-sm font-semibold text-slate-700">Departments</h3>
-              {wsList.length === 0 ? (
-                <p className="text-sm text-slate-400">No departments yet.</p>
-              ) : (
-                <div className="space-y-1">
-                  {wsList.map((ws: any) => (
-                    <button
-                      key={ws.id}
-                      onClick={() => setSelectedWorkspace(ws.id)}
-                      className={clsx(
-                        'w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',
-                        selectedWorkspace === ws.id
-                          ? 'bg-primary-50 text-primary-700'
-                          : 'text-slate-600 hover:bg-slate-50',
-                      )}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded bg-slate-200 text-xs font-bold text-slate-600">
-                          {ws.name.charAt(0).toUpperCase()}
-                        </span>
-                        {ws.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Member management */}
-          <div className="col-span-8">
-            {selectedWorkspace ? (
-              <div className="card p-4">
-                <h3 className="mb-4 text-sm font-semibold text-slate-700">
-                  {wsList.find((w: any) => w.id === selectedWorkspace)?.name || 'Department'} Members
-                </h3>
-                <WorkspaceMembers workspaceId={selectedWorkspace} />
-              </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="lg:col-span-4">
+          <div className="card p-4">
+            <h3 className="mb-3 text-sm font-semibold text-slate-700">Departments</h3>
+            <form className="mb-3 flex gap-2" onSubmit={createDepartment}>
+              <input
+                className="input min-w-0 flex-1 text-sm"
+                placeholder="New department"
+                value={newDepartmentName}
+                onChange={(event) => setNewDepartmentName(event.target.value)}
+              />
+              <button
+                className="btn-primary btn-sm"
+                disabled={createWorkspace.isPending || !newDepartmentName.trim()}
+              >
+                Add
+              </button>
+            </form>
+            {wsList.length === 0 ? (
+              <p className="text-sm text-slate-400">No departments yet.</p>
             ) : (
-              <div className="flex h-48 items-center justify-center rounded-xl border-2 border-dashed border-slate-200">
-                <p className="text-sm text-slate-400">Select a department to manage its members.</p>
+              <div className="space-y-1">
+                {wsList.map((ws: any) => (
+                  <div key={ws.id} className="flex items-center gap-1">
+                    {editingDepartmentId === ws.id ? (
+                      <>
+                        <input
+                          className="input min-w-0 flex-1 text-sm"
+                          value={editingDepartmentName}
+                          onChange={(event) => setEditingDepartmentName(event.target.value)}
+                        />
+                        <button className="btn-primary btn-sm" onClick={saveDepartmentName}>
+                          Save
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setSelectedWorkspace(ws.id)}
+                          className={clsx(
+                            'flex-1 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors',
+                            selectedWorkspace === ws.id
+                              ? 'bg-primary-50 text-primary-700'
+                              : 'text-slate-600 hover:bg-slate-50',
+                          )}
+                        >
+                          <span className="flex items-center gap-2">
+                            <span className="flex h-6 w-6 items-center justify-center rounded bg-slate-200 text-xs font-bold text-slate-600">
+                              {ws.name.charAt(0).toUpperCase()}
+                            </span>
+                            {ws.name}
+                          </span>
+                        </button>
+                        <button
+                          className="btn-ghost btn-sm"
+                          aria-label={`Rename ${ws.name}`}
+                          onClick={() => {
+                            setEditingDepartmentId(ws.id);
+                            setEditingDepartmentName(ws.name);
+                          }}
+                        >
+                          Edit
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
         </div>
-      )}
 
-      {activeSection === 'customization' && (
-        <div className="card p-6">
-          <CustomizationPanel />
+        <div className="lg:col-span-8">
+          {selectedWorkspace ? (
+            <div className="card p-4">
+              <h3 className="mb-4 text-sm font-semibold text-slate-700">
+                {wsList.find((workspace: any) => workspace.id === selectedWorkspace)?.name ||
+                  'Department'}{' '}
+                Members
+              </h3>
+              <WorkspaceMembers workspaceId={selectedWorkspace} />
+            </div>
+          ) : (
+            <div className="flex h-48 items-center justify-center rounded-xl border-2 border-dashed border-slate-200">
+              <p className="text-sm text-slate-400">Select a department to manage its members.</p>
+            </div>
+          )}
         </div>
-      )}
-
-      {activeSection === 'webhooks' && (
-        <div className="card p-6">
-          <WebhooksPanel />
-        </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -57,8 +57,8 @@ Click "Advanced" and add these environment variables:
 | `PORT` | `4000` |
 | `API_PREFIX` | `api/v1` |
 | `DATABASE_URL` | `postgresql://postgres.qmzxjfirlppveoxkynbt:*Cankidskidscan393@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres` |
-| `JWT_SECRET` | `1fd495e5c417c42cc97948ea3ced156b0fed9c7719581d1ea33e47aaa4e10e59` |
-| `JWT_REFRESH_SECRET` | `8e08b1e93d4e8423bc535a07bc2c505369e918d2f2ddf206b09113602050be47` |
+| `JWT_SECRET` | Generate a unique 32-byte secret for this environment |
+| `JWT_REFRESH_SECRET` | Generate a different unique 32-byte secret |
 | `CORS_ORIGINS` | `*` |
 
 **Note**: You can generate new JWT secrets by running:

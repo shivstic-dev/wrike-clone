@@ -39,5 +39,6 @@ docker/volumes/
 
 # Misc
 .cache/
+graphify-out/
 tmp/
 temp/

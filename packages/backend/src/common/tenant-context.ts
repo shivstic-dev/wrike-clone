@@ -6,6 +6,7 @@
 
 import { AsyncLocalStorage } from 'async_hooks';
 import { UnauthorizedException } from '@nestjs/common';
+import type { Knex } from 'knex';
 
 export interface TenantContextData {
   tenantId: string;
@@ -13,6 +14,8 @@ export interface TenantContextData {
   membershipId: string;
   role: string;
   permissions: string[];
+  /** Request-scoped transaction used for all tenant queries. */
+  database?: Knex.Transaction;
 }
 
 export const tenantContext = new AsyncLocalStorage<TenantContextData>();

@@ -77,7 +77,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         code,
         message,
         ...(details ? { details } : {}),
-        ...((request as unknown as Record<string, unknown>).id ? { requestId: (request as unknown as Record<string, unknown>).id as string } : {}),
+        ...((request as unknown as Record<string, unknown>).id
+          ? { requestId: (request as unknown as Record<string, unknown>).id as string }
+          : {}),
       },
     });
   }

@@ -15,7 +15,7 @@ import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { verify } from 'jsonwebtoken';
 import { loadAuthConfig } from '../../config/app.config';
-import { tenantContext, TenantContextData } from '../tenant-context';
+import { TenantContextData } from '../tenant-context';
 
 @Injectable()
 export class TenantContextMiddleware implements NestMiddleware {
@@ -56,11 +56,8 @@ export class TenantContextMiddleware implements NestMiddleware {
 
         (req as any).tenantContext = ctx;
 
-        // Use enterWith() for reliable context propagation.
-        // This sets the store for the current async execution context,
-        // surviving across all subsequent sync/async operations including
-        // guards, interceptors, controllers, and services.
-        tenantContext.enterWith(ctx);
+        // The interceptor establishes the scoped tenant transaction after
+        // guards run. Middleware only attaches decoded identity to this request.
         next();
       } else {
         this.logger.warn(`JWT payload missing tenantId for ${req.method} ${req.url}`);
@@ -70,7 +67,9 @@ export class TenantContextMiddleware implements NestMiddleware {
       // Token verification failed — let the AuthGuard handle rejection.
       // The interceptor (which runs after guards) will set up context
       // if the guard lets the request through.
-      this.logger.debug(`JWT decode skipped in middleware for ${req.method} ${req.url}: ${(err as Error).message}`);
+      this.logger.debug(
+        `JWT decode skipped in middleware for ${req.method} ${req.url}: ${(err as Error).message}`,
+      );
       next();
     }
   }

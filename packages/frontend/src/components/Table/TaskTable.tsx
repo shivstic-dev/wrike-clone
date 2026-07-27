@@ -20,20 +20,17 @@ import type { Task, TaskStatus, TaskPriority } from '@wrike-clone/shared';
 const columnHelper = createColumnHelper<Task>();
 
 const statusBadge: Record<TaskStatus, string> = {
-  backlog: 'badge-backlog',
   todo: 'badge-todo',
   in_progress: 'badge-in_progress',
-  in_review: 'badge-in_review',
-  done: 'badge-done',
-  cancelled: 'badge-cancelled',
+  completed: 'badge-done',
+  blocked: 'badge-cancelled',
 };
 
 const priorityClass: Record<TaskPriority, string> = {
-  none: 'priority-none',
   low: 'priority-low',
   medium: 'priority-medium',
   high: 'priority-high',
-  urgent: 'priority-urgent',
+  critical: 'priority-urgent',
 };
 
 interface TaskTableProps {
@@ -72,12 +69,19 @@ export function TaskTable({ tasks, isLoading }: TaskTableProps) {
       columnHelper.accessor('title', {
         header: 'Title',
         cell: (info) => (
-          <Link
-            to={`/tasks/${info.row.original.id}`}
-            className="font-medium text-primary-600 hover:text-primary-700 hover:underline"
-          >
-            {info.getValue()}
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/tasks/${info.row.original.id}`}
+              className="font-medium text-primary-600 hover:text-primary-700 hover:underline"
+            >
+              {info.getValue()}
+            </Link>
+            {info.row.original.visibility === 'global' && (
+              <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+                Global
+              </span>
+            )}
+          </div>
         ),
       }),
       columnHelper.accessor('status', {
@@ -98,11 +102,7 @@ export function TaskTable({ tasks, isLoading }: TaskTableProps) {
       }),
       columnHelper.accessor('assigneeId', {
         header: 'Assignee',
-        cell: (info) => (
-          <span className="text-sm text-slate-600">
-            {info.getValue() || '—'}
-          </span>
-        ),
+        cell: (info) => <span className="text-sm text-slate-600">{info.getValue() || '—'}</span>,
       }),
       columnHelper.accessor('dueDate', {
         header: 'Due date',
@@ -111,7 +111,9 @@ export function TaskTable({ tasks, isLoading }: TaskTableProps) {
           if (!date) return <span className="text-sm text-slate-400">—</span>;
           const isOverdue = new Date(date) < new Date();
           return (
-            <span className={clsx('text-sm', isOverdue ? 'text-red-600 font-medium' : 'text-slate-600')}>
+            <span
+              className={clsx('text-sm', isOverdue ? 'text-red-600 font-medium' : 'text-slate-600')}
+            >
               {new Date(date).toLocaleDateString()}
             </span>
           );
@@ -155,12 +157,7 @@ export function TaskTable({ tasks, isLoading }: TaskTableProps) {
   }
 
   if (tasks.length === 0) {
-    return (
-      <EmptyState
-        title="No tasks"
-        description="No tasks match the current filters."
-      />
-    );
+    return <EmptyState title="No tasks" description="No tasks match the current filters." />;
   }
 
   const selectedCount = Object.keys(rowSelection).length;
@@ -177,9 +174,7 @@ export function TaskTable({ tasks, isLoading }: TaskTableProps) {
           className="input max-w-xs"
         />
         {selectedCount > 0 && (
-          <span className="text-sm text-slate-500">
-            {selectedCount} selected
-          </span>
+          <span className="text-sm text-slate-500">{selectedCount} selected</span>
         )}
       </div>
 
@@ -194,7 +189,8 @@ export function TaskTable({ tasks, isLoading }: TaskTableProps) {
                     key={header.id}
                     className={clsx(
                       'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500',
-                      header.column.getCanSort() && 'cursor-pointer select-none hover:text-slate-700',
+                      header.column.getCanSort() &&
+                        'cursor-pointer select-none hover:text-slate-700',
                     )}
                     onClick={header.column.getToggleSortingHandler()}
                     style={{ width: header.getSize() }}

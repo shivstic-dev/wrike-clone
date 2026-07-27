@@ -7,7 +7,12 @@ import { EmptyState } from '../components/common/EmptyState';
 
 export default function MyTasksPage() {
   const { user } = useAuth();
-  const { data: tasksData, isLoading, error, refetch } = useTasks({
+  const {
+    data: tasksData,
+    isLoading,
+    error,
+    refetch,
+  } = useTasks({
     assigneeId: user?.id,
     perPage: 100,
   });
@@ -26,9 +31,7 @@ export default function MyTasksPage() {
     <div className="mx-auto max-w-7xl p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">My Tasks</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Tasks assigned to you across all projects.
-        </p>
+        <p className="mt-1 text-sm text-slate-500">Tasks assigned to you across all projects.</p>
       </div>
 
       {isLoading ? (

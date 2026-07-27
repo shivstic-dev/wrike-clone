@@ -65,21 +65,18 @@ export enum Permission {
 
 /** Task lifecycle statuses. Mappable to per-tenant custom workflows later. */
 export enum TaskStatus {
-  BACKLOG = 'backlog',
   TODO = 'todo',
   IN_PROGRESS = 'in_progress',
-  IN_REVIEW = 'in_review',
-  DONE = 'done',
-  CANCELLED = 'cancelled',
+  COMPLETED = 'completed',
+  BLOCKED = 'blocked',
 }
 
 /** Priority levels for tasks. */
 export enum TaskPriority {
-  NONE = 'none',
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high',
-  URGENT = 'urgent',
+  CRITICAL = 'critical',
 }
 
 /** Task dependency relationship type. */
@@ -99,14 +96,15 @@ export enum EventVisibility {
 
 /** Workspace-level role for department-based access control. */
 export enum WorkspaceRole {
-  DEPT_ADMIN = 'dept_admin',
-  MEMBER = 'member',
+  EMPLOYEE = 'employee',
+  MANAGER = 'manager',
+  DEPARTMENT_HEAD = 'department_head',
 }
 
 /** Task/project visibility — who can see this item. */
 export enum Visibility {
-  ORGANIZATION = 'organization',
   DEPARTMENT = 'department',
+  GLOBAL = 'global',
 }
 
 /** Approval chain step outcome. */

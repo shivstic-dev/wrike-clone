@@ -7,7 +7,12 @@ export default function CalendarPage() {
   const { data: tasksData, isLoading, error, refetch } = useTasks({ perPage: 500 });
 
   if (isLoading) return <LoadingSpinner className="mt-20" size="lg" />;
-  if (error) return <div className="p-6"><ErrorDisplay message="Failed to load tasks" onRetry={() => refetch()} /></div>;
+  if (error)
+    return (
+      <div className="p-6">
+        <ErrorDisplay message="Failed to load tasks" onRetry={() => refetch()} />
+      </div>
+    );
 
   const tasks = tasksData?.data || [];
 

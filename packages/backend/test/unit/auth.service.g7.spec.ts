@@ -24,6 +24,7 @@ function createQb() {
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     whereNull: jest.fn().mockReturnThis(),
+    join: jest.fn().mockReturnThis(),
     first: jest.fn(),
     insert: jest.fn().mockReturnThis(),
     update: jest.fn(),
@@ -52,10 +53,7 @@ describe('AuthService (G7 + Phase 2 features)', () => {
     qb.returning.mockResolvedValue([{}]);
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuthService,
-        { provide: DATABASE_PROVIDER, useValue: mockDb },
-      ],
+      providers: [AuthService, { provide: DATABASE_PROVIDER, useValue: mockDb }],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
@@ -89,9 +87,9 @@ describe('AuthService (G7 + Phase 2 features)', () => {
       });
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
-      await expect(
-        service.changePassword('user-1', 'wrong', 'new-pass-123'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.changePassword('user-1', 'wrong', 'new-pass-123')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('rejects same password', async () => {
@@ -101,17 +99,17 @@ describe('AuthService (G7 + Phase 2 features)', () => {
       });
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      await expect(
-        service.changePassword('user-1', 'same-pass', 'same-pass'),
-      ).rejects.toThrow('New password must be different from current password');
+      await expect(service.changePassword('user-1', 'same-pass', 'same-pass')).rejects.toThrow(
+        'New password must be different from current password',
+      );
     });
 
     it('rejects nonexistent user', async () => {
       qb.first.mockResolvedValue(null);
 
-      await expect(
-        service.changePassword('no-user', 'pwd', 'new-pwd-123'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.changePassword('no-user', 'pwd', 'new-pwd-123')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 
@@ -124,7 +122,7 @@ describe('AuthService (G7 + Phase 2 features)', () => {
       });
       (bcrypt.hash as jest.Mock).mockResolvedValue('temp-hash');
 
-      await service.adminResetPassword('user-1', 'tempPass123!');
+      await service.adminResetPassword('user-1', 'tempPass123!', 'tenant-1');
 
       expect((mockDb as any).transaction).toHaveBeenCalled();
       expect(qb.update).toHaveBeenCalledWith(
@@ -136,7 +134,7 @@ describe('AuthService (G7 + Phase 2 features)', () => {
       qb.first.mockResolvedValue(null);
 
       await expect(
-        service.adminResetPassword('no-user', 'tempPass123!'),
+        service.adminResetPassword('no-user', 'tempPass123!', 'tenant-1'),
       ).rejects.toThrow(UnauthorizedException);
     });
   });
@@ -144,7 +142,13 @@ describe('AuthService (G7 + Phase 2 features)', () => {
   describe('login with brute-force lockout', () => {
     it('locks account after 10 failed attempts', async () => {
       qb.first
-        .mockResolvedValueOnce({ id: 'tenant-1', slug: 'acme', name: 'Acme', settings: '{}', deleted_at: null })
+        .mockResolvedValueOnce({
+          id: 'tenant-1',
+          slug: 'acme',
+          name: 'Acme',
+          settings: '{}',
+          deleted_at: null,
+        })
         .mockResolvedValueOnce({
           id: 'user-1',
           email: 'admin@acme.com',
@@ -169,7 +173,13 @@ describe('AuthService (G7 + Phase 2 features)', () => {
 
     it('rejects login when account is locked', async () => {
       qb.first
-        .mockResolvedValueOnce({ id: 'tenant-1', slug: 'acme', name: 'Acme', settings: '{}', deleted_at: null })
+        .mockResolvedValueOnce({
+          id: 'tenant-1',
+          slug: 'acme',
+          name: 'Acme',
+          settings: '{}',
+          deleted_at: null,
+        })
         .mockResolvedValueOnce({
           id: 'user-1',
           email: 'admin@acme.com',
@@ -185,7 +195,13 @@ describe('AuthService (G7 + Phase 2 features)', () => {
 
     it('returns mustChangePassword flag when user must change password', async () => {
       qb.first
-        .mockResolvedValueOnce({ id: 'tenant-1', slug: 'acme', name: 'Acme', settings: '{}', deleted_at: null })
+        .mockResolvedValueOnce({
+          id: 'tenant-1',
+          slug: 'acme',
+          name: 'Acme',
+          settings: '{}',
+          deleted_at: null,
+        })
         .mockResolvedValueOnce({
           id: 'user-1',
           email: 'admin@acme.com',
@@ -195,16 +211,32 @@ describe('AuthService (G7 + Phase 2 features)', () => {
           failed_login_attempts: 0,
           locked_until: null,
         })
-        .mockResolvedValueOnce({ id: 'membership-1', tenant_id: 'tenant-1', user_id: 'user-1', role: 'admin', is_active: true });
+        .mockResolvedValueOnce({
+          id: 'membership-1',
+          tenant_id: 'tenant-1',
+          user_id: 'user-1',
+          role: 'admin',
+          is_active: true,
+        });
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
-      const result = await service.login({ email: 'admin@acme.com', password: 'correct', tenantSlug: 'acme' });
+      const result = await service.login({
+        email: 'admin@acme.com',
+        password: 'correct',
+        tenantSlug: 'acme',
+      });
       expect(result.mustChangePassword).toBe(true);
     });
 
     it('resets failed attempt counter on successful login', async () => {
       qb.first
-        .mockResolvedValueOnce({ id: 'tenant-1', slug: 'acme', name: 'Acme', settings: '{}', deleted_at: null })
+        .mockResolvedValueOnce({
+          id: 'tenant-1',
+          slug: 'acme',
+          name: 'Acme',
+          settings: '{}',
+          deleted_at: null,
+        })
         .mockResolvedValueOnce({
           id: 'user-1',
           email: 'admin@acme.com',
@@ -214,7 +246,13 @@ describe('AuthService (G7 + Phase 2 features)', () => {
           failed_login_attempts: 3,
           locked_until: null,
         })
-        .mockResolvedValueOnce({ id: 'membership-1', tenant_id: 'tenant-1', user_id: 'user-1', role: 'admin', is_active: true });
+        .mockResolvedValueOnce({
+          id: 'membership-1',
+          tenant_id: 'tenant-1',
+          user_id: 'user-1',
+          role: 'admin',
+          is_active: true,
+        });
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
       await service.login({ email: 'admin@acme.com', password: 'correct', tenantSlug: 'acme' });

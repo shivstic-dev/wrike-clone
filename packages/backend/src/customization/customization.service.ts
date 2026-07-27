@@ -62,9 +62,7 @@ export class CustomizationService {
 
   async deleteCustomField(id: string): Promise<void> {
     const ctx = requireTenantContext();
-    await this.db('custom_field_definitions')
-      .where({ id, tenant_id: ctx.tenantId })
-      .del();
+    await this.db('custom_field_definitions').where({ id, tenant_id: ctx.tenantId }).del();
   }
 
   // ── Custom Item Types ──────────────────────────────────────
@@ -72,9 +70,7 @@ export class CustomizationService {
 
   async findItemTypes() {
     const ctx = requireTenantContext();
-    return this.db('item_types')
-      .where({ tenant_id: ctx.tenantId })
-      .orderBy('name', 'asc');
+    return this.db('item_types').where({ tenant_id: ctx.tenantId }).orderBy('name', 'asc');
   }
 
   async createItemType(input: { name: string; icon?: string; color?: string }) {
@@ -94,9 +90,7 @@ export class CustomizationService {
 
   async deleteItemType(id: string): Promise<void> {
     const ctx = requireTenantContext();
-    await this.db('item_types')
-      .where({ id, tenant_id: ctx.tenantId })
-      .del();
+    await this.db('item_types').where({ id, tenant_id: ctx.tenantId }).del();
   }
 
   // ── Workspace Custom Statuses ─────────────────────────────
@@ -149,9 +143,7 @@ export class CustomizationService {
 
   async findBlueprints() {
     const ctx = requireTenantContext();
-    return this.db('project_templates')
-      .where({ tenant_id: ctx.tenantId })
-      .orderBy('name', 'asc');
+    return this.db('project_templates').where({ tenant_id: ctx.tenantId }).orderBy('name', 'asc');
   }
 
   async saveAsBlueprint(projectId: string) {
@@ -173,12 +165,14 @@ export class CustomizationService {
         name: `${project.name} (template)`,
         description: project.description,
         source_project_id: projectId,
-        task_template: JSON.stringify(tasks.map((t: any) => ({
-          title: t.title,
-          description: t.description,
-          priority: t.priority,
-          estimated_hours: t.estimated_hours,
-        }))),
+        task_template: JSON.stringify(
+          tasks.map((t: any) => ({
+            title: t.title,
+            description: t.description,
+            priority: t.priority,
+            estimated_hours: t.estimated_hours,
+          })),
+        ),
       })
       .returning('*');
 
@@ -207,7 +201,7 @@ export class CustomizationService {
         name,
         description: template.description,
         status: 'active',
-        priority: 'none',
+        priority: 'low',
         visibility: 'department',
       })
       .returning('*');
@@ -222,7 +216,7 @@ export class CustomizationService {
         title: t.title || 'Task',
         description: t.description || null,
         status: 'todo',
-        priority: t.priority || 'none',
+        priority: t.priority || 'low',
         estimated_hours: t.estimated_hours || null,
         sort_order: 0,
         custom_fields: '{}',
@@ -252,7 +246,8 @@ export class CustomizationService {
       id: form.id,
       name: form.name,
       description: form.description,
-      fields: typeof form.form_fields === 'string' ? JSON.parse(form.form_fields) : form.form_fields,
+      fields:
+        typeof form.form_fields === 'string' ? JSON.parse(form.form_fields) : form.form_fields,
     };
   }
 
@@ -270,7 +265,7 @@ export class CustomizationService {
 
     const fields = Array.isArray(form.form_fields)
       ? form.form_fields
-      : (safeJsonParse(form.form_fields) || []);
+      : safeJsonParse(form.form_fields) || [];
 
     // Find a system user or the form creator as fallback author
     let authorId = form.created_by_id;
@@ -307,9 +302,7 @@ export class CustomizationService {
 
   async findRequestForms() {
     const ctx = requireTenantContext();
-    return this.db('request_forms')
-      .where({ tenant_id: ctx.tenantId })
-      .orderBy('name', 'asc');
+    return this.db('request_forms').where({ tenant_id: ctx.tenantId }).orderBy('name', 'asc');
   }
 
   async createRequestForm(input: {
@@ -343,7 +336,7 @@ export class CustomizationService {
 
     const fields = Array.isArray(form.form_fields)
       ? form.form_fields
-      : (safeJsonParse(form.form_fields) || []);
+      : safeJsonParse(form.form_fields) || [];
 
     // Create a task from the form submission
     const taskId = uuidv4();

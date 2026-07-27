@@ -1,11 +1,18 @@
 import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
+  if (await knex.schema.hasTable('workspace_statuses')) return;
+
   // ── workspace_statuses — custom workflow statuses per workspace ──
   await knex.schema.createTable('workspace_statuses', (table) => {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
     table.uuid('tenant_id').notNullable().references('id').inTable('tenants').onDelete('CASCADE');
-    table.uuid('workspace_id').notNullable().references('id').inTable('workspaces').onDelete('CASCADE');
+    table
+      .uuid('workspace_id')
+      .notNullable()
+      .references('id')
+      .inTable('workspaces')
+      .onDelete('CASCADE');
     table.string('name', 128).notNullable();
     table.string('color', 7).notNullable().defaultTo('#6366f1');
     table.string('category', 32).notNullable().defaultTo('custom');
@@ -19,6 +26,7 @@ export async function up(knex: Knex): Promise<void> {
   `);
 
   await knex.schema.raw('ALTER TABLE workspace_statuses ENABLE ROW LEVEL SECURITY;');
+  await knex.schema.raw('ALTER TABLE workspace_statuses FORCE ROW LEVEL SECURITY;');
   await knex.schema.raw(`
     CREATE POLICY tenant_isolation ON workspace_statuses FOR ALL
       USING (tenant_id = current_tenant_id())
@@ -41,6 +49,7 @@ export async function up(knex: Knex): Promise<void> {
   `);
 
   await knex.schema.raw('ALTER TABLE project_templates ENABLE ROW LEVEL SECURITY;');
+  await knex.schema.raw('ALTER TABLE project_templates FORCE ROW LEVEL SECURITY;');
   await knex.schema.raw(`
     CREATE POLICY tenant_isolation ON project_templates FOR ALL
       USING (tenant_id = current_tenant_id())
@@ -55,7 +64,12 @@ export async function up(knex: Knex): Promise<void> {
     table.text('description');
     table.uuid('folder_id').notNullable().references('id').inTable('folders').onDelete('CASCADE');
     table.jsonb('form_fields').notNullable().defaultTo('[]');
-    table.uuid('created_by_id').notNullable().references('id').inTable('users').onDelete('RESTRICT');
+    table
+      .uuid('created_by_id')
+      .notNullable()
+      .references('id')
+      .inTable('users')
+      .onDelete('RESTRICT');
     table.timestamps(true, true);
   });
 
@@ -65,6 +79,7 @@ export async function up(knex: Knex): Promise<void> {
   `);
 
   await knex.schema.raw('ALTER TABLE request_forms ENABLE ROW LEVEL SECURITY;');
+  await knex.schema.raw('ALTER TABLE request_forms FORCE ROW LEVEL SECURITY;');
   await knex.schema.raw(`
     CREATE POLICY tenant_isolation ON request_forms FOR ALL
       USING (tenant_id = current_tenant_id())

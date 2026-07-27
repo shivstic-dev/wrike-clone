@@ -2,19 +2,19 @@
   "name": "wrike-clone",
   "version": "0.1.0",
   "private": true,
-  "description": "Enterprise-grade open-source work management platform (Wrike-equivalent)",
+  "description": "Open-source multi-tenant work management platform",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run build -w @wrike-clone/shared && npm run build -w @wrike-clone/backend && npm run build -w @wrike-clone/frontend",
     "clean": "npm run clean --workspaces",
-    "lint": "npm run lint --workspaces",
+    "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces",
     "test:cov": "npm run test:cov --workspaces",
     "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,js,jsx}\"",
     "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx,js,jsx}\"",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "npm run build -w @wrike-clone/shared && npm run typecheck --workspaces --if-present",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down",
     "docker:build": "docker compose -f docker/docker-compose.yml build",
@@ -29,9 +29,5 @@
   "engines": {
     "node": ">=22.0.0",
     "npm": ">=10.0.0"
-  },
-  "dependencies": {
-    "@sentry/node": "^10.68.0",
-    "@sentry/react": "^10.68.0"
   }
 }

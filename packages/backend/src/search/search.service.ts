@@ -139,11 +139,21 @@ export class SearchService {
       if (projectId) taskQuery = taskQuery.andWhere('tasks.project_id', projectId);
       if (assigneeId) taskQuery = taskQuery.andWhere('tasks.assignee_id', assigneeId);
 
-      const countResult = await taskQuery.clone().clearSelect().count('* as count').first() as { count?: string | number };
+      const countResult = (await taskQuery.clone().clearSelect().count('* as count').first()) as {
+        count?: string | number;
+      };
       total += Number(countResult?.count || 0);
 
       const taskResults = await taskQuery
-        .select('tasks.id', 'tasks.title', 'tasks.description', 'tasks.project_id', 'tasks.status', 'tasks.priority', 'tasks.due_date')
+        .select(
+          'tasks.id',
+          'tasks.title',
+          'tasks.description',
+          'tasks.project_id',
+          'tasks.status',
+          'tasks.priority',
+          'tasks.due_date',
+        )
         .limit(perPage)
         .offset((page - 1) * perPage)
         .orderBy('tasks.created_at', 'desc');
@@ -155,7 +165,12 @@ export class SearchService {
           title: task.title,
           description: task.description,
           url: `/tasks/${task.id}`,
-          metadata: { projectId: task.project_id, status: task.status, priority: task.priority, dueDate: task.due_date },
+          metadata: {
+            projectId: task.project_id,
+            status: task.status,
+            priority: task.priority,
+            dueDate: task.due_date,
+          },
         });
       }
     }
@@ -168,12 +183,19 @@ export class SearchService {
 
       if (searchTerm) {
         projectQuery = projectQuery.andWhere(function () {
-          this.where('projects.name', 'ilike', `%${searchTerm}%`)
-            .orWhere('projects.description', 'ilike', `%${searchTerm}%`);
+          this.where('projects.name', 'ilike', `%${searchTerm}%`).orWhere(
+            'projects.description',
+            'ilike',
+            `%${searchTerm}%`,
+          );
         });
       }
 
-      const countResult = await projectQuery.clone().clearSelect().count('* as count').first() as { count?: string | number };
+      const countResult = (await projectQuery
+        .clone()
+        .clearSelect()
+        .count('* as count')
+        .first()) as { count?: string | number };
       total += Number(countResult?.count || 0);
 
       const projectResults = await projectQuery
@@ -220,16 +242,18 @@ export class SearchService {
       });
 
       const index = client.index(`${document.type}s`);
-      await index.addDocuments([{
-        id: document.id,
-        title: document.title,
-        description: document.description,
-        status: document.status,
-        priority: document.priority,
-        project_id: document.projectId,
-        assignee_id: document.assigneeId,
-        due_date: document.dueDate,
-      }]);
+      await index.addDocuments([
+        {
+          id: document.id,
+          title: document.title,
+          description: document.description,
+          status: document.status,
+          priority: document.priority,
+          project_id: document.projectId,
+          assignee_id: document.assigneeId,
+          due_date: document.dueDate,
+        },
+      ]);
     } catch (err) {
       this.logger.warn(`Failed to index document ${document.id}: ${(err as Error).message}`);
     }

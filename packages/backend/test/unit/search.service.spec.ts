@@ -26,7 +26,7 @@ function createQb() {
     insert: jest.fn().mockReturnThis(),
     update: jest.fn(),
     del: jest.fn(),
-    count: jest.fn(),
+    count: jest.fn().mockReturnThis(),
     returning: jest.fn(),
     from: jest.fn(),
     select: jest.fn().mockReturnThis(),
@@ -56,10 +56,7 @@ describe('SearchService', () => {
     delete process.env['MEILISEARCH_HOST'];
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        SearchService,
-        { provide: DATABASE_PROVIDER, useValue: mockDb },
-      ],
+      providers: [SearchService, { provide: DATABASE_PROVIDER, useValue: mockDb }],
     }).compile();
 
     service = module.get<SearchService>(SearchService);
@@ -70,6 +67,8 @@ describe('SearchService', () => {
       qb.first
         .mockResolvedValueOnce({ count: 0 }) // task count
         .mockResolvedValueOnce({ count: 0 }); // project count
+      qb.orderBy.mockResolvedValueOnce([]);
+      qb.offset.mockReturnValueOnce(qb).mockResolvedValueOnce([]);
 
       const result = await service.search({ query: '' });
       expect(result.results).toEqual([]);
@@ -78,28 +77,36 @@ describe('SearchService', () => {
 
     it('searches tasks by title and description', async () => {
       const mockTasks = [
-        { id: 'task-1', title: 'Test Task', description: 'A test', project_id: 'p-1', status: 'todo', priority: 'medium', due_date: null },
+        {
+          id: 'task-1',
+          title: 'Test Task',
+          description: 'A test',
+          project_id: 'p-1',
+          status: 'todo',
+          priority: 'medium',
+          due_date: null,
+        },
       ];
 
       qb.first
-        .mockResolvedValueOnce({ count: 1 })  // task count
-        .mockResolvedValueOnce({ count: 0 });  // project count
+        .mockResolvedValueOnce({ count: 1 }) // task count
+        .mockResolvedValueOnce({ count: 0 }); // project count
 
       qb.limit.mockReturnThis();
-      qb.offset.mockReturnThis();
+      qb.offset.mockReturnValueOnce(qb).mockResolvedValueOnce([]);
       qb.orderBy.mockResolvedValueOnce(mockTasks);
 
       const result = await service.search({ query: 'test' });
 
       expect(result.results).toHaveLength(1);
-      expect(result.results[0].title).toBe('Test Task');
-      expect(result.results[0].type).toBe('task');
+      expect(result.results[0]!.title).toBe('Test Task');
+      expect(result.results[0]!.type).toBe('task');
     });
 
     it('filters by projectId when provided', async () => {
-      qb.first
-        .mockResolvedValueOnce({ count: 0 })
-        .mockResolvedValueOnce({ count: 0 });
+      qb.first.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 0 });
+      qb.orderBy.mockResolvedValueOnce([]);
+      qb.offset.mockReturnValueOnce(qb).mockResolvedValueOnce([]);
 
       await service.search({ query: 'test', projectId: 'project-1' });
 
@@ -109,24 +116,27 @@ describe('SearchService', () => {
 
     it('returns project search results', async () => {
       const mockProjects = [
-        { id: 'proj-1', name: 'My Project', description: 'A project description', status: 'active' },
+        {
+          id: 'proj-1',
+          name: 'My Project',
+          description: 'A project description',
+          status: 'active',
+        },
       ];
 
       qb.first
-        .mockResolvedValueOnce({ count: 0 })  // task count
-        .mockResolvedValueOnce({ count: 1 });  // project count
+        .mockResolvedValueOnce({ count: 0 }) // task count
+        .mockResolvedValueOnce({ count: 1 }); // project count
 
       qb.limit.mockReturnThis();
       qb.offset.mockReturnThis();
-      qb.orderBy
-        .mockResolvedValueOnce([])  // tasks
-        .mockResolvedValueOnce(mockProjects);  // projects
+      qb.offset.mockResolvedValueOnce(mockProjects);
 
       const result = await service.search({ query: 'project', type: 'projects' });
 
       expect(result.results).toHaveLength(1);
-      expect(result.results[0].title).toBe('My Project');
-      expect(result.results[0].type).toBe('project');
+      expect(result.results[0]!.title).toBe('My Project');
+      expect(result.results[0]!.type).toBe('project');
     });
   });
 
@@ -145,9 +155,7 @@ describe('SearchService', () => {
 
   describe('removeDocument', () => {
     it('skips removal when Meilisearch is not configured', async () => {
-      await expect(
-        service.removeDocument('task-1', 'task'),
-      ).resolves.toBeUndefined();
+      await expect(service.removeDocument('task-1', 'task')).resolves.toBeUndefined();
     });
   });
 });

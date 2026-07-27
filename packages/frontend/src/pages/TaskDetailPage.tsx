@@ -11,14 +11,14 @@ import { clsx } from 'clsx';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useState } from 'react';
+import { useWorkspaceMembers, useWorkspaces } from '../api/workspaces';
+import { useAuth } from '../contexts/AuthContext';
 
 const statusOptions: { value: string; label: string }[] = [
-  { value: TASK_STATUS.BACKLOG, label: 'Backlog' },
   { value: TASK_STATUS.TODO, label: 'To Do' },
   { value: TASK_STATUS.IN_PROGRESS, label: 'In Progress' },
-  { value: TASK_STATUS.IN_REVIEW, label: 'In Review' },
-  { value: TASK_STATUS.DONE, label: 'Done' },
-  { value: TASK_STATUS.CANCELLED, label: 'Cancelled' },
+  { value: TASK_STATUS.COMPLETED, label: 'Completed' },
+  { value: TASK_STATUS.BLOCKED, label: 'Blocked' },
 ];
 
 export default function TaskDetailPage() {
@@ -26,6 +26,9 @@ export default function TaskDetailPage() {
   const navigate = useNavigate();
   const { data: task, isLoading, error, refetch } = useTask(taskId!);
   const updateTask = useUpdateTask();
+  const { data: departments = [] } = useWorkspaces();
+  const { data: departmentMembers = [] } = useWorkspaceMembers(task?.departmentId || '');
+  const { user, membership } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
 
   const handleStatusChange = async (status: string) => {
@@ -39,7 +42,9 @@ export default function TaskDetailPage() {
 
   const handleUpdateTask = async (values: Partial<Task>) => {
     try {
-      await updateTask.mutateAsync({ id: taskId!, ...values } as UpdateTaskRequest & { id: string });
+      await updateTask.mutateAsync({ id: taskId!, ...values } as UpdateTaskRequest & {
+        id: string;
+      });
       toast.success('Task updated');
       setIsEditing(false);
     } catch {
@@ -54,10 +59,25 @@ export default function TaskDetailPage() {
   if (error || !task) {
     return (
       <div className="p-6">
-        <ErrorDisplay title="Task not found" message="This task does not exist or you don't have access." onRetry={() => refetch()} />
+        <ErrorDisplay
+          title="Task not found"
+          message="This task does not exist or you don't have access."
+          onRetry={() => refetch()}
+        />
       </div>
     );
   }
+  const departmentRole = departments.find(
+    (department) => department.id === task.departmentId,
+  )?.departmentRole;
+  const canSetVisibility = departmentRole === 'admin' || departmentRole === 'department_head';
+  const canManage =
+    membership?.role === 'admin' ||
+    membership?.role === 'manager' ||
+    departmentRole === 'admin' ||
+    departmentRole === 'manager' ||
+    departmentRole === 'department_head';
+  const canChangeStatus = canManage || task.assigneeId === user?.id;
 
   return (
     <div className="mx-auto max-w-4xl p-6">
@@ -66,8 +86,18 @@ export default function TaskDetailPage() {
         onClick={() => navigate(-1)}
         className="mb-4 flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
       >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+        <svg
+          className="h-4 w-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+          />
         </svg>
         Back
       </button>
@@ -77,6 +107,8 @@ export default function TaskDetailPage() {
           <h2 className="mb-4 text-lg font-semibold text-slate-900">Edit Task</h2>
           <TaskForm
             initialValues={task}
+            canSetVisibility={canSetVisibility}
+            assignees={departmentMembers}
             onSubmit={handleUpdateTask}
             onCancel={() => setIsEditing(false)}
           />
@@ -87,12 +119,11 @@ export default function TaskDetailPage() {
           <div className="mb-6">
             <div className="flex items-start justify-between">
               <h1 className="text-2xl font-bold text-slate-900">{task.title}</h1>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="btn-ghost btn-sm"
-              >
-                Edit
-              </button>
+              {canManage && (
+                <button onClick={() => setIsEditing(true)} className="btn-ghost btn-sm">
+                  Edit
+                </button>
+              )}
             </div>
             {task.description && (
               <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{task.description}</p>
@@ -107,6 +138,7 @@ export default function TaskDetailPage() {
                 value={task.status}
                 onChange={(e) => handleStatusChange(e.target.value)}
                 className="input text-sm"
+                disabled={!canChangeStatus}
               >
                 {statusOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -117,14 +149,19 @@ export default function TaskDetailPage() {
             </div>
             <div>
               <label className="label">Priority</label>
-              <p className={clsx('mt-1 text-sm font-medium capitalize', `priority-${task.priority}`)}>
+              <p
+                className={clsx('mt-1 text-sm font-medium capitalize', `priority-${task.priority}`)}
+              >
                 {task.priority}
               </p>
             </div>
             <div>
               <label className="label">Assignee</label>
               <p className="mt-1 text-sm text-slate-600">
-                {task.assigneeId || 'Unassigned'}
+                {departmentMembers.find((member) => member.userId === task.assigneeId)
+                  ?.displayName ||
+                  departmentMembers.find((member) => member.userId === task.assigneeId)?.email ||
+                  'Unassigned'}
               </p>
             </div>
           </div>
@@ -134,13 +171,17 @@ export default function TaskDetailPage() {
             {task.startDate && (
               <div>
                 <span className="text-slate-400">Start:</span>{' '}
-                <span className="text-slate-700">{format(new Date(task.startDate), 'MMM d, yyyy')}</span>
+                <span className="text-slate-700">
+                  {format(new Date(task.startDate), 'MMM d, yyyy')}
+                </span>
               </div>
             )}
             {task.dueDate && (
               <div>
                 <span className="text-slate-400">Due:</span>{' '}
-                <span className="text-slate-700">{format(new Date(task.dueDate), 'MMM d, yyyy')}</span>
+                <span className="text-slate-700">
+                  {format(new Date(task.dueDate), 'MMM d, yyyy')}
+                </span>
               </div>
             )}
             {task.estimatedHours != null && (

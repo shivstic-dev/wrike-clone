@@ -55,12 +55,13 @@ export interface Workspace extends BaseEntity {
     description: string | null;
     icon: string | null;
     sortOrder: number;
+    departmentRole?: 'admin' | 'department_head' | 'manager' | 'employee' | 'none';
 }
 /** Join table: workspace (department) <-> user with role. */
 export interface WorkspaceMember extends BaseEntity {
     workspaceId: string;
     userId: string;
-    role: 'dept_admin' | 'member';
+    role: 'employee' | 'manager' | 'department_head';
 }
 export interface Folder extends BaseEntity {
     workspaceId: string;
@@ -83,6 +84,7 @@ export interface TaskFolderLink {
 }
 export interface Project extends BaseEntity {
     folderId: string;
+    departmentId?: string;
     ownerId: string;
     name: string;
     description: string | null;
@@ -93,7 +95,7 @@ export interface Project extends BaseEntity {
     priority: TaskPriority;
     budget: number | null;
     actualCost: number | null;
-    visibility: 'organization' | 'department';
+    visibility: 'global' | 'department';
     taskCounts?: Array<{
         status: string;
         count: number | string;
@@ -101,6 +103,8 @@ export interface Project extends BaseEntity {
 }
 export interface Task extends BaseEntity {
     projectId: string;
+    departmentId: string;
+    departmentName?: string;
     parentTaskId: string | null;
     assigneeId: string | null;
     createdById: string;
@@ -113,6 +117,7 @@ export interface Task extends BaseEntity {
     startDate: Timestamp | null;
     dueDate: Timestamp | null;
     completedAt: Timestamp | null;
+    visibility: 'global' | 'department';
     sortOrder: number;
     customFields: Record<string, unknown>;
     isRecurring: boolean;

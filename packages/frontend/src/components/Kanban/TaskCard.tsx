@@ -8,11 +8,10 @@ interface TaskCardProps {
 }
 
 const priorityClass: Record<TaskPriority, string> = {
-  none: 'border-l-slate-300',
   low: 'border-l-slate-400',
   medium: 'border-l-blue-500',
   high: 'border-l-amber-500',
-  urgent: 'border-l-red-500',
+  critical: 'border-l-red-500',
 };
 
 export function TaskCard({ task }: TaskCardProps) {
@@ -41,12 +40,15 @@ export function TaskCard({ task }: TaskCardProps) {
         'hover:shadow-md',
       )}
     >
-      <Link
-        to={`/tasks/${task.id}`}
-        className="block"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="text-sm font-medium text-slate-900 line-clamp-2">{task.title}</p>
+      <Link to={`/tasks/${task.id}`} className="block" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-2">
+          <p className="flex-1 text-sm font-medium text-slate-900 line-clamp-2">{task.title}</p>
+          {task.visibility === 'global' && (
+            <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+              Global
+            </span>
+          )}
+        </div>
       </Link>
 
       <div className="mt-2 flex items-center gap-2">
@@ -59,7 +61,7 @@ export function TaskCard({ task }: TaskCardProps) {
           <span
             className={clsx(
               'text-xs',
-              new Date(task.dueDate) < new Date() && task.status !== 'done'
+              new Date(task.dueDate) < new Date() && task.status !== 'completed'
                 ? 'font-medium text-red-500'
                 : 'text-slate-400',
             )}

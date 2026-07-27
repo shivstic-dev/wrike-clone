@@ -39,10 +39,16 @@ function LogTimeModal({ taskId, onClose }: { taskId?: string; onClose: () => voi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTaskId) { toast.error('Please select a task'); return; }
+    if (!selectedTaskId) {
+      toast.error('Please select a task');
+      return;
+    }
 
     const totalMinutes = parseInt(hours) * 60 + parseInt(minutes);
-    if (totalMinutes <= 0) { toast.error('Duration must be positive'); return; }
+    if (totalMinutes <= 0) {
+      toast.error('Duration must be positive');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -70,37 +76,76 @@ function LogTimeModal({ taskId, onClose }: { taskId?: string; onClose: () => voi
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="label">Task</label>
-            <select className="input" value={selectedTaskId} onChange={(e) => setSelectedTaskId(e.target.value)} required>
+            <select
+              className="input"
+              value={selectedTaskId}
+              onChange={(e) => setSelectedTaskId(e.target.value)}
+              required
+            >
               <option value="">Select a task...</option>
               {tasks.map((t: any) => (
-                <option key={t.id} value={t.id}>{t.title}</option>
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
               ))}
             </select>
           </div>
           <div>
             <label className="label">Date</label>
-            <input type="date" className="input" value={loggedDate} onChange={(e) => setLoggedDate(e.target.value)} required />
+            <input
+              type="date"
+              className="input"
+              value={loggedDate}
+              onChange={(e) => setLoggedDate(e.target.value)}
+              required
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Hours</label>
-              <input type="number" className="input" min="0" max="24" value={hours} onChange={(e) => setHours(e.target.value)} />
+              <input
+                type="number"
+                className="input"
+                min="0"
+                max="24"
+                value={hours}
+                onChange={(e) => setHours(e.target.value)}
+              />
             </div>
             <div>
               <label className="label">Minutes</label>
-              <input type="number" className="input" min="0" max="59" value={minutes} onChange={(e) => setMinutes(e.target.value)} />
+              <input
+                type="number"
+                className="input"
+                min="0"
+                max="59"
+                value={minutes}
+                onChange={(e) => setMinutes(e.target.value)}
+              />
             </div>
           </div>
           <div>
             <label className="label">Description</label>
-            <textarea className="input resize-none" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+            <textarea
+              className="input resize-none"
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
           </div>
           <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" checked={isBillable} onChange={(e) => setIsBillable(e.target.checked)} className="rounded border-slate-300" />
+            <input
+              type="checkbox"
+              checked={isBillable}
+              onChange={(e) => setIsBillable(e.target.checked)}
+              className="rounded border-slate-300"
+            />
             Billable
           </label>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+            <button type="button" onClick={onClose} className="btn-secondary">
+              Cancel
+            </button>
             <button type="submit" disabled={isSubmitting} className="btn-primary">
               {isSubmitting ? 'Logging...' : 'Log Time'}
             </button>
@@ -138,37 +183,68 @@ export function TimesheetPanel() {
           <p className="text-xs text-slate-400">Log and track time spent on tasks.</p>
         </div>
         <button onClick={() => setShowLogModal(true)} className="btn-primary btn-sm">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
           Log Time
         </button>
       </div>
 
       {/* Week navigation */}
       <div className="mb-4 flex items-center gap-3 text-sm">
-        <button onClick={() => setWeekOffset(w => w - 1)} className="btn-ghost btn-sm p-1">&larr;</button>
+        <button onClick={() => setWeekOffset((w) => w - 1)} className="btn-ghost btn-sm p-1">
+          &larr;
+        </button>
         <span className="font-medium text-slate-700">
-          {format(weekStart, 'MMM d')} - {format(endOfWeek(weekStart, { weekStartsOn: 1 }), 'MMM d, yyyy')}
+          {format(weekStart, 'MMM d')} -{' '}
+          {format(endOfWeek(weekStart, { weekStartsOn: 1 }), 'MMM d, yyyy')}
         </span>
-        <button onClick={() => setWeekOffset(0)} className="btn-ghost btn-sm text-xs">This week</button>
-        <button onClick={() => setWeekOffset(w => w + 1)} className="btn-ghost btn-sm p-1">&rarr;</button>
+        <button onClick={() => setWeekOffset(0)} className="btn-ghost btn-sm text-xs">
+          This week
+        </button>
+        <button onClick={() => setWeekOffset((w) => w + 1)} className="btn-ghost btn-sm p-1">
+          &rarr;
+        </button>
       </div>
 
       {isLoading ? (
         <LoadingSpinner className="py-8" />
       ) : !entries || entries.length === 0 ? (
-        <EmptyState title="No time entries" description="Log time against tasks to track your work." action={
-          <button onClick={() => setShowLogModal(true)} className="btn-primary btn-sm">Log time</button>
-        } />
+        <EmptyState
+          title="No time entries"
+          description="Log time against tasks to track your work."
+          action={
+            <button onClick={() => setShowLogModal(true)} className="btn-primary btn-sm">
+              Log time
+            </button>
+          }
+        />
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">Date</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">Duration</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">Billable</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">Description</th>
-                <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">Locked</th>
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">
+                  Date
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">
+                  Duration
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">
+                  Billable
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">
+                  Description
+                </th>
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase text-slate-500">
+                  Locked
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -178,10 +254,19 @@ export function TimesheetPanel() {
                 const mins = entry.durationMinutes % 60;
                 return (
                   <tr key={entry.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2 text-sm text-slate-700">{format(new Date(entry.loggedDate), 'MMM d')}</td>
-                    <td className="px-4 py-2 text-sm text-slate-700">{hours}h {mins > 0 ? `${mins}m` : ''}</td>
+                    <td className="px-4 py-2 text-sm text-slate-700">
+                      {format(new Date(entry.loggedDate), 'MMM d')}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-slate-700">
+                      {hours}h {mins > 0 ? `${mins}m` : ''}
+                    </td>
                     <td className="px-4 py-2">
-                      <span className={clsx('badge', entry.isBillable ? 'badge-in_progress' : 'badge-backlog')}>
+                      <span
+                        className={clsx(
+                          'badge',
+                          entry.isBillable ? 'badge-in_progress' : 'badge-backlog',
+                        )}
+                      >
                         {entry.isBillable ? 'Billable' : 'Non-billable'}
                       </span>
                     </td>

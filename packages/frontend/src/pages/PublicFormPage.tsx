@@ -41,7 +41,9 @@ export default function PublicFormPage() {
         // Initialize empty values
         if (data.fields) {
           const initial: Record<string, string> = {};
-          data.fields.forEach((f: FormField) => { initial[f.name] = ''; });
+          data.fields.forEach((f: FormField) => {
+            initial[f.name] = '';
+          });
           setValues(initial);
         }
       } catch (err: any) {
@@ -95,7 +97,13 @@ export default function PublicFormPage() {
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-            <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <svg
+              className="h-8 w-8 text-green-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
             </svg>
           </div>
@@ -114,18 +122,29 @@ export default function PublicFormPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary-600 shadow-lg">
-            <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            <svg
+              className="h-7 w-7 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+              />
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-slate-900">{form?.name || 'Request Form'}</h1>
-          {form?.description && (
-            <p className="mt-2 text-sm text-slate-500">{form.description}</p>
-          )}
+          {form?.description && <p className="mt-2 text-sm text-slate-500">{form.description}</p>}
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="rounded-2xl bg-white p-8 shadow-lg border border-slate-100">
+        <form
+          onSubmit={handleSubmit}
+          className="rounded-2xl bg-white p-8 shadow-lg border border-slate-100"
+        >
           <div className="space-y-5">
             {form?.fields?.map((field) => (
               <div key={field.name}>
@@ -143,7 +162,9 @@ export default function PublicFormPage() {
                   >
                     <option value="">-- Select --</option>
                     {field.options.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
                     ))}
                   </select>
                 ) : field.type === 'textarea' ? (
@@ -182,8 +203,19 @@ export default function PublicFormPage() {
             {submitting ? (
               <span className="flex items-center justify-center gap-2">
                 <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
                 </svg>
                 Submitting...
               </span>
@@ -195,7 +227,7 @@ export default function PublicFormPage() {
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-slate-400">
-          Powered by Wrike Clone · Your information will be shared with the team.
+          Powered by OpenWork Hub · Your information will be shared with the team.
         </p>
       </div>
     </div>

@@ -1,5 +1,12 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import { setAccessToken, setTenantId, clearAuthState, setTokenRefreshCallback, setLogoutCallback, API_BASE_URL } from '../api/client';
+import {
+  setAccessToken,
+  setTenantId,
+  clearAuthState,
+  setTokenRefreshCallback,
+  setLogoutCallback,
+  API_BASE_URL,
+} from '../api/client';
 import type { LoginRequest, LoginResponse, User } from '@wrike-clone/shared';
 import toast from 'react-hot-toast';
 
@@ -69,16 +76,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   deletedAt: null,
                 } as User,
                 tenant: null,
-                membership: null,
+                membership: {
+                  id: payload.membershipId,
+                  tenantId: payload.tenantId,
+                  userId: payload.userId,
+                  role: payload.role,
+                  joinedAt: NOW,
+                  isActive: true,
+                } as LoginResponse['membership'],
                 isAuthenticated: true,
                 isLoading: false,
                 mustChangePassword: false,
               });
               return;
-            } catch { /* ignore decode errors */ }
+            } catch {
+              /* ignore decode errors */
+            }
           }
         }
-      } catch { /* silent refresh failed */ }
+      } catch {
+        /* silent refresh failed */
+      }
       setState((prev) => ({ ...prev, isLoading: false }));
     };
 
@@ -92,8 +110,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     setLogoutCallback(() => {
       setState({
-        user: null, tenant: null, membership: null,
-        isAuthenticated: false, isLoading: false, mustChangePassword: false,
+        user: null,
+        tenant: null,
+        membership: null,
+        isAuthenticated: false,
+        isLoading: false,
+        mustChangePassword: false,
       });
     });
   }, []);
@@ -141,7 +163,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         credentials: 'include',
       });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     clearAuthState();
     localStorage.removeItem('tenantSlug');
@@ -156,9 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout }}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={{ ...state, login, logout }}>{children}</AuthContext.Provider>
   );
 }
 

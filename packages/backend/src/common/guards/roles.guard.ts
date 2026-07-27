@@ -8,7 +8,14 @@
  * Use with the @Permissions() decorator on controllers/handlers.
  */
 
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Inject,
+  Logger,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { Knex } from 'knex';
@@ -23,6 +30,8 @@ const CACHE_TTL_MS = 60_000;
 
 @Injectable()
 export class RolesGuard implements CanActivate {
+  private readonly logger = new Logger(RolesGuard.name);
+
   constructor(
     private readonly reflector: Reflector,
     @Inject(DATABASE_PROVIDER) private readonly db: Knex,
@@ -81,7 +90,8 @@ export class RolesGuard implements CanActivate {
         .first();
 
       const role = membership?.role || 'member';
-      const permissions = DEFAULT_ROLE_PERMISSIONS[role] || DEFAULT_ROLE_PERMISSIONS['member'] || [];
+      const permissions =
+        DEFAULT_ROLE_PERMISSIONS[role] || DEFAULT_ROLE_PERMISSIONS['member'] || [];
 
       // Update cache
       permCache.set(cacheKey, {
@@ -90,9 +100,12 @@ export class RolesGuard implements CanActivate {
       });
 
       return permissions;
-    } catch {
-      // Fallback to JWT permissions on DB error
-      return user.permissions || [];
+    } catch (error) {
+      // Authorization must fail closed when current membership cannot be
+      // verified. Trusting stale JWT permissions here can preserve revoked
+      // admin access during a database incident.
+      this.logger.error(`Permission lookup failed for ${user.userId}: ${(error as Error).message}`);
+      throw new ForbiddenException('Unable to verify current permissions');
     }
   }
 }

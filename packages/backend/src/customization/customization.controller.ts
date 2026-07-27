@@ -24,7 +24,16 @@ export class CustomizationController {
 
   @Post('custom-fields')
   @Permissions('workflow:create')
-  async createCustomField(@Body() body: { name: string; key: string; fieldType: string; options?: string[]; isRequired?: boolean }) {
+  async createCustomField(
+    @Body()
+    body: {
+      name: string;
+      key: string;
+      fieldType: string;
+      options?: string[];
+      isRequired?: boolean;
+    },
+  ) {
     return this.customizationService.createCustomField(body);
   }
 
@@ -73,8 +82,14 @@ export class CustomizationController {
 
   @Post('blueprints/create-from')
   @Permissions('project:create')
-  async createFromBlueprint(@Body() body: { blueprintProjectId: string; name: string; folderId: string }) {
-    return this.customizationService.createFromBlueprint(body.blueprintProjectId, body.name, body.folderId);
+  async createFromBlueprint(
+    @Body() body: { blueprintProjectId: string; name: string; folderId: string },
+  ) {
+    return this.customizationService.createFromBlueprint(
+      body.blueprintProjectId,
+      body.name,
+      body.folderId,
+    );
   }
 
   // ── Workspace Custom Statuses ─────────────────────────────
@@ -104,13 +119,24 @@ export class CustomizationController {
 
   @Post('request-forms')
   @Permissions('project:create')
-  async createRequestForm(@Body() body: { name: string; description?: string; folderId: string; fields: Array<{ name: string; type: string; required: boolean; options?: string[] }> }) {
+  async createRequestForm(
+    @Body()
+    body: {
+      name: string;
+      description?: string;
+      folderId: string;
+      fields: Array<{ name: string; type: string; required: boolean; options?: string[] }>;
+    },
+  ) {
     return this.customizationService.createRequestForm(body);
   }
 
   @Post('request-forms/:formId/submit')
   @Permissions('task:create')
-  async submitRequestForm(@Param('formId') formId: string, @Body() body: { values: Record<string, unknown> }) {
+  async submitRequestForm(
+    @Param('formId') formId: string,
+    @Body() body: { values: Record<string, unknown> },
+  ) {
     return this.customizationService.submitRequestForm(formId, body.values);
   }
 }

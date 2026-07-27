@@ -5,7 +5,7 @@
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { loadAppConfig } from './config/app.config';
+import { loadAppConfig, validateProductionConfig } from './config/app.config';
 import { initSentry } from './common/sentry';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -15,6 +15,7 @@ import cookieParser from 'cookie-parser';
 initSentry();
 
 async function bootstrap(): Promise<void> {
+  validateProductionConfig();
   const config = loadAppConfig();
   const app = await NestFactory.create(AppModule);
 
@@ -43,7 +44,7 @@ async function bootstrap(): Promise<void> {
 
   // Start listening
   await app.listen(config.port);
-  console.log(`[${config.nodeEnv}] Wrike Clone API running on port ${config.port}`);
+  console.log(`[${config.nodeEnv}] Work Management API running on port ${config.port}`);
   console.log(`API prefix: ${config.apiPrefix}`);
 }
 

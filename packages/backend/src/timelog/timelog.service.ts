@@ -17,10 +17,10 @@ export class TimelogService {
 
   async findByTask(taskId: string, page = 1, perPage = 50) {
     const ctx = requireTenantContext();
-    const countResult = await this.db('time_entries')
+    const countResult = (await this.db('time_entries')
       .where({ task_id: taskId, tenant_id: ctx.tenantId, deleted_at: null })
       .count()
-      .first() as { count?: string | number } | undefined;
+      .first()) as { count?: string | number } | undefined;
 
     const entries = await this.db('time_entries')
       .join('users', 'time_entries.user_id', 'users.id')
@@ -64,9 +64,7 @@ export class TimelogService {
 
   async lock(id: string): Promise<void> {
     const ctx = requireTenantContext();
-    const entry = await this.db('time_entries')
-      .where({ id, tenant_id: ctx.tenantId })
-      .first();
+    const entry = await this.db('time_entries').where({ id, tenant_id: ctx.tenantId }).first();
     if (!entry) throw new NotFoundException('Time entry not found');
     await this.db('time_entries').where({ id }).update({ is_locked: true });
   }

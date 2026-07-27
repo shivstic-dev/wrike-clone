@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ProjectService } from './project.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -15,11 +25,12 @@ export class ProjectController {
   @Permissions('project:read')
   async findAll(
     @Query('folderId') folderId?: string,
+    @Query('workspaceId') workspaceId?: string,
     @Query('page') page?: number,
     @Query('perPage') perPage?: number,
     @Query('status') status?: string,
   ) {
-    return this.projectService.findAll({ folderId, page, perPage, status });
+    return this.projectService.findAll({ folderId, workspaceId, page, perPage, status });
   }
 
   @Get(':id')

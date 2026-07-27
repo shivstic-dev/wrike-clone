@@ -1,13 +1,9 @@
 import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
-  // Only drop after verifying tasks have assignees (migration 004 ran successfully)
-  const result = await knex('tasks').count('* as count').whereNotNull('assignee_id').first();
-  const hasAssigneeData = Number(result?.count || 0) > 0;
-
-  if (hasAssigneeData) {
-    await knex.schema.dropTableIfExists('task_assignees');
-  }
+  // Migration 004 copies legacy assignees first. The application now uses the
+  // canonical tasks.assignee_id column and no longer queries this join table.
+  await knex.schema.dropTableIfExists('task_assignees');
 }
 
 export async function down(knex: Knex): Promise<void> {

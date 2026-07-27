@@ -1,5 +1,5 @@
 -- =============================================================================
--- Wrike Clone — Database Schema v1
+-- Work Management Platform — applied production database baseline
 -- Multi-tenant PostgreSQL schema with Row-Level Security.
 -- Every table carries tenant_id; RLS policies enforce tenant isolation at the
 -- database level so a bug in application code can never leak data across orgs.
@@ -563,12 +563,7 @@ ALTER TABLE webhooks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE file_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE file_annotations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE workspace_statuses ENABLE ROW LEVEL SECURITY;
-ALTER TABLE project_templates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE request_forms ENABLE ROW LEVEL SECURITY;
-ALTER TABLE working_hours ENABLE ROW LEVEL SECURITY;
-ALTER TABLE time_off ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tenant_holidays ENABLE ROW LEVEL SECURITY;
+ALTER TABLE automation_rules ENABLE ROW LEVEL SECURITY;
 
 -- Generic RLS policy: rows visible only if tenant_id matches the session setting.
 -- Application sets `app.current_tenant_id` at login; all subsequent queries
@@ -587,9 +582,7 @@ DECLARE
     'task_comments', 'activity_logs', 'time_entries',
     'custom_field_definitions', 'item_types', 'approval_chains', 'approval_steps',
     'approval_requests', 'approval_votes', 'notifications', 'webhooks', 
-    'files', 'file_versions', 'file_annotations',
-    'workspace_statuses', 'project_templates', 'request_forms',
-    'working_hours', 'time_off', 'tenant_holidays'
+    'files', 'file_versions', 'file_annotations', 'automation_rules'
   ];
   t TEXT;
 BEGIN
@@ -603,6 +596,25 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Ensure policies apply even when the application role owns the tables.
+DO $$
+DECLARE
+  tables_with_tenant TEXT[] := ARRAY[
+    'workspaces', 'workspace_members', 'folders', 'projects', 'tasks',
+    'task_folder_links', 'task_dependencies', 'task_assignees',
+    'task_comments', 'activity_logs', 'time_entries',
+    'custom_field_definitions', 'item_types', 'approval_chains', 'approval_steps',
+    'approval_requests', 'approval_votes', 'notifications', 'webhooks',
+    'files', 'file_versions', 'file_annotations', 'automation_rules'
+  ];
+  t TEXT;
+BEGIN
+  FOREACH t IN ARRAY tables_with_tenant LOOP
+    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
 -- ── TRIGGERS: auto-update updated_at ────────────────────────────────────────
 
 DO $$
@@ -610,9 +622,7 @@ DECLARE
   tables_with_updated_at TEXT[] := ARRAY[
     'tenants', 'users', 'workspaces', 'folders', 'projects', 'tasks',
     'task_comments', 'time_entries', 'custom_field_definitions', 'item_types',
-    'approval_chains', 'automation_rules', 'webhooks', 'files',
-    'workspace_statuses', 'project_templates', 'request_forms',
-    'working_hours', 'time_off', 'tenant_holidays'
+    'approval_chains', 'automation_rules', 'webhooks', 'files'
   ];
   t TEXT;
 BEGIN
@@ -625,3 +635,7 @@ BEGIN
   END LOOP;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Legacy multi-assignee rows were consolidated into tasks.assignee_id by the
+-- current application model.
+DROP TABLE IF EXISTS task_assignees;

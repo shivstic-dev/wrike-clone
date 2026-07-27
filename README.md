@@ -1,20 +1,24 @@
-# Wrike Clone - Project Management Platform
+# OpenWork Hub
 
-A full-stack project management application inspired by Wrike, built with NestJS, React, and Supabase.
+An independent full-stack work management platform built with NestJS, React, and Supabase.
+
+This project is not affiliated with, endorsed by, or sponsored by Wrike, Inc.
 
 ## 🚀 Features
 
 ### Core Management
+
 - **Multi-tenant Architecture** with Row-Level Security (RLS)
 - **Workspaces & Projects** with hierarchical folder structure
 - **Task Management** with dependencies, assignees, and custom fields
-- **Real-time Collaboration** with comments and notifications
+- **Task Collaboration** with comments and an in-app notification API
 - **Kanban, Table, Gantt Chart & Calendar Views** for task visualization
 - **Approval Workflows** with multi-step chains
-- **Automation Rules** with event-driven actions
+- **Automation Rule Builder** for defining conditions and actions
 - **Time Tracking** with billable hours and timesheets
 
 ### Customization & Workflow
+
 - **Custom Fields** — Add extra fields (text, dropdown, date, etc.) to tasks
 - **Custom Item Types** — Define specialized task categories (Bug, Interview, etc.)
 - **Custom Statuses & Workflows** — Per-workspace status sets with custom colors
@@ -22,43 +26,57 @@ A full-stack project management application inspired by Wrike, built with NestJS
 - **Request Forms** — Intake forms for structured task creation
 
 ### Scheduling & Capacity
+
 - **Work Schedules** — Default working hours per day of week
 - **Time Off Management** — Vacation, sick, and personal day requests with approval
 - **Company Holidays** — Tenant-wide holidays for capacity planning
 
 ### Search & Discovery
+
 - **Global Search** — Full-text search across tasks and projects
 - **Search Page** — Paginated results with type and project filters
 - **PostgreSQL Full-Text Search** (with optional Meilisearch integration)
 
 ### Communication
-- **Comments & @Mentions** — Inline discussion on any task
-- **Email Notifications** — SMTP-based alerts (task assigned, new comment, approvals)
-- **Slack/Teams Integration** — Notifications and task creation from chat
-- **Inbox Notifications** — Centralized in-app feed
-- **Activity Stream** — Live log of all workspace changes
+
+- **Task Comments** — Inline discussion on tasks
+- **Email Delivery Service** — SMTP templates ready for workflow integration
+- **Inbox Notifications API** — Tenant-scoped notification storage and endpoints
 
 ### File Management
-- **File Upload & Versioning** — Upload files with automatic version tracking
-- **Proofing & Annotations** — Annotate images/PDFs for design review
-- **Cloud Storage Integrations** — Google Drive, Dropbox, OneDrive attachments
+
+- **Private File Storage** — Supabase Storage uploads with short-lived download links
+- **File Metadata & Annotations API** — Version metadata and annotation endpoints
 
 ### Analytics & Reports
+
 - **Dashboards** — Custom dashboards with task metrics and charts
 - **Portfolio View** — Aggregated view across workspaces and projects
 - **Reports & Analytics** — Custom reports with filters and date ranges
 - **Timesheets** — View and export time entries across projects
 
 ### Enterprise & Security
+
 - **Roles & Permissions** — RBAC with custom roles
-- **2FA/MFA** — Two-step verification
-- **Webhooks** — Real-time event notifications for external integrations
-- **API (v4) & Webhooks** — Full REST API with 400 req/min rate limit
+- **Webhook Management** — SSRF-protected endpoint configuration and delivery service
+- **Versioned REST API** — JWT authentication, RBAC, validation, and global rate limiting
 - **Row-Level Security (RLS)** — Database-level tenant isolation
+
+### Current distribution scope
+
+The distributed v1 is intentionally focused on department task monitoring:
+scoped Employee/Manager/Department Head/Admin permissions, task assignment and
+status control, department/global visibility, deadline and priority alerts, and
+server-generated PDF/XLSX reports. Generic Gantt, automation, portfolio,
+timesheet, schedule, search, Copilot, webhook, and public-form interfaces remain
+dormant and are not exposed in the production navigation or route table. See
+[feature coverage](FEATURE_COVERAGE.md) and
+[production cutover](PRODUCTION_CUTOVER.md) before deploying.
 
 ## 🛠️ Tech Stack
 
 ### Backend
+
 - **NestJS** — Progressive Node.js framework
 - **PostgreSQL** (Supabase) — Database with RLS
 - **Knex.js** — SQL query builder & migrations
@@ -68,6 +86,7 @@ A full-stack project management application inspired by Wrike, built with NestJS
 - **Nodemailer** — SMTP email notifications
 
 ### Frontend
+
 - **React 18** with TypeScript
 - **Vite** — Build tool
 - **TailwindCSS** — Styling
@@ -77,13 +96,14 @@ A full-stack project management application inspired by Wrike, built with NestJS
 - **Recharts** — Charts & analytics
 
 ### Shared
+
 - **Monorepo** with workspace packages
 - **Shared types & validation schemas**
 - **TypeScript** throughout
 
 ## 📋 Prerequisites
 
-- **Node.js** 18+ 
+- **Node.js** 18+
 - **npm** or **yarn**
 - **Supabase account** (for database)
 - **Git**
@@ -133,7 +153,7 @@ Run the schema in Supabase SQL Editor:
 
 1. Open your Supabase project dashboard
 2. Go to **SQL Editor**
-3. Copy and paste the contents of `packages/backend/src/database/schema.sql`
+3. Apply the SQL files in `supabase/migrations/` in filename order
 4. Click **Run**
 
 Alternatively, if you have `psql` installed:
@@ -191,22 +211,27 @@ The `vercel.json` file is already configured for both frontend and backend deplo
 ### Backend API Endpoints
 
 Once deployed, your API will be available at:
+
 - **Development**: `http://localhost:4000/api/v1`
 - **Production**: `https://your-domain.vercel.app/api/v1`
 
 ## 📚 API Documentation
 
 ### Health Check
+
 - `GET /api/v1/health` - Health check endpoint
 
 ### Authentication
+
 - `POST /api/v1/auth/login` - Login
 - `POST /api/v1/auth/refresh` - Refresh token
 - `POST /api/v1/auth/logout` - Logout
 - `POST /api/v1/auth/change-password` - Change password
 
 ### Resources
+
 - `/api/v1/tenants` — Tenant management
+- `/api/v1/tenants/bootstrap` — Setup-key-protected first tenant/admin bootstrap
 - `/api/v1/workspaces` — Workspace CRUD
 - `/api/v1/folders` — Folder hierarchy
 - `/api/v1/projects` — Project management
@@ -314,24 +339,24 @@ This project is licensed under the MIT License.
 
 ## 🔐 Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | PostgreSQL connection string (Supabase) | ✅ |
-| `JWT_SECRET` | JWT signing secret | ✅ |
-| `ENCRYPTION_KEY` | Encryption key (64-char hex) | ✅ |
-| `CORS_ORIGINS` | Allowed CORS origins | ✅ |
-| `SMTP_HOST` | SMTP server hostname | For email |
-| `SMTP_PORT` | SMTP port (default 587) | For email |
-| `SMTP_USER` | SMTP username | For email |
-| `SMTP_PASS` | SMTP password | For email |
-| `MEILISEARCH_HOST` | Meilisearch server URL | For full-text search |
-| `MEILISEARCH_API_KEY` | Meilisearch API key | For full-text search |
-| `STORAGE_DRIVER` | File storage driver (`local` or `s3` / `r2`) | For file uploads |
-| `S3_ENDPOINT` | S3-compatible endpoint (Cloudflare R2, AWS S3) | For S3 storage |
-| `S3_BUCKET` | S3 bucket name | For S3 storage |
-| `S3_REGION` | S3 region | For S3 storage |
-| `S3_ACCESS_KEY_ID` | S3 access key | For S3 storage |
-| `S3_SECRET_ACCESS_KEY` | S3 secret key | For S3 storage |
+| Variable               | Description                                    | Required             |
+| ---------------------- | ---------------------------------------------- | -------------------- |
+| `DATABASE_URL`         | PostgreSQL connection string (Supabase)        | ✅                   |
+| `JWT_SECRET`           | JWT signing secret                             | ✅                   |
+| `ENCRYPTION_KEY`       | Encryption key (64-char hex)                   | ✅                   |
+| `CORS_ORIGINS`         | Allowed CORS origins                           | ✅                   |
+| `SMTP_HOST`            | SMTP server hostname                           | For email            |
+| `SMTP_PORT`            | SMTP port (default 587)                        | For email            |
+| `SMTP_USER`            | SMTP username                                  | For email            |
+| `SMTP_PASS`            | SMTP password                                  | For email            |
+| `MEILISEARCH_HOST`     | Meilisearch server URL                         | For full-text search |
+| `MEILISEARCH_API_KEY`  | Meilisearch API key                            | For full-text search |
+| `STORAGE_DRIVER`       | File storage driver (`local` or `s3` / `r2`)   | For file uploads     |
+| `S3_ENDPOINT`          | S3-compatible endpoint (Cloudflare R2, AWS S3) | For S3 storage       |
+| `S3_BUCKET`            | S3 bucket name                                 | For S3 storage       |
+| `S3_REGION`            | S3 region                                      | For S3 storage       |
+| `S3_ACCESS_KEY_ID`     | S3 access key                                  | For S3 storage       |
+| `S3_SECRET_ACCESS_KEY` | S3 secret key                                  | For S3 storage       |
 
 ## 📧 Contact
 

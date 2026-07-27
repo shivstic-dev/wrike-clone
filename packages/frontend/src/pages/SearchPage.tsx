@@ -55,9 +55,7 @@ export default function SearchPage() {
       params.set('perPage', '20');
       if (projectId) params.set('projectId', projectId);
 
-      const { data } = await apiClient.get<SearchResponse>(
-        `/search?${params.toString()}`,
-      );
+      const { data } = await apiClient.get<SearchResponse>(`/search?${params.toString()}`);
       return data;
     },
     enabled: query.trim().length >= 2,
@@ -96,8 +94,18 @@ export default function SearchPage() {
         {/* Search form */}
         <form onSubmit={handleSearch} className="mt-4 flex gap-3">
           <div className="relative flex-1">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+              />
             </svg>
             <input
               type="text"
@@ -108,7 +116,9 @@ export default function SearchPage() {
               autoFocus
             />
           </div>
-          <button type="submit" className="btn-primary">Search</button>
+          <button type="submit" className="btn-primary">
+            Search
+          </button>
         </form>
       </div>
 
@@ -164,10 +174,12 @@ export default function SearchPage() {
                 to={result.url}
                 className="card flex items-start gap-4 p-4 transition-shadow hover:shadow-md"
               >
-                <span className={clsx(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white',
-                  result.type === 'task' ? 'bg-blue-500' : 'bg-amber-500',
-                )}>
+                <span
+                  className={clsx(
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white',
+                    result.type === 'task' ? 'bg-blue-500' : 'bg-amber-500',
+                  )}
+                >
                   {result.type === 'task' ? 'T' : 'P'}
                 </span>
                 <div className="flex-1 min-w-0">
@@ -175,9 +187,7 @@ export default function SearchPage() {
                     {result.title}
                   </h3>
                   {result.description && (
-                    <p className="mt-1 text-xs text-slate-500 line-clamp-2">
-                      {result.description}
-                    </p>
+                    <p className="mt-1 text-xs text-slate-500 line-clamp-2">{result.description}</p>
                   )}
                   <div className="mt-2 flex items-center gap-3 text-xs text-slate-400">
                     <span className="font-medium uppercase tracking-wider text-slate-500">
@@ -188,13 +198,24 @@ export default function SearchPage() {
                         {result.metadata.status.replace(/_/g, ' ')}
                       </span>
                     )}
-                    {typeof result.metadata?.priority === 'string' && result.metadata.priority !== 'none' && (
-                      <span>{result.metadata.priority}</span>
-                    )}
+                    {typeof result.metadata?.priority === 'string' &&
+                      result.metadata.priority !== 'none' && (
+                        <span>{result.metadata.priority}</span>
+                      )}
                   </div>
                 </div>
-                <svg className="mt-1 h-5 w-5 shrink-0 text-slate-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                <svg
+                  className="mt-1 h-5 w-5 shrink-0 text-slate-300"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8.25 4.5l7.5 7.5-7.5 7.5"
+                  />
                 </svg>
               </Link>
             ))}

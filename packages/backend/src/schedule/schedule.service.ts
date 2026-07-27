@@ -35,9 +35,7 @@ export class ScheduleService {
   ) {
     const ctx = requireTenantContext();
     await this.db.transaction(async (trx: any) => {
-      await trx('working_hours')
-        .where({ tenant_id: ctx.tenantId, user_id: userId })
-        .del();
+      await trx('working_hours').where({ tenant_id: ctx.tenantId, user_id: userId }).del();
 
       const inserts = hours.map((h) => ({
         id: uuidv4(),
@@ -89,9 +87,7 @@ export class ScheduleService {
 
   async approveTimeOff(id: string, approved: boolean) {
     const ctx = requireTenantContext();
-    const entry = await this.db('time_off')
-      .where({ id, tenant_id: ctx.tenantId })
-      .first();
+    const entry = await this.db('time_off').where({ id, tenant_id: ctx.tenantId }).first();
     if (!entry) throw new NotFoundException('Time off entry not found');
 
     const [updated] = await this.db('time_off')
@@ -105,8 +101,7 @@ export class ScheduleService {
 
   async getHolidays(year?: number) {
     const ctx = requireTenantContext();
-    const query = this.db('tenant_holidays')
-      .where({ tenant_id: ctx.tenantId });
+    const query = this.db('tenant_holidays').where({ tenant_id: ctx.tenantId });
 
     if (year) {
       query.whereRaw('EXTRACT(YEAR FROM date) = ?', [year]);
@@ -130,9 +125,7 @@ export class ScheduleService {
 
   async removeHoliday(id: string): Promise<void> {
     const ctx = requireTenantContext();
-    await this.db('tenant_holidays')
-      .where({ id, tenant_id: ctx.tenantId })
-      .del();
+    await this.db('tenant_holidays').where({ id, tenant_id: ctx.tenantId }).del();
   }
 
   // ── Capacity Planning ────────────────────────────────────
@@ -176,7 +169,7 @@ export class ScheduleService {
       if (dayHours) {
         const [startH, startM] = dayHours.start_time.split(':').map(Number);
         const [endH, endM] = dayHours.end_time.split(':').map(Number);
-        totalMinutes += (endH * 60 + endM) - (startH * 60 + startM);
+        totalMinutes += endH * 60 + endM - (startH * 60 + startM);
       } else {
         // Default: 8 hours on weekdays
         if (dayOfWeek >= 1 && dayOfWeek <= 5) {

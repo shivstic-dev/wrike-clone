@@ -62,7 +62,7 @@ export class CopilotService {
    * Query OpenAI GPT for a suggestion.
    */
   private async queryOpenAI(request: SuggestionRequest): Promise<SuggestionResponse> {
-    const systemPrompt = `You are an AI project management assistant for a Wrike-like platform called Wrike Clone. 
+    const systemPrompt = `You are an AI project management assistant for OpenWork Hub.
 You help users write better task descriptions, set appropriate priorities, break down complex tasks, 
 and get status recommendations.
 
@@ -134,7 +134,8 @@ Use a professional but friendly tone.`;
 
     if (lower.includes('description') || lower.includes('describe') || lower.includes('write')) {
       if (context?.taskTitle) {
-        suggestion = `For the task "${context.taskTitle}", a good description should include:\n` +
+        suggestion =
+          `For the task "${context.taskTitle}", a good description should include:\n` +
           `1. **Goal**: What needs to be accomplished\n` +
           `2. **Acceptance Criteria**: Specific requirements for completion\n` +
           `3. **Scope**: What's included (and what's not)\n` +
@@ -142,35 +143,49 @@ Use a professional but friendly tone.`;
           `Example: "Implement ${context.taskTitle} by adding the necessary backend endpoints and frontend components. ` +
           `Acceptance: API returns correct data, UI shows loading/error/empty states, tests pass."`;
       } else {
-        suggestion = 'To write an effective task description: start with the goal, add acceptance criteria, list dependencies, and define the scope of work. Keep it clear and actionable.';
+        suggestion =
+          'To write an effective task description: start with the goal, add acceptance criteria, list dependencies, and define the scope of work. Keep it clear and actionable.';
       }
-    } else if (lower.includes('priority') || lower.includes('urgent') || lower.includes('important')) {
-      suggestion = 'Priority recommendations:\n' +
+    } else if (
+      lower.includes('priority') ||
+      lower.includes('urgent') ||
+      lower.includes('important')
+    ) {
+      suggestion =
+        'Priority recommendations:\n' +
         '- **Urgent**: Critical path blockers, security issues, or client-facing deadlines\n' +
         '- **High**: Important features with approaching due dates\n' +
         '- **Medium**: Standard feature work, improvements\n' +
         '- **Low**: Nice-to-haves, technical debt, minor bugs';
-    } else if (lower.includes('breakdown') || lower.includes('subtask') || lower.includes('split')) {
-      suggestion = 'To break down this task:\n' +
+    } else if (
+      lower.includes('breakdown') ||
+      lower.includes('subtask') ||
+      lower.includes('split')
+    ) {
+      suggestion =
+        'To break down this task:\n' +
         '1. Identify the core components or steps required\n' +
         '2. Separate backend and frontend work\n' +
         '3. Split by milestone or deliverable\n' +
         '4. Each subtask should be independently completable in 1-3 days';
     } else if (lower.includes('status') || lower.includes('progress')) {
-      suggestion = 'Status recommendations:\n' +
+      suggestion =
+        'Status recommendations:\n' +
         '- **Backlog**: Ideas and future work not yet ready to start\n' +
         '- **To Do**: Ready and prioritized, just not started\n' +
         '- **In Progress**: Currently being worked on\n' +
         '- **In Review**: Ready for peer review or QA\n' +
         '- **Done**: Completed and verified';
     } else if (lower.includes('estimate') || lower.includes('time') || lower.includes('hour')) {
-      suggestion = 'For estimating effort:\n' +
+      suggestion =
+        'For estimating effort:\n' +
         '- Small tasks (1-4 hours): Simple changes, documentation, bug fixes\n' +
         '- Medium tasks (1-3 days): New features, UI components\n' +
         '- Large tasks (1-2 weeks): Major features, integrations\n' +
         '- Epic (2+ weeks): Break these down into smaller tasks';
     } else {
-      suggestion = `I can help with:\n` +
+      suggestion =
+        `I can help with:\n` +
         `- Writing task descriptions\n` +
         `- Recommending priority levels\n` +
         `- Breaking down complex tasks into subtasks\n` +

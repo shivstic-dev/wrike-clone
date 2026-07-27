@@ -49,7 +49,9 @@ export class ApprovalService {
     } else if (input.status === 'rejected') {
       await this.db('approval_requests').where({ id: requestId }).update({ status: 'rejected' });
     } else if (input.status === 'changes_requested') {
-      await this.db('approval_requests').where({ id: requestId }).update({ status: 'changes_requested' });
+      await this.db('approval_requests')
+        .where({ id: requestId })
+        .update({ status: 'changes_requested' });
     }
 
     return vote;

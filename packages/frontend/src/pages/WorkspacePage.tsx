@@ -15,11 +15,7 @@ const projectStatusColors: Record<string, string> = {
 
 export default function WorkspacePage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
-  const {
-    data: workspace,
-    isLoading: wsLoading,
-    error: wsError,
-  } = useWorkspace(workspaceId!);
+  const { data: workspace, isLoading: wsLoading, error: wsError } = useWorkspace(workspaceId!);
   const { data: folders, isLoading: foldersLoading } = useFolderTree(workspaceId!);
   const {
     data: projects,
@@ -43,7 +39,10 @@ export default function WorkspacePage() {
   if (!workspace) {
     return (
       <div className="p-6">
-        <ErrorDisplay title="Workspace not found" message="This workspace does not exist or you don't have access." />
+        <ErrorDisplay
+          title="Workspace not found"
+          message="This workspace does not exist or you don't have access."
+        />
       </div>
     );
   }
@@ -114,7 +113,10 @@ export default function WorkspacePage() {
               ))}
             </div>
           ) : (
-            <EmptyState title="No projects yet" description="Projects will appear here once they are created." />
+            <EmptyState
+              title="No projects yet"
+              description="Projects will appear here once they are created."
+            />
           )}
         </div>
       </div>

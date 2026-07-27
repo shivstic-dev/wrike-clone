@@ -5,6 +5,7 @@
 
 import {
   createTenantSchema,
+  bootstrapTenantSchema,
   createWorkspaceSchema,
   createFolderSchema,
   createProjectSchema,
@@ -14,6 +15,8 @@ import {
   inviteUserSchema,
   createDependencySchema,
   loginSchema,
+  registerSchema,
+  adminResetPasswordSchema,
   bulkTaskUpdateSchema,
   changePasswordSchema,
   addWorkspaceMemberSchema,
@@ -63,6 +66,45 @@ describe('Validation Schemas', () => {
     });
   });
 
+  describe('registration and password reset schemas', () => {
+    it('accepts a strong registration payload', () => {
+      expect(
+        registerSchema.safeParse({
+          email: 'user@example.com',
+          password: 'long-password-123',
+          displayName: 'Example User',
+          tenantSlug: 'acme-corp',
+        }).success,
+      ).toBe(true);
+    });
+
+    it('rejects weak registration passwords', () => {
+      expect(
+        registerSchema.safeParse({
+          email: 'user@example.com',
+          password: 'password',
+          displayName: 'Example User',
+          tenantSlug: 'acme-corp',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('requires a UUID and strong temporary password for admin resets', () => {
+      expect(
+        adminResetPasswordSchema.safeParse({
+          userId: validUUID(),
+          tempPassword: 'temporary-pass-123',
+        }).success,
+      ).toBe(true);
+      expect(
+        adminResetPasswordSchema.safeParse({
+          userId: 'not-a-uuid',
+          tempPassword: 'short',
+        }).success,
+      ).toBe(false);
+    });
+  });
+
   describe('createTenantSchema', () => {
     it('accepts valid tenant data', () => {
       const result = createTenantSchema.safeParse({
@@ -80,6 +122,32 @@ describe('Validation Schemas', () => {
 
     it('rejects invalid slug format', () => {
       const result = createTenantSchema.safeParse({ name: 'Test', slug: 'INVALID SLUG!' });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('bootstrapTenantSchema', () => {
+    it('accepts a tenant with a strong first-administrator account', () => {
+      const result = bootstrapTenantSchema.safeParse({
+        tenant: { name: 'Acme Corp', slug: 'acme-corp' },
+        admin: {
+          email: 'admin@example.com',
+          password: 'strong-password-123',
+          displayName: 'Admin User',
+        },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects weak bootstrap administrator credentials', () => {
+      const result = bootstrapTenantSchema.safeParse({
+        tenant: { name: 'Acme Corp', slug: 'acme-corp' },
+        admin: {
+          email: 'not-an-email',
+          password: 'short',
+          displayName: '',
+        },
+      });
       expect(result.success).toBe(false);
     });
   });
@@ -217,7 +285,7 @@ describe('Validation Schemas', () => {
 
   describe('updateTaskSchema', () => {
     it('accepts partial update with one field', () => {
-      const result = updateTaskSchema.safeParse({ status: 'done' });
+      const result = updateTaskSchema.safeParse({ status: 'completed' });
       expect(result.success).toBe(true);
     });
 
@@ -332,17 +400,17 @@ describe('Validation Schemas', () => {
         email: 'user@company.com',
         displayName: 'Jane Smith',
         tempPassword: 'tempPass123!',
-        role: 'member',
+        role: 'employee',
       });
       expect(result.success).toBe(true);
     });
 
-    it('accepts dept_admin role', () => {
+    it('accepts department_head role', () => {
       const result = addWorkspaceMemberSchema.safeParse({
         email: 'admin@company.com',
         displayName: 'Admin',
         tempPassword: 'tempPass123!',
-        role: 'dept_admin',
+        role: 'department_head',
       });
       expect(result.success).toBe(true);
     });
@@ -380,7 +448,7 @@ describe('Validation Schemas', () => {
 
   describe('updateWorkspaceMemberRoleSchema', () => {
     it('accepts valid role update', () => {
-      const result = updateWorkspaceMemberRoleSchema.safeParse({ role: 'dept_admin' });
+      const result = updateWorkspaceMemberRoleSchema.safeParse({ role: 'department_head' });
       expect(result.success).toBe(true);
     });
 
@@ -394,7 +462,7 @@ describe('Validation Schemas', () => {
     it('accepts valid bulk update', () => {
       const result = bulkTaskUpdateSchema.safeParse({
         taskIds: [validUUID(), validUUID()],
-        updates: { status: 'done' },
+        updates: { status: 'completed' },
       });
       expect(result.success).toBe(true);
     });

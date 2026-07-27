@@ -6,8 +6,15 @@
 import { useMemo, useRef, useState, useCallback } from 'react';
 import { clsx } from 'clsx';
 import {
-  format, addDays, differenceInDays, startOfWeek, endOfWeek,
-  eachDayOfInterval, min as dateMin, max as dateMax, parseISO,
+  format,
+  addDays,
+  differenceInDays,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  min as dateMin,
+  max as dateMax,
+  parseISO,
 } from 'date-fns';
 import type { Task } from '@wrike-clone/shared';
 
@@ -25,7 +32,11 @@ const BAR_HEIGHT = 26;
 
 export function GanttChart({ tasks, dependencies = [], onTaskUpdate }: GanttChartProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [draggingBar, setDraggingBar] = useState<{ taskId: string; startX: number; originalStartDays: number } | null>(null);
+  const [draggingBar, setDraggingBar] = useState<{
+    taskId: string;
+    startX: number;
+    originalStartDays: number;
+  } | null>(null);
   const [tooltipTask, setTooltipTask] = useState<string | null>(null);
 
   // Calculate date range covering all tasks
@@ -38,7 +49,7 @@ export function GanttChart({ tasks, dependencies = [], onTaskUpdate }: GanttChar
       return { startDate: start, endDate: end, dayCount: days.length, days };
     }
 
-    const dates = tasks.flatMap(t => {
+    const dates = tasks.flatMap((t) => {
       const d: Date[] = [];
       if (t.startDate) d.push(new Date(t.startDate));
       if (t.dueDate) d.push(new Date(t.dueDate));
@@ -61,59 +72,74 @@ export function GanttChart({ tasks, dependencies = [], onTaskUpdate }: GanttChar
   const timelineWidth = dayCount * DAY_WIDTH;
 
   // Calculate bar position from task dates
-  const getBarPosition = useCallback((task: Task) => {
-    const taskStart = task.startDate ? parseISO(task.startDate) : null;
-    const taskEnd = task.dueDate ? parseISO(task.dueDate) : null;
-    const left = taskStart ? Math.max(0, differenceInDays(taskStart, startDate) * DAY_WIDTH) : 0;
-    const width = taskStart && taskEnd
-      ? Math.max(DAY_WIDTH, differenceInDays(taskEnd, taskStart) * DAY_WIDTH + DAY_WIDTH)
-      : DAY_WIDTH * 2;
-    return { left, width, taskStart, taskEnd };
-  }, [startDate, DAY_WIDTH]);
+  const getBarPosition = useCallback(
+    (task: Task) => {
+      const taskStart = task.startDate ? parseISO(task.startDate) : null;
+      const taskEnd = task.dueDate ? parseISO(task.dueDate) : null;
+      const left = taskStart ? Math.max(0, differenceInDays(taskStart, startDate) * DAY_WIDTH) : 0;
+      const width =
+        taskStart && taskEnd
+          ? Math.max(DAY_WIDTH, differenceInDays(taskEnd, taskStart) * DAY_WIDTH + DAY_WIDTH)
+          : DAY_WIDTH * 2;
+      return { left, width, taskStart, taskEnd };
+    },
+    [startDate, DAY_WIDTH],
+  );
 
   // Handle mouse down on a task bar to start drag
-  const handleBarMouseDown = useCallback((e: React.MouseEvent, task: Task) => {
-    if (!onTaskUpdate) return;
-    e.preventDefault();
-    const pos = getBarPosition(task);
-    setDraggingBar({
-      taskId: task.id,
-      startX: e.clientX,
-      originalStartDays: task.startDate ? differenceInDays(parseISO(task.startDate), startDate) : 0,
-    });
-  }, [onTaskUpdate, getBarPosition, startDate]);
+  const handleBarMouseDown = useCallback(
+    (e: React.MouseEvent, task: Task) => {
+      if (!onTaskUpdate) return;
+      e.preventDefault();
+      const pos = getBarPosition(task);
+      setDraggingBar({
+        taskId: task.id,
+        startX: e.clientX,
+        originalStartDays: task.startDate
+          ? differenceInDays(parseISO(task.startDate), startDate)
+          : 0,
+      });
+    },
+    [onTaskUpdate, getBarPosition, startDate],
+  );
 
   // Handle mouse move during drag
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!draggingBar) return;
-    const deltaX = e.clientX - draggingBar.startX;
-    const dayDelta = Math.round(deltaX / DAY_WIDTH);
-    // Visual feedback handled by inline style
-  }, [draggingBar, DAY_WIDTH]);
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!draggingBar) return;
+      const deltaX = e.clientX - draggingBar.startX;
+      const dayDelta = Math.round(deltaX / DAY_WIDTH);
+      // Visual feedback handled by inline style
+    },
+    [draggingBar, DAY_WIDTH],
+  );
 
   // Handle mouse up to finalize drag
-  const handleMouseUp = useCallback((e: MouseEvent) => {
-    if (!draggingBar || !onTaskUpdate) return;
-    const deltaX = e.clientX - draggingBar.startX;
-    const dayDelta = Math.round(deltaX / DAY_WIDTH);
+  const handleMouseUp = useCallback(
+    (e: MouseEvent) => {
+      if (!draggingBar || !onTaskUpdate) return;
+      const deltaX = e.clientX - draggingBar.startX;
+      const dayDelta = Math.round(deltaX / DAY_WIDTH);
 
-    if (dayDelta !== 0) {
-      const task = tasks.find(t => t.id === draggingBar.taskId);
-      if (task) {
-        const newStart = task.startDate
-          ? addDays(parseISO(task.startDate), dayDelta).toISOString()
-          : undefined;
-        const newEnd = task.dueDate
-          ? addDays(parseISO(task.dueDate), dayDelta).toISOString()
-          : undefined;
-        onTaskUpdate(draggingBar.taskId, {
-          startDate: newStart as any,
-          dueDate: newEnd as any,
-        });
+      if (dayDelta !== 0) {
+        const task = tasks.find((t) => t.id === draggingBar.taskId);
+        if (task) {
+          const newStart = task.startDate
+            ? addDays(parseISO(task.startDate), dayDelta).toISOString()
+            : undefined;
+          const newEnd = task.dueDate
+            ? addDays(parseISO(task.dueDate), dayDelta).toISOString()
+            : undefined;
+          onTaskUpdate(draggingBar.taskId, {
+            startDate: newStart as any,
+            dueDate: newEnd as any,
+          });
+        }
       }
-    }
-    setDraggingBar(null);
-  }, [draggingBar, onTaskUpdate, DAY_WIDTH, tasks, startDate]);
+      setDraggingBar(null);
+    },
+    [draggingBar, onTaskUpdate, DAY_WIDTH, tasks, startDate],
+  );
 
   // Attach global mouse move/up handlers during drag
   const handleBarMouseDownRef = useRef(handleBarMouseDown);
@@ -122,7 +148,9 @@ export function GanttChart({ tasks, dependencies = [], onTaskUpdate }: GanttChar
   if (tasks.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white">
-        <p className="text-sm text-slate-400">No tasks to display on timeline. Create tasks with start and due dates.</p>
+        <p className="text-sm text-slate-400">
+          No tasks to display on timeline. Create tasks with start and due dates.
+        </p>
       </div>
     );
   }
@@ -137,7 +165,10 @@ export function GanttChart({ tasks, dependencies = [], onTaskUpdate }: GanttChar
       <div className="flex">
         {/* Task labels */}
         <div className="shrink-0 border-r border-slate-200" style={{ width: LABEL_WIDTH }}>
-          <div className="flex items-center border-b border-slate-200 bg-slate-50 px-4 text-xs font-semibold uppercase text-slate-500" style={{ height: HEADER_HEIGHT }}>
+          <div
+            className="flex items-center border-b border-slate-200 bg-slate-50 px-4 text-xs font-semibold uppercase text-slate-500"
+            style={{ height: HEADER_HEIGHT }}
+          >
             Tasks ({tasks.length})
           </div>
           <div>
@@ -154,7 +185,8 @@ export function GanttChart({ tasks, dependencies = [], onTaskUpdate }: GanttChar
                   <span className="truncate flex-1">{task.title}</span>
                   {tooltipTask === task.id && pos.taskStart && (
                     <span className="ml-2 shrink-0 text-[10px] text-slate-400">
-                      {format(pos.taskStart, 'MMM d')} - {pos.taskEnd ? format(pos.taskEnd, 'MMM d') : '?'}
+                      {format(pos.taskStart, 'MMM d')} -{' '}
+                      {pos.taskEnd ? format(pos.taskEnd, 'MMM d') : '?'}
                     </span>
                   )}
                 </div>
@@ -166,7 +198,10 @@ export function GanttChart({ tasks, dependencies = [], onTaskUpdate }: GanttChar
         {/* Timeline */}
         <div className="flex-1 overflow-x-auto" ref={scrollRef}>
           {/* Header days */}
-          <div className="flex border-b border-slate-200 bg-slate-50" style={{ height: HEADER_HEIGHT, minWidth: timelineWidth }}>
+          <div
+            className="flex border-b border-slate-200 bg-slate-50"
+            style={{ height: HEADER_HEIGHT, minWidth: timelineWidth }}
+          >
             {days.map((day, i) => (
               <div
                 key={i}
@@ -188,14 +223,19 @@ export function GanttChart({ tasks, dependencies = [], onTaskUpdate }: GanttChar
           </div>
 
           {/* Task bars area */}
-          <div className="relative" style={{ minWidth: timelineWidth, height: tasks.length * ROW_HEIGHT }}>
+          <div
+            className="relative"
+            style={{ minWidth: timelineWidth, height: tasks.length * ROW_HEIGHT }}
+          >
             {/* Vertical grid lines and weekend shading */}
             {days.map((day, i) => (
               <div
                 key={i}
                 className={clsx(
                   'absolute top-0 h-full border-r border-slate-100',
-                  format(day, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd') ? 'bg-primary-100/20' : '',
+                  format(day, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
+                    ? 'bg-primary-100/20'
+                    : '',
                 )}
                 style={{ left: i * DAY_WIDTH, width: DAY_WIDTH }}
               />
@@ -215,13 +255,20 @@ export function GanttChart({ tasks, dependencies = [], onTaskUpdate }: GanttChar
               style={{ width: timelineWidth, height: tasks.length * ROW_HEIGHT }}
             >
               <defs>
-                <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                <marker
+                  id="arrowhead"
+                  markerWidth="8"
+                  markerHeight="6"
+                  refX="8"
+                  refY="3"
+                  orient="auto"
+                >
                   <polygon points="0 0, 8 3, 0 6" fill="#94a3b8" />
                 </marker>
               </defs>
               {dependencies.map((dep, i) => {
-                const fromTask = tasks.find(t => t.id === dep.dependsOnTaskId);
-                const toTask = tasks.find(t => t.id === dep.taskId);
+                const fromTask = tasks.find((t) => t.id === dep.dependsOnTaskId);
+                const toTask = tasks.find((t) => t.id === dep.taskId);
                 if (!fromTask || !toTask) return null;
 
                 const fromIndex = tasks.indexOf(fromTask);
@@ -259,11 +306,13 @@ export function GanttChart({ tasks, dependencies = [], onTaskUpdate }: GanttChar
                     'absolute flex items-center rounded-full px-2.5 text-xs font-medium text-white select-none',
                     'transition-shadow hover:shadow-md hover:z-30',
                     isDragging ? 'z-40 shadow-lg opacity-80 cursor-grabbing' : 'cursor-grab',
-                    task.status === 'done' ? 'bg-green-500' :
-                    task.status === 'in_progress' ? 'bg-blue-500' :
-                    task.status === 'in_review' ? 'bg-amber-500' :
-                    task.status === 'cancelled' ? 'bg-red-400' :
-                    'bg-slate-400',
+                    task.status === 'completed'
+                      ? 'bg-green-500'
+                      : task.status === 'in_progress'
+                        ? 'bg-blue-500'
+                        : task.status === 'blocked'
+                          ? 'bg-red-400'
+                          : 'bg-slate-400',
                   )}
                   style={{
                     left: Math.max(0, pos.left + (isDragging ? 0 : 0)),

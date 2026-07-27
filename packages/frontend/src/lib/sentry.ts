@@ -7,9 +7,8 @@
  */
 import * as Sentry from '@sentry/react';
 
-const SENTRY_DSN = typeof import.meta !== 'undefined'
-  ? import.meta.env?.VITE_SENTRY_DSN
-  : undefined;
+const SENTRY_DSN =
+  typeof import.meta !== 'undefined' ? import.meta.env?.VITE_SENTRY_DSN : undefined;
 
 export function initSentry(): void {
   if (!SENTRY_DSN) {

@@ -26,10 +26,8 @@ export function CommentSection({ taskId }: CommentSectionProps) {
   } = useQuery({
     queryKey: ['comments', taskId],
     queryFn: async () => {
-      const { data } = await apiClient.get<{ data: TaskComment[] }>(
-        `/tasks/${taskId}/comments`,
-      );
-      return data.data;
+      const { data } = await apiClient.get<TaskComment[]>(`/tasks/${taskId}/comments`);
+      return data;
     },
   });
 
@@ -131,19 +129,13 @@ export function CommentSection({ taskId }: CommentSectionProps) {
               {/* Top-level comment */}
               <div className="rounded-lg bg-slate-50 p-4">
                 <div className="mb-1 flex items-center gap-2">
-                  <span className="text-sm font-medium text-slate-700">
-                    {comment.authorId}
-                  </span>
+                  <span className="text-sm font-medium text-slate-700">{comment.authorId}</span>
                   <span className="text-xs text-slate-400">
                     {format(new Date(comment.createdAt), 'MMM d, yyyy h:mm a')}
                   </span>
-                  {comment.isEdited && (
-                    <span className="text-xs text-slate-400">(edited)</span>
-                  )}
+                  {comment.isEdited && <span className="text-xs text-slate-400">(edited)</span>}
                 </div>
-                <p className="whitespace-pre-wrap text-sm text-slate-600">
-                  {comment.content}
-                </p>
+                <p className="whitespace-pre-wrap text-sm text-slate-600">{comment.content}</p>
                 <button
                   onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
                   className="mt-2 text-xs font-medium text-primary-600 hover:text-primary-700"
@@ -156,25 +148,18 @@ export function CommentSection({ taskId }: CommentSectionProps) {
               {repliesByParent[comment.id]?.map((reply) => (
                 <div key={reply.id} className="ml-6 mt-2 rounded-lg bg-slate-50 p-3">
                   <div className="mb-1 flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-700">
-                      {reply.authorId}
-                    </span>
+                    <span className="text-sm font-medium text-slate-700">{reply.authorId}</span>
                     <span className="text-xs text-slate-400">
                       {format(new Date(reply.createdAt), 'MMM d, yyyy h:mm a')}
                     </span>
                   </div>
-                  <p className="whitespace-pre-wrap text-sm text-slate-600">
-                    {reply.content}
-                  </p>
+                  <p className="whitespace-pre-wrap text-sm text-slate-600">{reply.content}</p>
                 </div>
               ))}
 
               {/* Reply form */}
               {replyTo === comment.id && (
-                <form
-                  onSubmit={(e) => handleSubmitReply(e, comment.id)}
-                  className="ml-6 mt-2"
-                >
+                <form onSubmit={(e) => handleSubmitReply(e, comment.id)} className="ml-6 mt-2">
                   <textarea
                     value={replyContent}
                     onChange={(e) => setReplyContent(e.target.value)}

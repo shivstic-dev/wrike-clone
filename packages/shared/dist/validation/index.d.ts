@@ -30,6 +30,32 @@ export declare const refreshTokenSchema: z.ZodObject<{
 }, {
     refreshToken: string;
 }>;
+export declare const registerSchema: z.ZodObject<{
+    email: z.ZodString;
+    password: z.ZodString;
+    displayName: z.ZodString;
+    tenantSlug: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    email: string;
+    password: string;
+    tenantSlug: string;
+    displayName: string;
+}, {
+    email: string;
+    password: string;
+    tenantSlug: string;
+    displayName: string;
+}>;
+export declare const adminResetPasswordSchema: z.ZodObject<{
+    userId: z.ZodString;
+    tempPassword: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    userId: string;
+    tempPassword: string;
+}, {
+    userId: string;
+    tempPassword: string;
+}>;
 export declare const changePasswordSchema: z.ZodEffects<z.ZodObject<{
     currentPassword: z.ZodString;
     newPassword: z.ZodString;
@@ -58,6 +84,56 @@ export declare const createTenantSchema: z.ZodObject<{
     name: string;
     slug: string;
     domain?: string | undefined;
+}>;
+export declare const bootstrapTenantSchema: z.ZodObject<{
+    tenant: z.ZodObject<{
+        name: z.ZodString;
+        slug: z.ZodString;
+        domain: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        name: string;
+        slug: string;
+        domain?: string | undefined;
+    }, {
+        name: string;
+        slug: string;
+        domain?: string | undefined;
+    }>;
+    admin: z.ZodObject<{
+        email: z.ZodString;
+        password: z.ZodString;
+        displayName: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        email: string;
+        password: string;
+        displayName: string;
+    }, {
+        email: string;
+        password: string;
+        displayName: string;
+    }>;
+}, "strip", z.ZodTypeAny, {
+    tenant: {
+        name: string;
+        slug: string;
+        domain?: string | undefined;
+    };
+    admin: {
+        email: string;
+        password: string;
+        displayName: string;
+    };
+}, {
+    tenant: {
+        name: string;
+        slug: string;
+        domain?: string | undefined;
+    };
+    admin: {
+        email: string;
+        password: string;
+        displayName: string;
+    };
 }>;
 export declare const updateTenantSchema: z.ZodEffects<z.ZodObject<{
     name: z.ZodOptional<z.ZodString>;
@@ -182,11 +258,11 @@ export declare const createProjectSchema: z.ZodObject<{
     dueDate: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodString]>>;
     priority: z.ZodOptional<z.ZodNativeEnum<typeof TaskPriority>>;
     budget: z.ZodOptional<z.ZodNumber>;
-    visibility: z.ZodDefault<z.ZodOptional<z.ZodEnum<["organization", "department"]>>>;
+    visibility: z.ZodDefault<z.ZodOptional<z.ZodEnum<["global", "department"]>>>;
 }, "strip", z.ZodTypeAny, {
     name: string;
     folderId: string;
-    visibility: "organization" | "department";
+    visibility: "global" | "department";
     description?: string | undefined;
     startDate?: string | undefined;
     dueDate?: string | undefined;
@@ -200,7 +276,7 @@ export declare const createProjectSchema: z.ZodObject<{
     dueDate?: string | undefined;
     priority?: TaskPriority | undefined;
     budget?: number | undefined;
-    visibility?: "organization" | "department" | undefined;
+    visibility?: "global" | "department" | undefined;
 }>;
 export declare const updateProjectSchema: z.ZodEffects<z.ZodObject<{
     name: z.ZodOptional<z.ZodString>;
@@ -211,7 +287,7 @@ export declare const updateProjectSchema: z.ZodEffects<z.ZodObject<{
     priority: z.ZodOptional<z.ZodNativeEnum<typeof TaskPriority>>;
     budget: z.ZodOptional<z.ZodNumber>;
     actualCost: z.ZodOptional<z.ZodNumber>;
-    visibility: z.ZodOptional<z.ZodEnum<["organization", "department"]>>;
+    visibility: z.ZodOptional<z.ZodEnum<["global", "department"]>>;
 }, "strip", z.ZodTypeAny, {
     status?: "active" | "on_hold" | "completed" | "cancelled" | undefined;
     name?: string | undefined;
@@ -220,7 +296,7 @@ export declare const updateProjectSchema: z.ZodEffects<z.ZodObject<{
     dueDate?: string | null | undefined;
     priority?: TaskPriority | undefined;
     budget?: number | undefined;
-    visibility?: "organization" | "department" | undefined;
+    visibility?: "global" | "department" | undefined;
     actualCost?: number | undefined;
 }, {
     status?: "active" | "on_hold" | "completed" | "cancelled" | undefined;
@@ -230,7 +306,7 @@ export declare const updateProjectSchema: z.ZodEffects<z.ZodObject<{
     dueDate?: string | null | undefined;
     priority?: TaskPriority | undefined;
     budget?: number | undefined;
-    visibility?: "organization" | "department" | undefined;
+    visibility?: "global" | "department" | undefined;
     actualCost?: number | undefined;
 }>, {
     status?: "active" | "on_hold" | "completed" | "cancelled" | undefined;
@@ -240,7 +316,7 @@ export declare const updateProjectSchema: z.ZodEffects<z.ZodObject<{
     dueDate?: string | null | undefined;
     priority?: TaskPriority | undefined;
     budget?: number | undefined;
-    visibility?: "organization" | "department" | undefined;
+    visibility?: "global" | "department" | undefined;
     actualCost?: number | undefined;
 }, {
     status?: "active" | "on_hold" | "completed" | "cancelled" | undefined;
@@ -250,7 +326,7 @@ export declare const updateProjectSchema: z.ZodEffects<z.ZodObject<{
     dueDate?: string | null | undefined;
     priority?: TaskPriority | undefined;
     budget?: number | undefined;
-    visibility?: "organization" | "department" | undefined;
+    visibility?: "global" | "department" | undefined;
     actualCost?: number | undefined;
 }>;
 export declare const createTaskSchema: z.ZodObject<{
@@ -264,8 +340,10 @@ export declare const createTaskSchema: z.ZodObject<{
     estimatedHours: z.ZodOptional<z.ZodNumber>;
     startDate: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodString]>>;
     dueDate: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodString]>>;
+    visibility: z.ZodDefault<z.ZodOptional<z.ZodEnum<["global", "department"]>>>;
     customFields: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, "strip", z.ZodTypeAny, {
+    visibility: "global" | "department";
     projectId: string;
     title: string;
     status?: TaskStatus | undefined;
@@ -285,6 +363,7 @@ export declare const createTaskSchema: z.ZodObject<{
     startDate?: string | undefined;
     dueDate?: string | undefined;
     priority?: TaskPriority | undefined;
+    visibility?: "global" | "department" | undefined;
     parentTaskId?: string | undefined;
     assigneeId?: string | undefined;
     estimatedHours?: number | undefined;
@@ -300,6 +379,7 @@ export declare const updateTaskSchema: z.ZodEffects<z.ZodObject<{
     actualHours: z.ZodOptional<z.ZodNumber>;
     startDate: z.ZodOptional<z.ZodNullable<z.ZodUnion<[z.ZodString, z.ZodString]>>>;
     dueDate: z.ZodOptional<z.ZodNullable<z.ZodUnion<[z.ZodString, z.ZodString]>>>;
+    visibility: z.ZodOptional<z.ZodEnum<["global", "department"]>>;
     sortOrder: z.ZodOptional<z.ZodNumber>;
     customFields: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
 }, "strip", z.ZodTypeAny, {
@@ -308,6 +388,7 @@ export declare const updateTaskSchema: z.ZodEffects<z.ZodObject<{
     startDate?: string | null | undefined;
     dueDate?: string | null | undefined;
     priority?: TaskPriority | undefined;
+    visibility?: "global" | "department" | undefined;
     assigneeId?: string | null | undefined;
     title?: string | undefined;
     estimatedHours?: number | undefined;
@@ -320,6 +401,7 @@ export declare const updateTaskSchema: z.ZodEffects<z.ZodObject<{
     startDate?: string | null | undefined;
     dueDate?: string | null | undefined;
     priority?: TaskPriority | undefined;
+    visibility?: "global" | "department" | undefined;
     assigneeId?: string | null | undefined;
     title?: string | undefined;
     estimatedHours?: number | undefined;
@@ -332,6 +414,7 @@ export declare const updateTaskSchema: z.ZodEffects<z.ZodObject<{
     startDate?: string | null | undefined;
     dueDate?: string | null | undefined;
     priority?: TaskPriority | undefined;
+    visibility?: "global" | "department" | undefined;
     assigneeId?: string | null | undefined;
     title?: string | undefined;
     estimatedHours?: number | undefined;
@@ -344,6 +427,7 @@ export declare const updateTaskSchema: z.ZodEffects<z.ZodObject<{
     startDate?: string | null | undefined;
     dueDate?: string | null | undefined;
     priority?: TaskPriority | undefined;
+    visibility?: "global" | "department" | undefined;
     assigneeId?: string | null | undefined;
     title?: string | undefined;
     estimatedHours?: number | undefined;
@@ -354,12 +438,13 @@ export declare const updateTaskSchema: z.ZodEffects<z.ZodObject<{
 export declare const taskFilterSchema: z.ZodObject<{
     projectId: z.ZodOptional<z.ZodString>;
     assigneeId: z.ZodOptional<z.ZodString>;
-    status: z.ZodOptional<z.ZodArray<z.ZodNativeEnum<typeof TaskStatus>, "many">>;
-    priority: z.ZodOptional<z.ZodArray<z.ZodNativeEnum<typeof TaskPriority>, "many">>;
+    status: z.ZodEffects<z.ZodOptional<z.ZodArray<z.ZodNativeEnum<typeof TaskStatus>, "many">>, TaskStatus[] | undefined, unknown>;
+    priority: z.ZodEffects<z.ZodOptional<z.ZodArray<z.ZodNativeEnum<typeof TaskPriority>, "many">>, TaskPriority[] | undefined, unknown>;
     search: z.ZodOptional<z.ZodString>;
     dueDateBefore: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodString]>>;
     dueDateAfter: z.ZodOptional<z.ZodUnion<[z.ZodString, z.ZodString]>>;
     folderId: z.ZodOptional<z.ZodString>;
+    departmentId: z.ZodOptional<z.ZodString>;
     page: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
     perPage: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 }, "strip", z.ZodTypeAny, {
@@ -373,15 +458,17 @@ export declare const taskFilterSchema: z.ZodObject<{
     search?: string | undefined;
     dueDateBefore?: string | undefined;
     dueDateAfter?: string | undefined;
+    departmentId?: string | undefined;
 }, {
-    status?: TaskStatus[] | undefined;
+    status?: unknown;
     folderId?: string | undefined;
-    priority?: TaskPriority[] | undefined;
+    priority?: unknown;
     projectId?: string | undefined;
     assigneeId?: string | undefined;
     search?: string | undefined;
     dueDateBefore?: string | undefined;
     dueDateAfter?: string | undefined;
+    departmentId?: string | undefined;
     page?: number | undefined;
     perPage?: number | undefined;
 }>;
@@ -397,6 +484,7 @@ export declare const bulkTaskUpdateSchema: z.ZodObject<{
         actualHours: z.ZodOptional<z.ZodNumber>;
         startDate: z.ZodOptional<z.ZodNullable<z.ZodUnion<[z.ZodString, z.ZodString]>>>;
         dueDate: z.ZodOptional<z.ZodNullable<z.ZodUnion<[z.ZodString, z.ZodString]>>>;
+        visibility: z.ZodOptional<z.ZodEnum<["global", "department"]>>;
         sortOrder: z.ZodOptional<z.ZodNumber>;
         customFields: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
     }, "strip", z.ZodTypeAny, {
@@ -405,6 +493,7 @@ export declare const bulkTaskUpdateSchema: z.ZodObject<{
         startDate?: string | null | undefined;
         dueDate?: string | null | undefined;
         priority?: TaskPriority | undefined;
+        visibility?: "global" | "department" | undefined;
         assigneeId?: string | null | undefined;
         title?: string | undefined;
         estimatedHours?: number | undefined;
@@ -417,6 +506,7 @@ export declare const bulkTaskUpdateSchema: z.ZodObject<{
         startDate?: string | null | undefined;
         dueDate?: string | null | undefined;
         priority?: TaskPriority | undefined;
+        visibility?: "global" | "department" | undefined;
         assigneeId?: string | null | undefined;
         title?: string | undefined;
         estimatedHours?: number | undefined;
@@ -429,6 +519,7 @@ export declare const bulkTaskUpdateSchema: z.ZodObject<{
         startDate?: string | null | undefined;
         dueDate?: string | null | undefined;
         priority?: TaskPriority | undefined;
+        visibility?: "global" | "department" | undefined;
         assigneeId?: string | null | undefined;
         title?: string | undefined;
         estimatedHours?: number | undefined;
@@ -441,6 +532,7 @@ export declare const bulkTaskUpdateSchema: z.ZodObject<{
         startDate?: string | null | undefined;
         dueDate?: string | null | undefined;
         priority?: TaskPriority | undefined;
+        visibility?: "global" | "department" | undefined;
         assigneeId?: string | null | undefined;
         title?: string | undefined;
         estimatedHours?: number | undefined;
@@ -456,6 +548,7 @@ export declare const bulkTaskUpdateSchema: z.ZodObject<{
         startDate?: string | null | undefined;
         dueDate?: string | null | undefined;
         priority?: TaskPriority | undefined;
+        visibility?: "global" | "department" | undefined;
         assigneeId?: string | null | undefined;
         title?: string | undefined;
         estimatedHours?: number | undefined;
@@ -471,6 +564,7 @@ export declare const bulkTaskUpdateSchema: z.ZodObject<{
         startDate?: string | null | undefined;
         dueDate?: string | null | undefined;
         priority?: TaskPriority | undefined;
+        visibility?: "global" | "department" | undefined;
         assigneeId?: string | null | undefined;
         title?: string | undefined;
         estimatedHours?: number | undefined;
@@ -618,24 +712,24 @@ export declare const addWorkspaceMemberSchema: z.ZodObject<{
     email: z.ZodString;
     displayName: z.ZodString;
     tempPassword: z.ZodString;
-    role: z.ZodEnum<["dept_admin", "member"]>;
+    role: z.ZodEnum<["employee", "manager", "department_head"]>;
 }, "strip", z.ZodTypeAny, {
     email: string;
-    role: "dept_admin" | "member";
     displayName: string;
     tempPassword: string;
+    role: "employee" | "manager" | "department_head";
 }, {
     email: string;
-    role: "dept_admin" | "member";
     displayName: string;
     tempPassword: string;
+    role: "employee" | "manager" | "department_head";
 }>;
 export declare const updateWorkspaceMemberRoleSchema: z.ZodObject<{
-    role: z.ZodEnum<["dept_admin", "member"]>;
+    role: z.ZodEnum<["employee", "manager", "department_head"]>;
 }, "strip", z.ZodTypeAny, {
-    role: "dept_admin" | "member";
+    role: "employee" | "manager" | "department_head";
 }, {
-    role: "dept_admin" | "member";
+    role: "employee" | "manager" | "department_head";
 }>;
 export declare const paginationSchema: z.ZodObject<{
     page: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
@@ -653,15 +747,59 @@ export declare const paginationSchema: z.ZodObject<{
     sortBy?: string | undefined;
     sortDirection?: "asc" | "desc" | undefined;
 }>;
+export declare const departmentReportFilterSchema: z.ZodEffects<z.ZodObject<{
+    departmentId: z.ZodOptional<z.ZodString>;
+    dateFrom: z.ZodOptional<z.ZodDate>;
+    dateTo: z.ZodOptional<z.ZodDate>;
+    status: z.ZodOptional<z.ZodNativeEnum<typeof TaskStatus>>;
+    priority: z.ZodOptional<z.ZodNativeEnum<typeof TaskPriority>>;
+    assigneeId: z.ZodOptional<z.ZodString>;
+    format: z.ZodOptional<z.ZodEnum<["pdf", "xlsx"]>>;
+}, "strip", z.ZodTypeAny, {
+    status?: TaskStatus | undefined;
+    priority?: TaskPriority | undefined;
+    assigneeId?: string | undefined;
+    departmentId?: string | undefined;
+    dateFrom?: Date | undefined;
+    dateTo?: Date | undefined;
+    format?: "pdf" | "xlsx" | undefined;
+}, {
+    status?: TaskStatus | undefined;
+    priority?: TaskPriority | undefined;
+    assigneeId?: string | undefined;
+    departmentId?: string | undefined;
+    dateFrom?: Date | undefined;
+    dateTo?: Date | undefined;
+    format?: "pdf" | "xlsx" | undefined;
+}>, {
+    status?: TaskStatus | undefined;
+    priority?: TaskPriority | undefined;
+    assigneeId?: string | undefined;
+    departmentId?: string | undefined;
+    dateFrom?: Date | undefined;
+    dateTo?: Date | undefined;
+    format?: "pdf" | "xlsx" | undefined;
+}, {
+    status?: TaskStatus | undefined;
+    priority?: TaskPriority | undefined;
+    assigneeId?: string | undefined;
+    departmentId?: string | undefined;
+    dateFrom?: Date | undefined;
+    dateTo?: Date | undefined;
+    format?: "pdf" | "xlsx" | undefined;
+}>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type AdminResetPasswordInput = z.infer<typeof adminResetPasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type CreateTenantInput = z.infer<typeof createTenantSchema>;
+export type BootstrapTenantInput = z.infer<typeof bootstrapTenantSchema>;
 export type UpdateTenantInput = z.infer<typeof updateTenantSchema>;
 export type InviteUserInput = z.infer<typeof inviteUserSchema>;
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
 export type CreateFolderInput = z.infer<typeof createFolderSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
-export type CreateTaskInput = z.infer<typeof createTaskSchema>;
+export type CreateTaskInput = z.input<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type TaskFilterInput = z.infer<typeof taskFilterSchema>;
 export type BulkTaskUpdateInput = z.infer<typeof bulkTaskUpdateSchema>;
@@ -674,4 +812,5 @@ export type SubmitApprovalVoteInput = z.infer<typeof submitApprovalVoteSchema>;
 export type CreateWebhookInput = z.infer<typeof createWebhookSchema>;
 export type AddWorkspaceMemberInput = z.infer<typeof addWorkspaceMemberSchema>;
 export type UpdateWorkspaceMemberRoleInput = z.infer<typeof updateWorkspaceMemberRoleSchema>;
+export type DepartmentReportFilterInput = z.infer<typeof departmentReportFilterSchema>;
 //# sourceMappingURL=index.d.ts.map

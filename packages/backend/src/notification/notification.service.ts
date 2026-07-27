@@ -26,10 +26,10 @@ export class NotificationService {
 
   async findAll(page = 1, perPage = 50) {
     const ctx = requireTenantContext();
-    const countResult = await this.db('notifications')
+    const countResult = (await this.db('notifications')
       .where({ tenant_id: ctx.tenantId, user_id: ctx.userId })
       .count()
-      .first() as { count?: string | number } | undefined;
+      .first()) as { count?: string | number } | undefined;
 
     const data = await this.db('notifications')
       .where({ tenant_id: ctx.tenantId, user_id: ctx.userId })

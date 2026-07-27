@@ -8,8 +8,10 @@
 import { Global, Module, OnApplicationShutdown } from '@nestjs/common';
 import { knex, Knex } from 'knex';
 import { loadDatabaseConfig } from '../config/app.config';
+import { getTenantContext } from '../common/tenant-context';
 
 export const DATABASE_PROVIDER = 'KNEX_CONNECTION';
+export const ROOT_DATABASE_PROVIDER = 'ROOT_KNEX_CONNECTION';
 
 function createConnectionConfig(config: ReturnType<typeof loadDatabaseConfig>) {
   if (config.databaseUrl) {
@@ -33,14 +35,14 @@ function createConnectionConfig(config: ReturnType<typeof loadDatabaseConfig>) {
 @Module({
   providers: [
     {
-      provide: DATABASE_PROVIDER,
+      provide: ROOT_DATABASE_PROVIDER,
       useFactory: (): Knex => {
         const config = loadDatabaseConfig();
         return knex({
           client: 'pg',
           connection: createConnectionConfig(config),
           pool: {
-            min: 2,
+            min: 0,
             max: config.maxConnections,
             idleTimeoutMillis: config.idleTimeoutMs,
           },
@@ -48,8 +50,24 @@ function createConnectionConfig(config: ReturnType<typeof loadDatabaseConfig>) {
         });
       },
     },
+    {
+      provide: DATABASE_PROVIDER,
+      inject: [ROOT_DATABASE_PROVIDER],
+      useFactory: (rootDb: Knex): Knex =>
+        new Proxy(rootDb as any, {
+          apply(target, thisArg, argArray) {
+            const activeDb = getTenantContext()?.database || target;
+            return Reflect.apply(activeDb as any, thisArg, argArray);
+          },
+          get(target, property, receiver) {
+            const activeDb = getTenantContext()?.database || target;
+            const value = Reflect.get(activeDb as any, property, receiver);
+            return typeof value === 'function' ? value.bind(activeDb) : value;
+          },
+        }) as Knex,
+    },
   ],
-  exports: [DATABASE_PROVIDER],
+  exports: [DATABASE_PROVIDER, ROOT_DATABASE_PROVIDER],
 })
 export class DatabaseModule implements OnApplicationShutdown {
   async onApplicationShutdown(): Promise<void> {

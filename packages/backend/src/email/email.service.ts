@@ -16,6 +16,24 @@ export interface EmailOptions {
   from?: string;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function safeHttpUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? escapeHtml(url.toString()) : '#';
+  } catch {
+    return '#';
+  }
+}
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -30,9 +48,7 @@ export class EmailService {
     if (this.enabled) {
       this.initTransporter();
     } else {
-      this.logger.warn(
-        'SMTP not configured (SMTP_HOST/SMTP_PORT). Emails will be logged only.',
-      );
+      this.logger.warn('SMTP not configured (SMTP_HOST/SMTP_PORT). Emails will be logged only.');
     }
   }
 
@@ -91,15 +107,16 @@ export class EmailService {
     taskUrl: string,
     assignedBy: string,
   ): Promise<boolean> {
+    const safeTaskTitle = escapeHtml(taskTitle);
     return this.send({
       to: toEmail,
-      subject: `[Wrike Clone] You've been assigned: ${taskTitle}`,
+      subject: `[OpenWork Hub] You've been assigned: ${taskTitle}`,
       html: `
         <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #4f46e5;">Task Assigned</h2>
-          <p>You have been assigned a task by <strong>${assignedBy}</strong>:</p>
-          <p style="font-size: 16px; font-weight: 500; color: #1e293b;">${taskTitle}</p>
-          <a href="${taskUrl}" style="display: inline-block; padding: 10px 20px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-size: 14px;">
+          <p>You have been assigned a task by <strong>${escapeHtml(assignedBy)}</strong>:</p>
+          <p style="font-size: 16px; font-weight: 500; color: #1e293b;">${safeTaskTitle}</p>
+          <a href="${safeHttpUrl(taskUrl)}" style="display: inline-block; padding: 10px 20px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-size: 14px;">
             View Task
           </a>
         </div>
@@ -117,17 +134,18 @@ export class EmailService {
     commentAuthor: string,
     commentContent: string,
   ): Promise<boolean> {
+    const safeTaskTitle = escapeHtml(taskTitle);
     return this.send({
       to: toEmail,
-      subject: `[Wrike Clone] New comment on: ${taskTitle}`,
+      subject: `[OpenWork Hub] New comment on: ${taskTitle}`,
       html: `
         <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #4f46e5;">New Comment</h2>
-          <p><strong>${commentAuthor}</strong> commented on <strong>${taskTitle}</strong>:</p>
+          <p><strong>${escapeHtml(commentAuthor)}</strong> commented on <strong>${safeTaskTitle}</strong>:</p>
           <blockquote style="border-left: 3px solid #e2e8f0; padding: 8px 16px; margin: 12px 0; color: #475569;">
-            ${commentContent}
+            ${escapeHtml(commentContent)}
           </blockquote>
-          <a href="${taskUrl}" style="display: inline-block; padding: 10px 20px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-size: 14px;">
+          <a href="${safeHttpUrl(taskUrl)}" style="display: inline-block; padding: 10px 20px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-size: 14px;">
             View Task
           </a>
         </div>
@@ -144,15 +162,16 @@ export class EmailService {
     approvalUrl: string,
     requestedBy: string,
   ): Promise<boolean> {
+    const safeTaskTitle = escapeHtml(taskTitle);
     return this.send({
       to: toEmail,
-      subject: `[Wrike Clone] Approval needed: ${taskTitle}`,
+      subject: `[OpenWork Hub] Approval needed: ${taskTitle}`,
       html: `
         <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #4f46e5;">Approval Request</h2>
-          <p><strong>${requestedBy}</strong> is requesting your approval on:</p>
-          <p style="font-size: 16px; font-weight: 500; color: #1e293b;">${taskTitle}</p>
-          <a href="${approvalUrl}" style="display: inline-block; padding: 10px 20px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-size: 14px;">
+          <p><strong>${escapeHtml(requestedBy)}</strong> is requesting your approval on:</p>
+          <p style="font-size: 16px; font-weight: 500; color: #1e293b;">${safeTaskTitle}</p>
+          <a href="${safeHttpUrl(approvalUrl)}" style="display: inline-block; padding: 10px 20px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-size: 14px;">
             Review & Approve
           </a>
         </div>
@@ -163,18 +182,37 @@ export class EmailService {
   /**
    * Send a weekly digest or report notification.
    */
-  async sendDigest(
+  async sendDigest(toEmail: string, subject: string, summaryHtml: string): Promise<boolean> {
+    return this.send({
+      to: toEmail,
+      subject: `[OpenWork Hub] ${subject}`,
+      html: `
+        <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #4f46e5;">${escapeHtml(subject)}</h2>
+          ${summaryHtml}
+        </div>
+      `,
+    });
+  }
+
+  async sendTaskAlert(
     toEmail: string,
-    subject: string,
-    summaryHtml: string,
+    taskTitle: string,
+    taskUrl: string,
+    heading: string,
+    detail: string,
   ): Promise<boolean> {
     return this.send({
       to: toEmail,
-      subject: `[Wrike Clone] ${subject}`,
+      subject: `[OpenWork Hub] ${heading}: ${taskTitle}`,
       html: `
         <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #4f46e5;">${subject}</h2>
-          ${summaryHtml}
+          <h2 style="color: #4f46e5;">${escapeHtml(heading)}</h2>
+          <p style="font-size: 16px; font-weight: 500; color: #1e293b;">${escapeHtml(taskTitle)}</p>
+          <p>${escapeHtml(detail)}</p>
+          <a href="${safeHttpUrl(taskUrl)}" style="display: inline-block; padding: 10px 20px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px; font-size: 14px;">
+            View Task
+          </a>
         </div>
       `,
     });

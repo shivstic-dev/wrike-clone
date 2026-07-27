@@ -35,8 +35,24 @@ export class FileController {
 
   @Post('upload')
   @Permissions('task:write')
-  async upload(@Body() body: { taskId: string; originalName: string; mimeType: string; sizeBytes: number; content: string; thumbnailContent?: string }) {
+  async upload(
+    @Body()
+    body: {
+      taskId: string;
+      originalName: string;
+      mimeType: string;
+      sizeBytes: number;
+      content: string;
+      thumbnailContent?: string;
+    },
+  ) {
     return this.fileService.upload(body);
+  }
+
+  @Get(':id/download')
+  @Permissions('task:read')
+  async createDownloadUrl(@Param('id') id: string) {
+    return this.fileService.createDownloadUrl(id);
   }
 
   @Get(':id')
@@ -64,7 +80,16 @@ export class FileController {
   @Permissions('task:write')
   async addAnnotation(
     @Param('fileVersionId') fileVersionId: string,
-    @Body() body: { x: number; y: number; width: number; height: number; content: string; color?: string; pageNumber?: number },
+    @Body()
+    body: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      content: string;
+      color?: string;
+      pageNumber?: number;
+    },
   ) {
     return this.fileService.addAnnotation(fileVersionId, body);
   }

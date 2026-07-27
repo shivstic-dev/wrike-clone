@@ -45,9 +45,7 @@ export class AutomationService {
 
   async toggle(id: string, isActive: boolean) {
     const ctx = requireTenantContext();
-    const rule = await this.db('automation_rules')
-      .where({ id, tenant_id: ctx.tenantId })
-      .first();
+    const rule = await this.db('automation_rules').where({ id, tenant_id: ctx.tenantId }).first();
     if (!rule) throw new NotFoundException('Rule not found');
 
     await this.db('automation_rules').where({ id }).update({ is_active: isActive });
@@ -72,8 +70,10 @@ export class AutomationService {
 
       for (const rule of rules) {
         try {
-          const conditions = typeof rule.conditions === 'string' ? JSON.parse(rule.conditions) : rule.conditions;
-          const actions = typeof rule.actions === 'string' ? JSON.parse(rule.actions) : rule.actions;
+          const conditions =
+            typeof rule.conditions === 'string' ? JSON.parse(rule.conditions) : rule.conditions;
+          const actions =
+            typeof rule.actions === 'string' ? JSON.parse(rule.actions) : rule.actions;
 
           // Evaluate conditions (simple match — all conditions must pass)
           const conditionsMet = this.evaluateConditions(conditions, _payload);

@@ -22,7 +22,7 @@ export default function AuthLayout() {
         <Outlet />
       </main>
       <footer className="pb-4 text-center text-xs text-slate-400">
-        &copy; {new Date().getFullYear()} Wrike Clone. All rights reserved.
+        &copy; {new Date().getFullYear()} OpenWork Hub. All rights reserved.
       </footer>
     </div>
   );

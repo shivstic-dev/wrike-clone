@@ -13,7 +13,7 @@ export type Timestamp = string; // ISO-8601
 
 /** Base fields every database row carries. */
 export interface BaseEntity {
-  id: string;          // UUIDv7
+  id: string; // UUIDv7
   tenantId: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -70,20 +70,21 @@ export interface Workspace extends BaseEntity {
   description: string | null;
   icon: string | null;
   sortOrder: number;
+  departmentRole?: 'admin' | 'department_head' | 'manager' | 'employee' | 'none';
 }
 
 /** Join table: workspace (department) <-> user with role. */
 export interface WorkspaceMember extends BaseEntity {
   workspaceId: string;
   userId: string;
-  role: 'dept_admin' | 'member';
+  role: 'employee' | 'manager' | 'department_head';
 }
 
 // ── Folder (recursive hierarchy) ────────────────────────────────
 
 export interface Folder extends BaseEntity {
   workspaceId: string;
-  parentFolderId: string | null;  // self-referential for nesting
+  parentFolderId: string | null; // self-referential for nesting
   name: string;
   description: string | null;
   icon: string | null;
@@ -106,6 +107,7 @@ export interface TaskFolderLink {
 
 export interface Project extends BaseEntity {
   folderId: string;
+  departmentId?: string;
   ownerId: string;
   name: string;
   description: string | null;
@@ -116,7 +118,7 @@ export interface Project extends BaseEntity {
   priority: TaskPriority;
   budget: number | null;
   actualCost: number | null;
-  visibility: 'organization' | 'department';
+  visibility: 'global' | 'department';
   taskCounts?: Array<{ status: string; count: number | string }>;
 }
 
@@ -124,6 +126,8 @@ export interface Project extends BaseEntity {
 
 export interface Task extends BaseEntity {
   projectId: string;
+  departmentId: string;
+  departmentName?: string;
   parentTaskId: string | null;
   assigneeId: string | null;
   createdById: string;
@@ -136,6 +140,7 @@ export interface Task extends BaseEntity {
   startDate: Timestamp | null;
   dueDate: Timestamp | null;
   completedAt: Timestamp | null;
+  visibility: 'global' | 'department';
   sortOrder: number;
   customFields: Record<string, unknown>;
   isRecurring: boolean;
@@ -144,8 +149,8 @@ export interface Task extends BaseEntity {
 
 export interface TaskDependency {
   id: string;
-  taskId: string;            // the task that depends
-  dependsOnTaskId: string;   // the task it depends on
+  taskId: string; // the task that depends
+  dependsOnTaskId: string; // the task it depends on
   dependencyType: string;
   lagDays: number;
 }
@@ -155,7 +160,7 @@ export interface TaskAssignee {
   taskId: string;
   userId: string;
   assignedAt: Timestamp;
-  role: string | null;      // e.g. "responsible", "accountable", "consulted"
+  role: string | null; // e.g. "responsible", "accountable", "consulted"
 }
 
 // ── Comments & Activity ────────────────────────────────────────
@@ -197,8 +202,9 @@ export interface CustomFieldDefinition {
   id: string;
   tenantId: string;
   name: string;
-  key: string;            // machine-readable, used in JSONB custom_fields
-  fieldType: 'text' | 'number' | 'date' | 'boolean' | 'select' | 'multi_select' | 'user' | 'formula';
+  key: string; // machine-readable, used in JSONB custom_fields
+  fieldType:
+    'text' | 'number' | 'date' | 'boolean' | 'select' | 'multi_select' | 'user' | 'formula';
   options: string[] | null;
   isRequired: boolean;
   defaultValue: unknown;
@@ -260,7 +266,7 @@ export interface FileVersion extends BaseEntity {
   originalName: string;
   mimeType: string;
   sizeBytes: number;
-  storagePath: string;      // MinIO/S3 path
+  storagePath: string; // MinIO/S3 path
   thumbnailPath: string | null;
   category: FileCategory;
   uploadedById: string;
@@ -273,7 +279,7 @@ export interface FileAnnotation {
   fileVersionId: string;
   authorId: string;
   pageNumber: number | null;
-  timestampMs: number | null;  // for video frames
+  timestampMs: number | null; // for video frames
   x: number;
   y: number;
   width: number;
@@ -298,12 +304,27 @@ export interface AutomationRule {
 
 export interface RuleCondition {
   field: string;
-  operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than' | 'changed_to' | 'is_set' | 'is_not_set';
+  operator:
+    | 'equals'
+    | 'not_equals'
+    | 'contains'
+    | 'greater_than'
+    | 'less_than'
+    | 'changed_to'
+    | 'is_set'
+    | 'is_not_set';
   value: unknown;
 }
 
 export interface RuleAction {
-  type: 'update_field' | 'assign_user' | 'change_status' | 'send_notification' | 'create_task' | 'webhook' | 'llm_action';
+  type:
+    | 'update_field'
+    | 'assign_user'
+    | 'change_status'
+    | 'send_notification'
+    | 'create_task'
+    | 'webhook'
+    | 'llm_action';
   config: Record<string, unknown>;
 }
 

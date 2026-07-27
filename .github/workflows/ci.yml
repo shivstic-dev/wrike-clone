@@ -55,6 +55,9 @@ jobs:
       - name: Prettier format check
         run: npm run format:check
 
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=critical
+
   # ── Test ─────────────────────────────────────
   test:
     name: Run Tests

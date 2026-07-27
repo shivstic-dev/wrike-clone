@@ -8,7 +8,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { DATABASE_PROVIDER } from '../database/database.module';
 import { requireTenantContext } from '../common/tenant-context';
 import { applyVisibilityScope } from '../common/visibility.scope';
-import type { CreateProjectInput, UpdateProjectRequest, PaginatedResponse } from '@wrike-clone/shared';
+import type {
+  CreateProjectInput,
+  UpdateProjectRequest,
+  PaginatedResponse,
+} from '@wrike-clone/shared';
 
 @Injectable()
 export class ProjectService {
@@ -16,34 +20,43 @@ export class ProjectService {
 
   constructor(@Inject(DATABASE_PROVIDER) private readonly db: Knex) {}
 
-  async findAll(params: { folderId?: string; page?: number; perPage?: number; status?: string }) {
+  async findAll(params: {
+    folderId?: string;
+    workspaceId?: string;
+    page?: number;
+    perPage?: number;
+    status?: string;
+  }) {
     const ctx = requireTenantContext();
-    const { folderId, page = 1, perPage = 25, status } = params;
+    const { folderId, workspaceId, page = 1, perPage = 25, status } = params;
 
     let query = this.db('projects')
       .where('projects.tenant_id', ctx.tenantId)
       .whereNull('projects.deleted_at');
 
     // Apply visibility scope
-    query = query
-      .leftJoin('folders', 'projects.folder_id', 'folders.id')
-      .select('projects.*'); // re-select after join
+    query = query.leftJoin('folders', 'projects.folder_id', 'folders.id').select('projects.*'); // re-select after join
 
     query = applyVisibilityScope(query, ctx, 'folders.workspace_id', 'projects.visibility');
 
     if (folderId) query = query.andWhere('projects.folder_id', folderId);
+    if (workspaceId) query = query.andWhere('folders.workspace_id', workspaceId);
     if (status) query = query.andWhere('projects.status', status);
 
-    const countResult = await query.clone().clearSelect().count('projects.id').first() as { count?: string | number } | undefined;
+    const countResult = (await query.clone().clearSelect().count('projects.id').first()) as
+      { count?: string | number } | undefined;
     const projects = await query
-      .select('projects.*', this.db.raw("row_to_json(u.*) as owner"))
+      .select('projects.*', this.db.raw('row_to_json(u.*) as owner'))
       .leftJoin({ u: 'users' }, 'projects.owner_id', 'u.id')
       .orderBy('projects.created_at', 'desc')
       .limit(perPage)
       .offset((page - 1) * perPage);
 
     const total = Number(countResult?.count || 0);
-    return { data: projects, meta: { page, perPage, total, totalPages: Math.ceil(total / perPage) } };
+    return {
+      data: projects,
+      meta: { page, perPage, total, totalPages: Math.ceil(total / perPage) },
+    };
   }
 
   async findById(id: string) {
@@ -53,9 +66,10 @@ export class ProjectService {
       .where('projects.id', id)
       .andWhere('projects.tenant_id', ctx.tenantId)
       .whereNull('projects.deleted_at')
-      .select('projects.*')
+      .select('projects.*', 'folders.workspace_id as department_id')
       .modify((qb: any) => {
-        if (ctx.role !== 'admin') applyVisibilityScope(qb, ctx, 'folders.workspace_id', 'projects.visibility');
+        if (ctx.role !== 'admin')
+          applyVisibilityScope(qb, ctx, 'folders.workspace_id', 'projects.visibility');
       })
       .first();
 
@@ -90,7 +104,7 @@ export class ProjectService {
         description: input.description || null,
         start_date: input.startDate || null,
         due_date: input.dueDate || null,
-        priority: input.priority || 'none',
+        priority: input.priority || 'low',
         budget: input.budget || null,
         visibility: 'department', // default: department-only
       })
@@ -124,7 +138,9 @@ export class ProjectService {
   async remove(id: string): Promise<void> {
     const ctx = requireTenantContext();
     await this.findById(id);
-    await this.db('projects').where({ id, tenant_id: ctx.tenantId }).update({ deleted_at: new Date() });
+    await this.db('projects')
+      .where({ id, tenant_id: ctx.tenantId })
+      .update({ deleted_at: new Date() });
     this.logger.log(`Project ${id} deleted`);
   }
 }

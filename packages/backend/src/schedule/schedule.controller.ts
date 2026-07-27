@@ -2,7 +2,17 @@
  * Schedule controller — REST endpoints for work schedules.
  */
 
-import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Query,
+  Body,
+  UseGuards,
+} from '@nestjs/common';
 import { ScheduleService } from './schedule.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -41,7 +51,9 @@ export class ScheduleController {
 
   @Post('time-off')
   @Permissions('task:read')
-  async requestTimeOff(@Body() body: { date: string; type: 'vacation' | 'sick' | 'personal'; reason?: string }) {
+  async requestTimeOff(
+    @Body() body: { date: string; type: 'vacation' | 'sick' | 'personal'; reason?: string },
+  ) {
     return this.scheduleService.requestTimeOff(body);
   }
 

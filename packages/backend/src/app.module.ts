@@ -5,12 +5,13 @@
  */
 
 import { Module, NestModule, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { DatabaseModule } from './database/database.module';
 import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
 import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
+import { CamelCaseResponseInterceptor } from './common/interceptors/camel-case-response.interceptor';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { EventsService } from './common/events.service';
 import { AuthModule } from './auth/auth.module';
@@ -33,11 +34,11 @@ import { CustomizationModule } from './customization/customization.module';
 import { EmailModule } from './email/email.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { CopilotModule } from './copilot/copilot.module';
+import { ReportModule } from './reports/report.module';
 
 // Conditionally register BullMQ only when Redis is configured
 const queueImports: any[] = [];
 if (process.env['REDIS_HOST']) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { BullModule } = require('@nestjs/bullmq');
   queueImports.push(
     BullModule.forRoot({
@@ -88,6 +89,7 @@ if (process.env['REDIS_HOST']) {
     EmailModule,
     ScheduleModule,
     CopilotModule,
+    ReportModule,
   ],
   providers: [
     {
@@ -97,6 +99,14 @@ if (process.env['REDIS_HOST']) {
     {
       provide: APP_INTERCEPTOR,
       useClass: TenantContextInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: CamelCaseResponseInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
     EventsService,
   ],

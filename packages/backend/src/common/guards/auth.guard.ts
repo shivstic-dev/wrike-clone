@@ -30,7 +30,14 @@ export class AuthGuard implements CanActivate {
 
     try {
       const config = loadAuthConfig();
-      const payload = verify(token, config.jwtSecret) as any;
+      const payload = verify(token, config.jwtSecret, {
+        algorithms: ['HS256'],
+        issuer: config.issuer,
+        audience: config.audience,
+      }) as any;
+      if (!payload.sub || !payload.tenantId || !payload.membershipId || !payload.email) {
+        throw new Error('Token is missing required claims');
+      }
       request.user = {
         userId: payload.sub || payload.userId,
         tenantId: payload.tenantId,

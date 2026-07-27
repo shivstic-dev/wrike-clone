@@ -51,29 +51,36 @@ export function SearchBar() {
   const results = data?.results || [];
 
   // Keyboard navigation
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedIndex(i => Math.min(i + 1, results.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedIndex(i => Math.max(i - 1, -1));
-    } else if (e.key === 'Enter' && selectedIndex >= 0 && results[selectedIndex]) {
-      e.preventDefault();
-      navigate(results[selectedIndex].url);
-      setQuery('');
-      setIsOpen(false);
-    } else if (e.key === 'Escape') {
-      setIsOpen(false);
-      inputRef.current?.blur();
-    }
-  }, [navigate, results, selectedIndex]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(i + 1, results.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(i - 1, -1));
+      } else if (e.key === 'Enter' && selectedIndex >= 0 && results[selectedIndex]) {
+        e.preventDefault();
+        navigate(results[selectedIndex].url);
+        setQuery('');
+        setIsOpen(false);
+      } else if (e.key === 'Escape') {
+        setIsOpen(false);
+        inputRef.current?.blur();
+      }
+    },
+    [navigate, results, selectedIndex],
+  );
 
   // Click outside to close
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
-          inputRef.current && !inputRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -93,9 +100,16 @@ export function SearchBar() {
       <div className="relative">
         <svg
           className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"
-          fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+          stroke="currentColor"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+          />
         </svg>
         <input
           ref={inputRef}
@@ -143,26 +157,28 @@ export function SearchBar() {
                     )}
                   >
                     {/* Type icon */}
-                    <span className={clsx(
-                      'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded text-xs font-bold text-white',
-                      result.type === 'task' ? 'bg-blue-500' : 'bg-amber-500',
-                    )}>
+                    <span
+                      className={clsx(
+                        'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded text-xs font-bold text-white',
+                        result.type === 'task' ? 'bg-blue-500' : 'bg-amber-500',
+                      )}
+                    >
                       {result.type === 'task' ? 'T' : 'P'}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">
-                        {result.title}
-                      </p>
+                      <p className="text-sm font-medium text-slate-900 truncate">{result.title}</p>
                       {result.description && (
                         <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">
                           {result.description}
                         </p>
                       )}
                       <div className="mt-1 flex items-center gap-2">
-                        <span className={clsx(
-                          'text-[10px] font-medium uppercase tracking-wider',
-                          result.type === 'task' ? 'text-blue-500' : 'text-amber-500',
-                        )}>
+                        <span
+                          className={clsx(
+                            'text-[10px] font-medium uppercase tracking-wider',
+                            result.type === 'task' ? 'text-blue-500' : 'text-amber-500',
+                          )}
+                        >
                           {result.type}
                         </span>
                         {String(result.metadata?.status ?? '') && (
@@ -177,8 +193,18 @@ export function SearchBar() {
                         )}
                       </div>
                     </div>
-                    <svg className="mt-1 h-4 w-4 shrink-0 text-slate-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                    <svg
+                      className="mt-1 h-4 w-4 shrink-0 text-slate-300"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M8.25 4.5l7.5 7.5-7.5 7.5"
+                      />
                     </svg>
                   </button>
                 </li>
@@ -191,7 +217,10 @@ export function SearchBar() {
               <Link
                 to={`/search?q=${encodeURIComponent(query)}`}
                 className="text-xs font-medium text-primary-600 hover:text-primary-700"
-                onClick={() => { setQuery(''); setIsOpen(false); }}
+                onClick={() => {
+                  setQuery('');
+                  setIsOpen(false);
+                }}
               >
                 See all {data.total} results
               </Link>
