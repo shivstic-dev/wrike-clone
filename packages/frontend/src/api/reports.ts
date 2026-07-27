@@ -8,11 +8,18 @@ export interface ReportFilters {
   status?: 'todo' | 'in_progress' | 'completed' | 'blocked';
   priority?: 'low' | 'medium' | 'high' | 'critical';
   assigneeId?: string;
+  scope?: 'self' | 'individual' | 'combined';
+  targetUserId?: string;
 }
 
 export interface DepartmentReport {
   generatedAt: string;
-  scope: { departmentId?: string; role: string; ownTasksOnly: boolean };
+  scope: {
+    departmentId?: string;
+    role: string;
+    mode: 'self' | 'individual' | 'combined';
+    ownTasksOnly: boolean;
+  };
   totals: {
     tasks: number;
     completed: number;

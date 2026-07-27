@@ -15,7 +15,28 @@ export const taskKeys = {
   list: (filters: TaskFilterParams) => [...taskKeys.lists(), filters] as const,
   details: () => [...taskKeys.all, 'detail'] as const,
   detail: (id: string) => [...taskKeys.details(), id] as const,
+  mine: (filters: TaskFilterParams) => [...taskKeys.all, 'mine', filters] as const,
+  grouped: (departmentId: string) => [...taskKeys.all, 'grouped', departmentId] as const,
 };
+
+export interface DepartmentTaskGroup {
+  user: {
+    userId: string;
+    displayName: string;
+    email: string;
+    role: 'employee' | 'manager' | 'department_head';
+  };
+  tasks: Task[];
+}
+
+export interface GroupedDepartmentTasks {
+  viewerRole: 'admin' | 'department_head' | 'manager';
+  myTasks: Task[];
+  managerGroups: DepartmentTaskGroup[];
+  employeeGroups: DepartmentTaskGroup[];
+  unassigned: Task[];
+  members: DepartmentTaskGroup['user'][];
+}
 
 export function buildTaskSearchParams(filters: TaskFilterParams): URLSearchParams {
   const params = new URLSearchParams();
@@ -43,6 +64,61 @@ export function useTasks(filters: TaskFilterParams = {}) {
       const params = buildTaskSearchParams(filters);
       const { data } = await apiClient.get<PaginatedResponse<Task>>(`/tasks?${params.toString()}`);
       return data;
+    },
+  });
+}
+
+export function useMyTasks(filters: TaskFilterParams = {}, enabled = true) {
+  return useQuery({
+    queryKey: taskKeys.mine(filters),
+    queryFn: async () => {
+      const params = buildTaskSearchParams(filters);
+      const { data } = await apiClient.get<PaginatedResponse<Task>>(
+        `/tasks/my?${params.toString()}`,
+      );
+      return data;
+    },
+    enabled,
+  });
+}
+
+export function useGroupedDepartmentTasks(departmentId: string, enabled = true) {
+  return useQuery({
+    queryKey: taskKeys.grouped(departmentId),
+    queryFn: async () => {
+      const { data } = await apiClient.get<GroupedDepartmentTasks>(
+        `/departments/${departmentId}/tasks/grouped`,
+      );
+      return data;
+    },
+    enabled: enabled && !!departmentId,
+  });
+}
+
+export function useAddTaskAssignee() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, userId }: { taskId: string; userId: string }) => {
+      const { data } = await apiClient.post<Task>(`/tasks/${taskId}/assignees`, { userId });
+      return data;
+    },
+    onSuccess: (task) => {
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      queryClient.setQueryData(taskKeys.detail(task.id), task);
+    },
+  });
+}
+
+export function useRemoveTaskAssignee() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, userId }: { taskId: string; userId: string }) => {
+      const { data } = await apiClient.delete<Task>(`/tasks/${taskId}/assignees/${userId}`);
+      return data;
+    },
+    onSuccess: (task) => {
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      queryClient.setQueryData(taskKeys.detail(task.id), task);
     },
   });
 }

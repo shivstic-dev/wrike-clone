@@ -61,6 +61,60 @@ export function useWorkspaceMembers(workspaceId: string) {
   });
 }
 
+export interface RoleChangeEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  changedByName: string | null;
+  oldRole: 'employee' | 'manager';
+  newRole: 'employee' | 'manager';
+  changedAt: string;
+}
+
+export function useChangeDepartmentRole() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      departmentId,
+      userId,
+      role,
+    }: {
+      departmentId: string;
+      userId: string;
+      role: 'employee' | 'manager';
+    }) => {
+      const { data } = await apiClient.patch(
+        `/departments/${departmentId}/members/${userId}/role`,
+        { role },
+      );
+      return data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [...workspaceKeys.detail(variables.departmentId), 'members'],
+      });
+      queryClient.invalidateQueries({ queryKey: ['tasks', 'grouped', variables.departmentId] });
+      queryClient.invalidateQueries({
+        queryKey: ['departments', variables.departmentId, 'role-changes'],
+      });
+    },
+  });
+}
+
+export function useDepartmentRoleChanges(departmentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['departments', departmentId, 'role-changes'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<RoleChangeEntry[]>(
+        `/departments/${departmentId}/role-changes`,
+      );
+      return data;
+    },
+    enabled: enabled && !!departmentId,
+  });
+}
+
 export function useWorkspace(id: string) {
   return useQuery({
     queryKey: workspaceKeys.detail(id),

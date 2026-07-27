@@ -69,15 +69,51 @@ export class DepartmentAccessService {
     return this.assertRole(departmentId, ['admin', 'department_head', 'manager']);
   }
 
+  async assertCanViewGroupedTasks(departmentId: string): Promise<DepartmentRole> {
+    return this.assertRole(departmentId, ['admin', 'department_head', 'manager']);
+  }
+
+  async assertCanChangeMemberRole(departmentId: string): Promise<DepartmentRole> {
+    return this.assertRole(departmentId, ['admin', 'department_head']);
+  }
+
+  async assertCanAssignTo(departmentId: string, targetUserId: string): Promise<DepartmentRole> {
+    const ctx = requireTenantContext();
+    const actorRole = await this.getRole(departmentId);
+    const targetRole = await this.getRole(departmentId, targetUserId);
+
+    if (targetRole === 'none' || targetRole === 'admin') {
+      throw new ForbiddenException('Assignee must be an active member of this department');
+    }
+    if (actorRole === 'admin' || actorRole === 'department_head') return actorRole;
+    if (actorRole === 'manager' && (targetRole === 'employee' || targetUserId === ctx.userId)) {
+      return actorRole;
+    }
+    throw new ForbiddenException('Managers may only assign employees or themselves');
+  }
+
   async assertCanSetVisibility(departmentId: string): Promise<DepartmentRole> {
     return this.assertRole(departmentId, ['admin', 'department_head']);
   }
 
-  async assertCanChangeStatus(departmentId: string, assigneeId: string | null): Promise<void> {
+  async assertCanChangeStatus(
+    departmentId: string,
+    taskIdOrAssigneeId: string | null,
+    assigneeIdArgument?: string | null,
+  ): Promise<void> {
     const ctx = requireTenantContext();
+    const hasTaskId = arguments.length >= 3;
+    const taskId = hasTaskId ? taskIdOrAssigneeId : null;
+    const assigneeId = hasTaskId ? assigneeIdArgument || null : taskIdOrAssigneeId;
     const role = await this.getRole(departmentId);
     if (role === 'admin' || role === 'department_head' || role === 'manager') return;
     if (role === 'employee' && assigneeId === ctx.userId) return;
+    if (role === 'employee' && taskId) {
+      const assignment = await this.db('task_assignees')
+        .where({ tenant_id: ctx.tenantId, task_id: taskId, user_id: ctx.userId })
+        .first();
+      if (assignment) return;
+    }
     throw new ForbiddenException('You may only change the status of tasks assigned to you');
   }
 

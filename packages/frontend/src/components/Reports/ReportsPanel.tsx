@@ -38,8 +38,18 @@ export function ReportsPanel() {
   const [status, setStatus] = useState('');
   const [priority, setPriority] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
+  const [scope, setScope] = useState<'self' | 'individual' | 'combined'>('self');
+  const [targetUserId, setTargetUserId] = useState('');
   const [exporting, setExporting] = useState<'pdf' | 'xlsx' | null>(null);
   const isAdmin = membership?.role === 'admin';
+  const departmentRole = departments.find(
+    (department) => department.id === departmentId,
+  )?.departmentRole;
+  const canUseTeamScopes =
+    isAdmin ||
+    departmentRole === 'admin' ||
+    departmentRole === 'department_head' ||
+    departmentRole === 'manager';
   const members = useQuery({
     queryKey: ['workspace-members', departmentId],
     queryFn: async () => {
@@ -63,10 +73,12 @@ export function ReportsPanel() {
       status: (status || undefined) as ReportFilters['status'],
       priority: (priority || undefined) as ReportFilters['priority'],
       assigneeId: assigneeId || undefined,
+      scope,
+      targetUserId: scope === 'individual' ? targetUserId || undefined : undefined,
     }),
-    [departmentId, dateFrom, dateTo, status, priority, assigneeId],
+    [departmentId, dateFrom, dateTo, status, priority, assigneeId, scope, targetUserId],
   );
-  const enabled = isAdmin || !!departmentId;
+  const enabled = (isAdmin || !!departmentId) && (scope !== 'individual' || !!targetUserId);
   const report = useDepartmentReport(filters, enabled);
 
   async function exportReport(format: 'pdf' | 'xlsx') {
@@ -92,7 +104,7 @@ export function ReportsPanel() {
   return (
     <div className="space-y-6">
       <section className="card p-4">
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-8">
           <label className="text-xs font-medium text-slate-600">
             Department
             <select
@@ -155,6 +167,41 @@ export function ReportsPanel() {
             </select>
           </label>
           <label className="text-xs font-medium text-slate-600">
+            Report scope
+            <select
+              className="input mt-1 w-full text-sm"
+              value={scope}
+              onChange={(event) => {
+                const nextScope = event.target.value as 'self' | 'individual' | 'combined';
+                setScope(nextScope);
+                if (nextScope !== 'individual') setTargetUserId('');
+              }}
+            >
+              <option value="self">My tasks</option>
+              {canUseTeamScopes && <option value="individual">One person</option>}
+              {canUseTeamScopes && <option value="combined">Combined team</option>}
+            </select>
+          </label>
+          <label className="text-xs font-medium text-slate-600">
+            Report person
+            <select
+              className="input mt-1 w-full text-sm"
+              value={targetUserId}
+              disabled={scope !== 'individual' || !departmentId}
+              onChange={(event) => setTargetUserId(event.target.value)}
+            >
+              <option value="">Choose a person</option>
+              {(members.data || []).map((member: any) => (
+                <option
+                  key={member.userId || member.user_id}
+                  value={member.userId || member.user_id}
+                >
+                  {member.displayName || member.display_name || member.email}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-medium text-slate-600">
             Assignee
             <select
               className="input mt-1 w-full text-sm"
@@ -176,11 +223,15 @@ export function ReportsPanel() {
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-slate-500">
-            {data?.scope.ownTasksOnly
-              ? 'Employee view: your assigned tasks only'
-              : isAdmin && !departmentId
-                ? 'Organization-wide admin report'
-                : 'Department management report'}
+            {data?.scope.mode === 'self'
+              ? 'Personal report: your assigned tasks only'
+              : data?.scope.mode === 'individual'
+                ? 'Individual report for the selected team member'
+                : data?.scope.mode === 'combined'
+                  ? 'Combined report limited to your permitted team'
+                  : isAdmin && !departmentId
+                    ? 'Organization-wide admin report'
+                    : 'Department management report'}
           </p>
           <div className="flex gap-2">
             <button

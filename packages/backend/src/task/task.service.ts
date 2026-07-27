@@ -15,7 +15,7 @@ import { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
 import { DATABASE_PROVIDER } from '../database/database.module';
 import { requireTenantContext } from '../common/tenant-context';
-import { applyVisibilityScope } from '../common/visibility.scope';
+import { applyTaskAccessScope } from '../common/visibility.scope';
 import type {
   CreateTaskInput,
   UpdateTaskInput,
@@ -90,17 +90,22 @@ export class TaskService {
       .leftJoin('workspaces', 'tasks.department_id', 'workspaces.id');
 
     if (!tenantAdmin) {
-      query = applyVisibilityScope(
-        query,
-        { ...ctx, role: 'member' },
-        'tasks.department_id',
-        'tasks.visibility',
-      );
+      query = applyTaskAccessScope(query, { ...ctx, role: 'member' });
     }
 
     // Apply filters
     if (projectId) query = query.andWhere('tasks.project_id', projectId);
-    if (assigneeId) query = query.andWhere('tasks.assignee_id', assigneeId);
+    if (assigneeId) {
+      query = query.andWhere((assignee) =>
+        assignee.where('tasks.assignee_id', assigneeId).orWhereExists(function () {
+          this.select(1)
+            .from('task_assignees as filtered_ta')
+            .whereRaw('filtered_ta.task_id = tasks.id')
+            .andWhere('filtered_ta.tenant_id', ctx.tenantId)
+            .andWhere('filtered_ta.user_id', assigneeId);
+        }),
+      );
+    }
     if (status && status.length > 0) query = query.whereIn('tasks.status', status);
     if (priority && priority.length > 0) query = query.whereIn('tasks.priority', priority);
     if (dueDateBefore) query = query.andWhere('tasks.due_date', '<=', dueDateBefore);
@@ -111,9 +116,7 @@ export class TaskService {
         .andWhere('task_folder_links.folder_id', folderId);
     }
     if (departmentId) {
-      query = query.andWhere((builder) =>
-        builder.where('tasks.department_id', departmentId).orWhere('tasks.visibility', 'global'),
-      );
+      query = query.andWhere('tasks.department_id', departmentId);
     }
     if (search) {
       query = query.andWhereRaw(
@@ -142,7 +145,7 @@ export class TaskService {
       .offset((page - 1) * perPage);
 
     return {
-      data: tasks,
+      data: await this.attachAssignees(tasks),
       meta: {
         page,
         perPage,
@@ -163,12 +166,7 @@ export class TaskService {
       .select('tasks.*', 'workspaces.name as department_name')
       .modify((qb: Knex.QueryBuilder) => {
         if (!tenantAdmin) {
-          applyVisibilityScope(
-            qb,
-            { ...ctx, role: 'member' },
-            'tasks.department_id',
-            'tasks.visibility',
-          );
+          applyTaskAccessScope(qb, { ...ctx, role: 'member' });
         }
       })
       .first();
@@ -187,15 +185,10 @@ export class TaskService {
     }
 
     // Fetch related data
-    const [comments, dependencies, assignee, attachments] = await Promise.all([
+    const [comments, dependencies, assignees, attachments] = await Promise.all([
       this.findComments(id),
       this.db('task_dependencies').where({ task_id: id }),
-      task.assignee_id
-        ? this.db('users')
-            .where({ id: task.assignee_id })
-            .select('id', 'display_name', 'avatar_url')
-            .first()
-        : Promise.resolve(null),
+      this.getTaskAssignees(id),
       this.db('file_versions')
         .join('files', 'file_versions.file_id', 'files.id')
         .where('files.task_id', id)
@@ -206,7 +199,7 @@ export class TaskService {
       ...task,
       comments,
       dependencies,
-      assignees: assignee ? [assignee] : [],
+      assignees,
       attachments,
     };
   }
@@ -219,6 +212,94 @@ export class TaskService {
       .where({ task_id: taskId, tenant_id: ctx.tenantId })
       .whereNull('deleted_at')
       .orderBy('created_at', 'asc');
+  }
+
+  private async getTaskAssignees(taskId: string) {
+    const ctx = requireTenantContext();
+    return this.db('task_assignees')
+      .join('users', 'task_assignees.user_id', 'users.id')
+      .where({
+        'task_assignees.tenant_id': ctx.tenantId,
+        'task_assignees.task_id': taskId,
+      })
+      .select(
+        'task_assignees.id',
+        'task_assignees.task_id',
+        'task_assignees.user_id',
+        'task_assignees.assigned_by_id',
+        'task_assignees.is_primary',
+        'task_assignees.assigned_at',
+        'users.display_name',
+        'users.email',
+        'users.avatar_url',
+      )
+      .orderBy('task_assignees.is_primary', 'desc')
+      .orderBy('users.display_name', 'asc');
+  }
+
+  private async attachAssignees(tasks: Array<Record<string, any>>) {
+    if (tasks.length === 0) return tasks;
+    const ctx = requireTenantContext();
+    const taskIds = tasks.map((task) => task.id as string);
+    const result = await this.db('task_assignees')
+      .join('users', 'task_assignees.user_id', 'users.id')
+      .where('task_assignees.tenant_id', ctx.tenantId)
+      .whereIn('task_assignees.task_id', taskIds)
+      .select(
+        'task_assignees.id',
+        'task_assignees.task_id',
+        'task_assignees.user_id',
+        'task_assignees.assigned_by_id',
+        'task_assignees.is_primary',
+        'task_assignees.assigned_at',
+        'users.display_name',
+        'users.email',
+        'users.avatar_url',
+      )
+      .orderBy('task_assignees.is_primary', 'desc');
+    const rows = Array.isArray(result) ? result : [];
+    const byTask = new Map<string, Array<Record<string, unknown>>>();
+    for (const row of rows) {
+      const values = byTask.get(row.task_id) || [];
+      values.push(row);
+      byTask.set(row.task_id, values);
+    }
+    return tasks.map((task) => ({ ...task, assignees: byTask.get(task.id) || [] }));
+  }
+
+  private uniqueAssigneeIds(input: {
+    assigneeId?: string | null;
+    assigneeIds?: string[];
+  }): string[] {
+    const ids = [...(input.assigneeId ? [input.assigneeId] : []), ...(input.assigneeIds || [])];
+    return [...new Set(ids)];
+  }
+
+  private async validateAssignees(departmentId: string, assigneeIds: string[]): Promise<void> {
+    for (const userId of assigneeIds) {
+      await this.validateAssigneeInDepartment(departmentId, userId);
+      await this.departmentAccess.assertCanAssignTo(departmentId, userId);
+    }
+  }
+
+  private async replaceTaskAssignees(
+    taskId: string,
+    assigneeIds: string[],
+    executor: Knex | Knex.Transaction = this.db,
+  ): Promise<void> {
+    const ctx = requireTenantContext();
+    await executor('task_assignees').where({ tenant_id: ctx.tenantId, task_id: taskId }).del();
+    if (assigneeIds.length === 0) return;
+    await executor('task_assignees').insert(
+      assigneeIds.map((userId, index) => ({
+        id: uuidv4(),
+        tenant_id: ctx.tenantId,
+        task_id: taskId,
+        user_id: userId,
+        assigned_by_id: ctx.userId,
+        is_primary: index === 0,
+      })),
+    );
   }
 
   /**
@@ -267,29 +348,34 @@ export class TaskService {
     if (input.visibility === 'global') {
       await this.departmentAccess.assertCanSetVisibility(project.department_id);
     }
-    await this.validateAssigneeInDepartment(project.department_id, input.assigneeId || null);
+    const assigneeIds = this.uniqueAssigneeIds(input);
+    await this.validateAssignees(project.department_id, assigneeIds);
 
-    const [task] = await this.db('tasks')
-      .insert({
-        id,
-        tenant_id: ctx.tenantId,
-        project_id: input.projectId,
-        department_id: project.department_id,
-        parent_task_id: input.parentTaskId || null,
-        assignee_id: input.assigneeId || null,
-        created_by_id: ctx.userId,
-        title: input.title,
-        description: input.description || null,
-        status: input.status || TaskStatus.TODO,
-        priority: input.priority || TaskPriority.LOW,
-        estimated_hours: input.estimatedHours || null,
-        start_date: input.startDate || null,
-        due_date: input.dueDate || null,
-        visibility: input.visibility || 'department',
-        custom_fields: input.customFields ? JSON.stringify(input.customFields) : '{}',
-        sort_order: 0,
-      })
-      .returning('*');
+    const task = await this.db.transaction(async (trx) => {
+      const [created] = await trx('tasks')
+        .insert({
+          id,
+          tenant_id: ctx.tenantId,
+          project_id: input.projectId,
+          department_id: project.department_id,
+          parent_task_id: input.parentTaskId || null,
+          assignee_id: assigneeIds[0] || null,
+          created_by_id: ctx.userId,
+          title: input.title,
+          description: input.description || null,
+          status: input.status || TaskStatus.TODO,
+          priority: input.priority || TaskPriority.LOW,
+          estimated_hours: input.estimatedHours || null,
+          start_date: input.startDate || null,
+          due_date: input.dueDate || null,
+          visibility: input.visibility || 'department',
+          custom_fields: input.customFields ? JSON.stringify(input.customFields) : '{}',
+          sort_order: 0,
+        })
+        .returning('*');
+      await this.replaceTaskAssignees(id, assigneeIds, trx);
+      return created;
+    });
 
     // Log activity
     await this.logActivity(ctx.userId, 'task', id, 'task:created', {});
@@ -301,7 +387,7 @@ export class TaskService {
     }
 
     this.logger.log(`Task ${id} created in project ${input.projectId}`);
-    return task;
+    return { ...task, assignees: await this.getTaskAssignees(id) };
   }
 
   /**
@@ -316,6 +402,7 @@ export class TaskService {
     if (statusOnly) {
       await this.departmentAccess.assertCanChangeStatus(
         existing.department_id,
+        existing.id,
         existing.assignee_id,
       );
     } else {
@@ -324,8 +411,10 @@ export class TaskService {
     if (input.visibility !== undefined && input.visibility !== existing.visibility) {
       await this.departmentAccess.assertCanSetVisibility(existing.department_id);
     }
-    if (input.assigneeId !== undefined && input.assigneeId !== existing.assignee_id) {
-      await this.validateAssigneeInDepartment(existing.department_id, input.assigneeId);
+    const assigneesProvided = input.assigneeIds !== undefined || input.assigneeId !== undefined;
+    const desiredAssigneeIds = assigneesProvided ? this.uniqueAssigneeIds(input) : [];
+    if (assigneesProvided) {
+      await this.validateAssignees(existing.department_id, desiredAssigneeIds);
     }
 
     const changes: Record<string, { old: unknown; new: unknown }> = {};
@@ -357,6 +446,16 @@ export class TaskService {
       }
     }
 
+    if (assigneesProvided) {
+      const existingRows = await this.getTaskAssignees(id);
+      const existingIds = existingRows.map((row) => row.user_id as string);
+      if (JSON.stringify(existingIds) !== JSON.stringify(desiredAssigneeIds)) {
+        changes['assigneeIds'] = { old: existingIds, new: desiredAssigneeIds };
+      }
+      updates['assignee_id'] = desiredAssigneeIds[0] || null;
+      delete changes['assigneeId'];
+    }
+
     if (Object.keys(changes).length === 0) {
       return existing;
     }
@@ -374,10 +473,16 @@ export class TaskService {
     }
     updates['updated_at'] = new Date();
 
-    const [updated] = await this.db('tasks')
-      .where({ id, tenant_id: ctx.tenantId })
-      .update(updates)
-      .returning('*');
+    const updated = await this.db.transaction(async (trx) => {
+      const [row] = await trx('tasks')
+        .where({ id, tenant_id: ctx.tenantId })
+        .update(updates)
+        .returning('*');
+      if (assigneesProvided) {
+        await this.replaceTaskAssignees(id, desiredAssigneeIds, trx);
+      }
+      return row;
+    });
 
     // Log activity
     if (Object.keys(changes).length > 0) {
@@ -387,14 +492,14 @@ export class TaskService {
           status: changes['status'],
         });
       }
-      if (changes['assigneeId']) {
+      if (changes['assigneeId'] || changes['assigneeIds']) {
         await this.logActivity(ctx.userId, 'task', id, 'task:assigned', {
-          assigneeId: changes['assigneeId'],
+          assignees: changes['assigneeIds'] || changes['assigneeId'],
         });
       }
     }
 
-    if (changes['assigneeId'] || changes['priority']) {
+    if (changes['assigneeId'] || changes['assigneeIds'] || changes['priority']) {
       await this.db('notification_log')
         .where({ tenant_id: ctx.tenantId, task_id: id })
         .andWhere('rule_type', 'like', 'priority_%')
@@ -404,7 +509,7 @@ export class TaskService {
       }
     }
 
-    return updated;
+    return { ...updated, assignees: await this.getTaskAssignees(id) };
   }
 
   /**
@@ -415,9 +520,164 @@ export class TaskService {
     const existing = await this.findVisibleTask(id);
     await this.departmentAccess.assertCanManageTask(existing.department_id);
 
-    await this.db('tasks').where({ id }).update({ deleted_at: new Date() });
+    await this.db.transaction(async (trx) => {
+      await trx('task_assignees').where({ task_id: id, tenant_id: ctx.tenantId }).del();
+      await trx('tasks').where({ id, tenant_id: ctx.tenantId }).update({ deleted_at: new Date() });
+    });
     await this.logActivity(ctx.userId, 'task', id, 'task:deleted', {});
     this.logger.log(`Task ${id} soft-deleted`);
+  }
+
+  async findMyTasks(filter: TaskFilterInput) {
+    const ctx = requireTenantContext();
+    return this.findAll({ ...filter, assigneeId: ctx.userId });
+  }
+
+  async findDepartmentTasksGrouped(departmentId: string) {
+    const ctx = requireTenantContext();
+    const viewerRole = await this.departmentAccess.assertCanViewGroupedTasks(departmentId);
+    const members = await this.db('workspace_members')
+      .join('users', 'workspace_members.user_id', 'users.id')
+      .leftJoin('department_heads', function () {
+        this.on('department_heads.department_id', '=', 'workspace_members.workspace_id').andOn(
+          'department_heads.user_id',
+          '=',
+          'workspace_members.user_id',
+        );
+      })
+      .leftJoin('tenant_memberships', function () {
+        this.on('tenant_memberships.tenant_id', '=', 'workspace_members.tenant_id').andOn(
+          'tenant_memberships.user_id',
+          '=',
+          'workspace_members.user_id',
+        );
+      })
+      .where({
+        'workspace_members.tenant_id': ctx.tenantId,
+        'workspace_members.workspace_id': departmentId,
+      })
+      .select(
+        'users.id as user_id',
+        'users.display_name',
+        'users.email',
+        'users.avatar_url',
+        this.db.raw(`
+          CASE
+            WHEN department_heads.id IS NOT NULL THEN 'department_head'
+            WHEN workspace_members.role = 'manager' OR tenant_memberships.role = 'manager'
+              THEN 'manager'
+            ELSE 'employee'
+          END AS role
+        `),
+      )
+      .orderBy('users.display_name', 'asc');
+
+    const visibleMembers =
+      viewerRole === 'manager'
+        ? members.filter((member) => member.role === 'employee' || member.user_id === ctx.userId)
+        : members;
+    const visibleIds = visibleMembers.map((member) => member.user_id as string);
+
+    let taskQuery = this.db('tasks')
+      .leftJoin('workspaces', 'tasks.department_id', 'workspaces.id')
+      .where({
+        'tasks.tenant_id': ctx.tenantId,
+        'tasks.department_id': departmentId,
+      })
+      .whereNull('tasks.deleted_at')
+      .select('tasks.*', 'workspaces.name as department_name')
+      .orderByRaw(
+        `CASE WHEN tasks.due_date < NOW() AND tasks.status <> 'completed' THEN 0 ELSE 1 END`,
+      )
+      .orderBy('tasks.due_date', 'asc', 'last')
+      .orderBy('tasks.created_at', 'desc');
+
+    if (viewerRole === 'manager') {
+      taskQuery = taskQuery.andWhere((taskScope) =>
+        taskScope
+          .whereIn('tasks.assignee_id', visibleIds)
+          .orWhereExists(function () {
+            this.select(1)
+              .from('task_assignees as grouped_ta')
+              .whereRaw('grouped_ta.task_id = tasks.id')
+              .andWhere('grouped_ta.tenant_id', ctx.tenantId)
+              .whereIn('grouped_ta.user_id', visibleIds);
+          })
+          .orWhere((unassigned) =>
+            unassigned.whereNull('tasks.assignee_id').whereNotExists(function () {
+              this.select(1)
+                .from('task_assignees as grouped_any_ta')
+                .whereRaw('grouped_any_ta.task_id = tasks.id')
+                .andWhere('grouped_any_ta.tenant_id', ctx.tenantId);
+            }),
+          ),
+      );
+    }
+
+    const tasks = await this.attachAssignees(await taskQuery);
+    const groupFor = (member: Record<string, any>) => ({
+      user: member,
+      tasks: tasks.filter((task) =>
+        task.assignees.some((assignee: Record<string, any>) => assignee.user_id === member.user_id),
+      ),
+    });
+    const assignedTaskIds = new Set(
+      tasks.flatMap((task) =>
+        task.assignees.map((assignee: Record<string, any>) => assignee.task_id as string),
+      ),
+    );
+
+    return {
+      viewerRole,
+      myTasks: tasks.filter((task) =>
+        task.assignees.some((assignee: Record<string, any>) => assignee.user_id === ctx.userId),
+      ),
+      managerGroups: visibleMembers.filter((member) => member.role === 'manager').map(groupFor),
+      employeeGroups: visibleMembers.filter((member) => member.role === 'employee').map(groupFor),
+      unassigned: tasks.filter((task) => !assignedTaskIds.has(task.id)),
+      members,
+    };
+  }
+
+  async addAssignee(taskId: string, userId: string) {
+    const ctx = requireTenantContext();
+    const task = await this.findVisibleTask(taskId);
+    await this.departmentAccess.assertCanManageTask(task.department_id);
+    await this.validateAssignees(task.department_id, [userId]);
+    const current = await this.getTaskAssignees(taskId);
+    const ids = current.map((assignee) => assignee.user_id as string);
+    if (!ids.includes(userId)) ids.push(userId);
+    await this.db.transaction(async (trx) => {
+      await this.replaceTaskAssignees(taskId, ids, trx);
+      await trx('tasks')
+        .where({ id: taskId, tenant_id: ctx.tenantId })
+        .update({ assignee_id: ids[0] || null, updated_at: new Date() });
+    });
+    await this.logActivity(ctx.userId, 'task', taskId, 'task:assignee:added', { userId });
+    if (!current.some((assignee) => assignee.user_id === userId)) {
+      await this.createAssignmentNotification({ ...task, assignee_id: userId });
+    }
+    return this.findById(taskId);
+  }
+
+  async removeAssignee(taskId: string, userId: string) {
+    const ctx = requireTenantContext();
+    const task = await this.findVisibleTask(taskId);
+    await this.departmentAccess.assertCanManageTask(task.department_id);
+    await this.departmentAccess.assertCanAssignTo(task.department_id, userId);
+    const current = await this.getTaskAssignees(taskId);
+    if (!current.some((assignee) => assignee.user_id === userId)) {
+      throw new NotFoundException('Task assignee not found');
+    }
+    const ids = current.map((assignee) => assignee.user_id as string).filter((id) => id !== userId);
+    await this.db.transaction(async (trx) => {
+      await this.replaceTaskAssignees(taskId, ids, trx);
+      await trx('tasks')
+        .where({ id: taskId, tenant_id: ctx.tenantId })
+        .update({ assignee_id: ids[0] || null, updated_at: new Date() });
+    });
+    await this.logActivity(ctx.userId, 'task', taskId, 'task:assignee:removed', { userId });
+    return this.findById(taskId);
   }
 
   /**
@@ -438,15 +698,19 @@ export class TaskService {
     const statusOnly = updateFields.length === 1 && updateFields[0] === 'status';
     for (const task of existingTasks) {
       if (statusOnly) {
-        await this.departmentAccess.assertCanChangeStatus(task.department_id, task.assignee_id);
+        await this.departmentAccess.assertCanChangeStatus(
+          task.department_id,
+          task.id,
+          task.assignee_id,
+        );
       } else {
         await this.departmentAccess.assertCanManageTask(task.department_id);
       }
       if (input.updates.visibility !== undefined && input.updates.visibility !== task.visibility) {
         await this.departmentAccess.assertCanSetVisibility(task.department_id);
       }
-      if (input.updates.assigneeId !== undefined && input.updates.assigneeId !== task.assignee_id) {
-        await this.validateAssigneeInDepartment(task.department_id, input.updates.assigneeId);
+      if (input.updates.assigneeId !== undefined || input.updates.assigneeIds !== undefined) {
+        await this.validateAssignees(task.department_id, this.uniqueAssigneeIds(input.updates));
       }
     }
 
@@ -476,6 +740,9 @@ export class TaskService {
           dbUpdates[dbField] = value;
         }
       }
+      if (input.updates.assigneeIds !== undefined) {
+        dbUpdates['assignee_id'] = this.uniqueAssigneeIds(input.updates)[0] || null;
+      }
 
       if (dbUpdates['status'] === 'completed') {
         dbUpdates['completed_at'] = new Date();
@@ -487,12 +754,19 @@ export class TaskService {
       // Perform a single batched UPDATE inside a transaction
       if (Object.keys(dbUpdates).length > 0) {
         const updated = await this.db.transaction(async (trx) => {
-          return trx('tasks')
+          const rows = await trx('tasks')
             .whereIn('id', input.taskIds)
             .andWhere('tenant_id', ctx.tenantId)
             .whereNull('deleted_at')
             .update(dbUpdates)
             .returning('*');
+          if (input.updates.assigneeId !== undefined || input.updates.assigneeIds !== undefined) {
+            const assigneeIds = this.uniqueAssigneeIds(input.updates);
+            for (const task of rows) {
+              await this.replaceTaskAssignees(task.id, assigneeIds, trx);
+            }
+          }
+          return rows;
         });
 
         // Log activity
@@ -505,12 +779,16 @@ export class TaskService {
               status: { new: input.updates.status },
             });
           }
-          if (input.updates.assigneeId !== undefined) {
+          if (input.updates.assigneeId !== undefined || input.updates.assigneeIds !== undefined) {
             await this.logActivity(ctx.userId, 'task', task.id, 'task:assigned', {
-              assigneeId: { new: input.updates.assigneeId },
+              assigneeIds: { new: this.uniqueAssigneeIds(input.updates) },
             });
           }
-          if (input.updates.assigneeId !== undefined || input.updates.priority !== undefined) {
+          if (
+            input.updates.assigneeId !== undefined ||
+            input.updates.assigneeIds !== undefined ||
+            input.updates.priority !== undefined
+          ) {
             await this.db('notification_log')
               .where({ tenant_id: ctx.tenantId, task_id: task.id })
               .andWhere('rule_type', 'like', 'priority_%')

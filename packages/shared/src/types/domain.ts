@@ -130,6 +130,7 @@ export interface Task extends BaseEntity {
   departmentName?: string;
   parentTaskId: string | null;
   assigneeId: string | null;
+  assignees?: TaskAssignee[];
   createdById: string;
   title: string;
   description: string | null;
@@ -159,8 +160,12 @@ export interface TaskAssignee {
   id: string;
   taskId: string;
   userId: string;
+  assignedById: string | null;
+  isPrimary: boolean;
   assignedAt: Timestamp;
-  role: string | null; // e.g. "responsible", "accountable", "consulted"
+  displayName?: string;
+  email?: string;
+  avatarUrl?: string | null;
 }
 
 // ── Comments & Activity ────────────────────────────────────────

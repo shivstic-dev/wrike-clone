@@ -32,5 +32,7 @@ describe('task API contract helpers', () => {
   it('builds stable list and detail cache keys', () => {
     expect(taskKeys.lists()).toEqual(['tasks', 'list']);
     expect(taskKeys.detail('task-1')).toEqual(['tasks', 'detail', 'task-1']);
+    expect(taskKeys.mine({ perPage: 100 })).toEqual(['tasks', 'mine', { perPage: 100 }]);
+    expect(taskKeys.grouped('department-1')).toEqual(['tasks', 'grouped', 'department-1']);
   });
 });

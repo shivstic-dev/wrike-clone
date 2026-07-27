@@ -1,19 +1,16 @@
-import { useTasks } from '../api/tasks';
-import { useAuth } from '../contexts/AuthContext';
+import { useMyTasks } from '../api/tasks';
 import { TaskTable } from '../components/Table/TaskTable';
 import { ErrorDisplay } from '../components/common/ErrorDisplay';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { EmptyState } from '../components/common/EmptyState';
 
 export default function MyTasksPage() {
-  const { user } = useAuth();
   const {
     data: tasksData,
     isLoading,
     error,
     refetch,
-  } = useTasks({
-    assigneeId: user?.id,
+  } = useMyTasks({
     perPage: 100,
   });
 

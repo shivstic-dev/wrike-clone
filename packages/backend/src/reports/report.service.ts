@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { Knex } from 'knex';
 import PDFDocument from 'pdfkit';
 import { strToU8, zipSync } from 'fflate';
@@ -23,7 +23,12 @@ type ReportTask = {
 
 export interface DepartmentReport {
   generatedAt: string;
-  scope: { departmentId?: string; role: string; ownTasksOnly: boolean };
+  scope: {
+    departmentId?: string;
+    role: string;
+    mode: 'self' | 'individual' | 'combined';
+    ownTasksOnly: boolean;
+  };
   filters: Record<string, string | undefined>;
   totals: {
     tasks: number;
@@ -46,11 +51,11 @@ export class ReportService {
 
   async build(filter: DepartmentReportFilterInput): Promise<DepartmentReport> {
     const ctx = requireTenantContext();
-    const scope = await this.departmentAccess.getReportScope(filter.departmentId);
+    const scope = await this.resolveAudience(filter);
     const query = this.db('tasks')
       .join('workspaces', 'workspaces.id', 'tasks.department_id')
-      .leftJoin('users as assignee', 'assignee.id', 'tasks.assignee_id')
       .where('tasks.tenant_id', ctx.tenantId)
+      .whereNull('tasks.deleted_at')
       .select(
         'tasks.id',
         'tasks.title',
@@ -58,7 +63,20 @@ export class ReportService {
         'tasks.priority',
         'tasks.visibility',
         'workspaces.name as department_name',
-        'assignee.display_name as assignee_name',
+        this.db.raw(`COALESCE(
+          (
+            SELECT string_agg(report_user.display_name, ', ' ORDER BY report_ta.is_primary DESC, report_user.display_name)
+            FROM task_assignees report_ta
+            JOIN users report_user ON report_user.id = report_ta.user_id
+            WHERE report_ta.task_id = tasks.id
+              AND report_ta.tenant_id = tasks.tenant_id
+          ),
+          (
+            SELECT legacy_user.display_name
+            FROM users legacy_user
+            WHERE legacy_user.id = tasks.assignee_id
+          )
+        ) AS assignee_name`),
         'tasks.start_date',
         'tasks.due_date',
         'tasks.completed_at',
@@ -68,7 +86,7 @@ export class ReportService {
       .orderBy('tasks.created_at', 'desc');
 
     if (scope.departmentId) query.where('tasks.department_id', scope.departmentId);
-    if (scope.ownTasksOnly) query.where('tasks.assignee_id', ctx.userId);
+    if (scope.userIds) this.whereAssignedTo(query, scope.userIds);
     if (filter.dateFrom) query.where('tasks.created_at', '>=', filter.dateFrom);
     if (filter.dateTo) {
       const end = new Date(filter.dateTo);
@@ -77,7 +95,10 @@ export class ReportService {
     }
     if (filter.status) query.where('tasks.status', filter.status);
     if (filter.priority) query.where('tasks.priority', filter.priority);
-    if (filter.assigneeId) query.where('tasks.assignee_id', filter.assigneeId);
+    if (filter.assigneeId) {
+      await this.assertReportTargetAllowed(filter.assigneeId, scope.userIds);
+      this.whereAssignedTo(query, [filter.assigneeId]);
+    }
 
     const tasks = (await query) as ReportTask[];
     const now = Date.now();
@@ -110,7 +131,8 @@ export class ReportService {
       scope: {
         departmentId: scope.departmentId,
         role: scope.role,
-        ownTasksOnly: scope.ownTasksOnly,
+        mode: scope.mode,
+        ownTasksOnly: scope.mode === 'self',
       },
       filters: {
         dateFrom: filter.dateFrom?.toISOString(),
@@ -118,6 +140,8 @@ export class ReportService {
         status: filter.status,
         priority: filter.priority,
         assigneeId: filter.assigneeId,
+        scope: scope.mode,
+        targetUserId: filter.targetUserId,
       },
       totals: {
         tasks: tasks.length,
@@ -137,6 +161,101 @@ export class ReportService {
         .map(([assignee, values]) => ({ assignee, ...values }))
         .sort((a, b) => b.total - a.total),
       tasks,
+    };
+  }
+
+  private whereAssignedTo(query: Knex.QueryBuilder, userIds: string[]): void {
+    const ctx = requireTenantContext();
+    query.andWhere((assigned) =>
+      assigned.whereIn('tasks.assignee_id', userIds).orWhereExists(function () {
+        this.select(1)
+          .from('task_assignees as report_scope_ta')
+          .whereRaw('report_scope_ta.task_id = tasks.id')
+          .andWhere('report_scope_ta.tenant_id', ctx.tenantId)
+          .whereIn('report_scope_ta.user_id', userIds);
+      }),
+    );
+  }
+
+  private async assertReportTargetAllowed(
+    userId: string,
+    allowedUserIds: string[] | null,
+  ): Promise<void> {
+    const ctx = requireTenantContext();
+    if (allowedUserIds && !allowedUserIds.includes(userId)) {
+      throw new ForbiddenException('That user is outside your report scope');
+    }
+    const member = await this.db('tenant_memberships')
+      .where({ tenant_id: ctx.tenantId, user_id: userId, is_active: true })
+      .first();
+    if (!member) throw new ForbiddenException('That user is outside your organization');
+  }
+
+  private async resolveAudience(filter: DepartmentReportFilterInput): Promise<{
+    departmentId?: string;
+    role: string;
+    mode: 'self' | 'individual' | 'combined';
+    userIds: string[] | null;
+  }> {
+    const ctx = requireTenantContext();
+    const base = await this.departmentAccess.getReportScope(filter.departmentId);
+    const mode = filter.scope || 'self';
+    const role = base.role;
+
+    if (role === 'employee') {
+      if (mode !== 'self') {
+        throw new ForbiddenException('Employees may only run reports for themselves');
+      }
+      return { departmentId: base.departmentId, role, mode, userIds: [ctx.userId] };
+    }
+    if (mode === 'self') {
+      return { departmentId: base.departmentId, role, mode, userIds: [ctx.userId] };
+    }
+
+    const departmentMembers = base.departmentId
+      ? await this.db('workspace_members')
+          .leftJoin('department_heads', function () {
+            this.on('department_heads.department_id', '=', 'workspace_members.workspace_id').andOn(
+              'department_heads.user_id',
+              '=',
+              'workspace_members.user_id',
+            );
+          })
+          .where({
+            'workspace_members.tenant_id': ctx.tenantId,
+            'workspace_members.workspace_id': base.departmentId,
+          })
+          .select(
+            'workspace_members.user_id',
+            'workspace_members.role',
+            'department_heads.id as head_id',
+          )
+      : [];
+
+    let allowedIds: string[] | null;
+    if (role === 'manager') {
+      allowedIds = [
+        ctx.userId,
+        ...departmentMembers
+          .filter((member) => member.role === 'employee' && !member.head_id)
+          .map((member) => member.user_id as string),
+      ];
+    } else if (base.departmentId) {
+      allowedIds = departmentMembers.map((member) => member.user_id as string);
+    } else {
+      allowedIds = null;
+    }
+
+    if (mode === 'individual') {
+      const target = filter.targetUserId!;
+      await this.assertReportTargetAllowed(target, allowedIds);
+      return { departmentId: base.departmentId, role, mode, userIds: [target] };
+    }
+    return {
+      departmentId: base.departmentId,
+      role,
+      mode,
+      userIds: allowedIds ? [...new Set(allowedIds)] : null,
     };
   }
 

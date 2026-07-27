@@ -7,7 +7,7 @@
  * frontend (form validation), so rules never diverge.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.departmentReportFilterSchema = exports.paginationSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.createDependencySchema = exports.bulkTaskUpdateSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
+exports.departmentReportFilterSchema = exports.paginationSchema = exports.addTaskAssigneeSchema = exports.changeDepartmentMemberRoleSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.createDependencySchema = exports.bulkTaskUpdateSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
 const zod_1 = require("zod");
 const enums_1 = require("../enums");
 // ── Helpers ────────────────────────────────────────────────────
@@ -135,6 +135,7 @@ exports.createTaskSchema = zod_1.z.object({
     projectId: exports.uuidField,
     parentTaskId: exports.uuidField.optional(),
     assigneeId: exports.uuidField.optional(),
+    assigneeIds: zod_1.z.array(exports.uuidField).max(50).optional(),
     title: zod_1.z.string().min(1).max(500),
     description: zod_1.z.string().max(10000).optional(),
     status: zod_1.z.nativeEnum(enums_1.TaskStatus).optional(),
@@ -152,6 +153,7 @@ exports.updateTaskSchema = zod_1.z
     status: zod_1.z.nativeEnum(enums_1.TaskStatus).optional(),
     priority: zod_1.z.nativeEnum(enums_1.TaskPriority).optional(),
     assigneeId: exports.uuidField.nullable().optional(),
+    assigneeIds: zod_1.z.array(exports.uuidField).max(50).optional(),
     estimatedHours: zod_1.z.number().nonnegative().optional(),
     actualHours: zod_1.z.number().nonnegative().optional(),
     startDate: exports.isoDate.nullable().optional(),
@@ -261,6 +263,12 @@ exports.addWorkspaceMemberSchema = zod_1.z.object({
 exports.updateWorkspaceMemberRoleSchema = zod_1.z.object({
     role: zod_1.z.enum(['employee', 'manager', 'department_head']),
 });
+exports.changeDepartmentMemberRoleSchema = zod_1.z.object({
+    role: zod_1.z.enum(['employee', 'manager']),
+});
+exports.addTaskAssigneeSchema = zod_1.z.object({
+    userId: exports.uuidField,
+});
 // ── Pagination ─────────────────────────────────────────────────
 exports.paginationSchema = zod_1.z.object({
     page: zod_1.z.coerce.number().int().positive().optional().default(1),
@@ -276,7 +284,13 @@ exports.departmentReportFilterSchema = zod_1.z
     status: zod_1.z.nativeEnum(enums_1.TaskStatus).optional(),
     priority: zod_1.z.nativeEnum(enums_1.TaskPriority).optional(),
     assigneeId: zod_1.z.string().uuid().optional(),
+    scope: zod_1.z.enum(['self', 'individual', 'combined']).optional().default('self'),
+    targetUserId: zod_1.z.string().uuid().optional(),
     format: zod_1.z.enum(['pdf', 'xlsx']).optional(),
+})
+    .refine((value) => value.scope !== 'individual' || !!value.targetUserId, {
+    message: 'targetUserId is required for individual reports',
+    path: ['targetUserId'],
 })
     .refine((value) => !value.dateFrom || !value.dateTo || value.dateFrom <= value.dateTo, {
     message: 'dateFrom must be before or equal to dateTo',

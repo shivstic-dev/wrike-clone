@@ -201,6 +201,13 @@ export class WorkspaceService {
       .whereIn('department_id', ids)
       .select('department_id');
     const headIds = new Set(heads.map((head) => head.department_id as string));
+    const tenantMembership = await this.db('tenant_memberships')
+      .where({
+        tenant_id: workspaces[0]?.tenant_id as string,
+        user_id: userId,
+        is_active: true,
+      })
+      .first();
     const roles = new Map(
       memberships.map((membership) => [
         membership.workspace_id as string,
@@ -212,7 +219,9 @@ export class WorkspaceService {
       ...workspace,
       department_role: headIds.has(workspace.id as string)
         ? 'department_head'
-        : roles.get(workspace.id as string) || 'none',
+        : tenantMembership?.role === 'manager' && roles.has(workspace.id as string)
+          ? 'manager'
+          : roles.get(workspace.id as string) || 'none',
     }));
   }
 
@@ -388,11 +397,83 @@ export class WorkspaceService {
       throw new NotFoundException('Member not found in this workspace');
     }
 
+    const currentRole = await this.departmentAccess.getRole(workspaceId, userId);
+    if (
+      (role === 'employee' || role === 'manager') &&
+      (currentRole === 'employee' || currentRole === 'manager')
+    ) {
+      return this.changeDepartmentMemberRole(workspaceId, userId, role);
+    }
+
     const storedRole = role === 'department_head' ? 'employee' : role;
     await this.db('workspace_members').where({ id: member.id }).update({ role: storedRole });
     await this.setDepartmentHead(workspaceId, userId, role === 'department_head');
 
     return { ...member, role };
+  }
+
+  async changeDepartmentMemberRole(
+    workspaceId: string,
+    userId: string,
+    role: 'employee' | 'manager',
+  ) {
+    const ctx = this.getContext();
+    await this.findById(workspaceId);
+    await this.departmentAccess.assertCanChangeMemberRole(workspaceId);
+
+    const member = await this.db('workspace_members')
+      .where({ workspace_id: workspaceId, user_id: userId, tenant_id: ctx.tenantId })
+      .first();
+    if (!member) throw new NotFoundException('Member not found in this department');
+
+    const targetRole = await this.departmentAccess.getRole(workspaceId, userId);
+    if (targetRole === 'admin' || targetRole === 'department_head') {
+      throw new ForbiddenException('Department heads and administrators cannot be changed here');
+    }
+    if (member.role === role) return { ...member, role };
+
+    await this.db.transaction(async (trx) => {
+      await trx('workspace_members')
+        .where({ id: member.id, tenant_id: ctx.tenantId })
+        .update({ role, updated_at: new Date() });
+      await trx('role_change_log').insert({
+        id: uuidv4(),
+        tenant_id: ctx.tenantId,
+        department_id: workspaceId,
+        user_id: userId,
+        changed_by_id: ctx.userId,
+        old_role: member.role,
+        new_role: role,
+      });
+    });
+    await this.logActivity(ctx.userId, 'workspace_member', member.id, 'department:role:changed', {
+      userId,
+      workspaceId,
+      oldRole: member.role,
+      newRole: role,
+    });
+    return { ...member, role };
+  }
+
+  async findRoleChangeLog(workspaceId: string) {
+    const ctx = this.getContext();
+    await this.findById(workspaceId);
+    await this.departmentAccess.assertCanChangeMemberRole(workspaceId);
+    return this.db('role_change_log')
+      .join({ target_user: 'users' }, 'role_change_log.user_id', 'target_user.id')
+      .leftJoin({ actor_user: 'users' }, 'role_change_log.changed_by_id', 'actor_user.id')
+      .where({
+        'role_change_log.tenant_id': ctx.tenantId,
+        'role_change_log.department_id': workspaceId,
+      })
+      .select(
+        'role_change_log.*',
+        'target_user.display_name as user_name',
+        'target_user.email as user_email',
+        'actor_user.display_name as changed_by_name',
+      )
+      .orderBy('role_change_log.changed_at', 'desc')
+      .limit(100);
   }
 
   /**

@@ -9,7 +9,12 @@ interface TaskFormProps {
   onCancel?: () => void;
   isSubmitting?: boolean;
   canSetVisibility?: boolean;
-  assignees?: Array<{ userId: string; displayName: string; email: string }>;
+  assignees?: Array<{
+    userId: string;
+    displayName: string;
+    email: string;
+    role?: 'employee' | 'manager' | 'department_head';
+  }>;
 }
 
 const statusOptions: { value: string; label: string }[] = [
@@ -39,7 +44,11 @@ export function TaskForm({
   const [description, setDescription] = useState(initialValues?.description || '');
   const [status, setStatus] = useState<string>(initialValues?.status || TASK_STATUS.TODO);
   const [priority, setPriority] = useState<string>(initialValues?.priority || TASK_PRIORITY.MEDIUM);
-  const [assigneeId, setAssigneeId] = useState(initialValues?.assigneeId || '');
+  const [assigneeIds, setAssigneeIds] = useState<string[]>(
+    initialValues?.assignees?.map((assignee) => assignee.userId) ||
+      (initialValues?.assigneeId ? [initialValues.assigneeId] : []),
+  );
+  const [assigneesChanged, setAssigneesChanged] = useState(false);
   const [estimatedHours, setEstimatedHours] = useState<number | null>(
     initialValues?.estimatedHours ?? null,
   );
@@ -59,7 +68,7 @@ export function TaskForm({
       description: description.trim() || undefined,
       status: status as Task['status'],
       priority: priority as Task['priority'],
-      assigneeId: assigneeId || undefined,
+      ...(!initialValues?.id || assigneesChanged ? { assigneeIds } : {}),
       estimatedHours: estimatedHours ?? undefined,
       startDate: startDate ? new Date(startDate).toISOString() : undefined,
       dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
@@ -187,22 +196,32 @@ export function TaskForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor="assigneeId" className="label">
-            Assignee
+          <label htmlFor="assigneeIds" className="label">
+            Assignees
           </label>
           <select
-            id="assigneeId"
+            id="assigneeIds"
             className={inputClasses}
-            value={assigneeId}
-            onChange={(event) => setAssigneeId(event.target.value)}
+            value={assigneeIds}
+            multiple
+            size={Math.min(Math.max(assignees.length, 3), 6)}
+            onChange={(event) => {
+              setAssigneeIds(
+                Array.from(event.currentTarget.selectedOptions, (option) => option.value),
+              );
+              setAssigneesChanged(true);
+            }}
           >
-            <option value="">Unassigned</option>
             {assignees.map((assignee) => (
               <option key={assignee.userId} value={assignee.userId}>
                 {assignee.displayName || assignee.email}
+                {assignee.role ? ` (${assignee.role.replace('_', ' ')})` : ''}
               </option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-slate-500">
+            Hold Ctrl (Windows) or Command (Mac) to select more than one person.
+          </p>
         </div>
 
         <div>

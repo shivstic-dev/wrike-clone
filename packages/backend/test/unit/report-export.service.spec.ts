@@ -3,7 +3,12 @@ import { ReportService, type DepartmentReport } from '../../src/reports/report.s
 
 const report: DepartmentReport = {
   generatedAt: '2026-07-27T12:00:00.000Z',
-  scope: { departmentId: 'department-1', role: 'manager', ownTasksOnly: false },
+  scope: {
+    departmentId: 'department-1',
+    role: 'manager',
+    mode: 'combined',
+    ownTasksOnly: false,
+  },
   filters: {},
   totals: { tasks: 1, completed: 0, overdue: 1, averageCompletionHours: null },
   byStatus: { todo: 1 },

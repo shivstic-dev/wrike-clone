@@ -163,6 +163,7 @@ export const createTaskSchema = z.object({
   projectId: uuidField,
   parentTaskId: uuidField.optional(),
   assigneeId: uuidField.optional(),
+  assigneeIds: z.array(uuidField).max(50).optional(),
   title: z.string().min(1).max(500),
   description: z.string().max(10000).optional(),
   status: z.nativeEnum(TaskStatus).optional(),
@@ -181,6 +182,7 @@ export const updateTaskSchema = z
     status: z.nativeEnum(TaskStatus).optional(),
     priority: z.nativeEnum(TaskPriority).optional(),
     assigneeId: uuidField.nullable().optional(),
+    assigneeIds: z.array(uuidField).max(50).optional(),
     estimatedHours: z.number().nonnegative().optional(),
     actualHours: z.number().nonnegative().optional(),
     startDate: isoDate.nullable().optional(),
@@ -319,6 +321,14 @@ export const updateWorkspaceMemberRoleSchema = z.object({
   role: z.enum(['employee', 'manager', 'department_head']),
 });
 
+export const changeDepartmentMemberRoleSchema = z.object({
+  role: z.enum(['employee', 'manager']),
+});
+
+export const addTaskAssigneeSchema = z.object({
+  userId: uuidField,
+});
+
 // ── Pagination ─────────────────────────────────────────────────
 
 export const paginationSchema = z.object({
@@ -336,7 +346,13 @@ export const departmentReportFilterSchema = z
     status: z.nativeEnum(TaskStatus).optional(),
     priority: z.nativeEnum(TaskPriority).optional(),
     assigneeId: z.string().uuid().optional(),
+    scope: z.enum(['self', 'individual', 'combined']).optional().default('self'),
+    targetUserId: z.string().uuid().optional(),
     format: z.enum(['pdf', 'xlsx']).optional(),
+  })
+  .refine((value) => value.scope !== 'individual' || !!value.targetUserId, {
+    message: 'targetUserId is required for individual reports',
+    path: ['targetUserId'],
   })
   .refine((value) => !value.dateFrom || !value.dateTo || value.dateFrom <= value.dateTo, {
     message: 'dateFrom must be before or equal to dateTo',
@@ -369,4 +385,6 @@ export type SubmitApprovalVoteInput = z.infer<typeof submitApprovalVoteSchema>;
 export type CreateWebhookInput = z.infer<typeof createWebhookSchema>;
 export type AddWorkspaceMemberInput = z.infer<typeof addWorkspaceMemberSchema>;
 export type UpdateWorkspaceMemberRoleInput = z.infer<typeof updateWorkspaceMemberRoleSchema>;
+export type ChangeDepartmentMemberRoleInput = z.infer<typeof changeDepartmentMemberRoleSchema>;
+export type AddTaskAssigneeInput = z.infer<typeof addTaskAssigneeSchema>;
 export type DepartmentReportFilterInput = z.infer<typeof departmentReportFilterSchema>;

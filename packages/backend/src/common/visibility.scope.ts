@@ -38,6 +38,92 @@ export function applyVisibilityScope(
 }
 
 /**
+ * Apply the role-aware task scope from the department RBAC model.
+ *
+ * Employees see only tasks assigned to them. Managers see their own tasks and
+ * tasks assigned to employees in departments they manage. Department heads
+ * see every task in their departments. Tenant admins bypass this helper.
+ */
+export function applyTaskAccessScope(
+  qb: Knex.QueryBuilder,
+  ctx: TenantContextData,
+): Knex.QueryBuilder {
+  if (ctx.role === 'admin') return qb;
+
+  return qb.andWhere((scope) => {
+    scope
+      .where('tasks.assignee_id', ctx.userId)
+      .orWhereExists(function () {
+        this.select(1)
+          .from('task_assignees as own_ta')
+          .whereRaw('own_ta.task_id = tasks.id')
+          .andWhere('own_ta.tenant_id', ctx.tenantId)
+          .andWhere('own_ta.user_id', ctx.userId);
+      })
+      .orWhereExists(function () {
+        this.select(1)
+          .from('department_heads as own_dh')
+          .whereRaw('own_dh.department_id = tasks.department_id')
+          .andWhere('own_dh.tenant_id', ctx.tenantId)
+          .andWhere('own_dh.user_id', ctx.userId);
+      })
+      .orWhere((managerScope) => {
+        managerScope
+          .whereExists(function () {
+            this.select(1)
+              .from('workspace_members as actor_wm')
+              .leftJoin('tenant_memberships as actor_tm', function () {
+                this.on('actor_tm.tenant_id', '=', 'actor_wm.tenant_id').andOn(
+                  'actor_tm.user_id',
+                  '=',
+                  'actor_wm.user_id',
+                );
+              })
+              .whereRaw('actor_wm.workspace_id = tasks.department_id')
+              .andWhere('actor_wm.tenant_id', ctx.tenantId)
+              .andWhere('actor_wm.user_id', ctx.userId)
+              .andWhere((role) =>
+                role.where('actor_wm.role', 'manager').orWhere('actor_tm.role', 'manager'),
+              );
+          })
+          .andWhere((employeeTask) => {
+            employeeTask
+              .where((unassigned) => {
+                unassigned.whereNull('tasks.assignee_id').whereNotExists(function () {
+                  this.select(1)
+                    .from('task_assignees as any_ta')
+                    .whereRaw('any_ta.task_id = tasks.id')
+                    .andWhere('any_ta.tenant_id', ctx.tenantId);
+                });
+              })
+              .orWhereIn('tasks.assignee_id', function () {
+                this.select('employee_wm.user_id')
+                  .from('workspace_members as employee_wm')
+                  .whereRaw('employee_wm.workspace_id = tasks.department_id')
+                  .andWhere('employee_wm.tenant_id', ctx.tenantId)
+                  .andWhere('employee_wm.role', 'employee');
+              })
+              .orWhereExists(function () {
+                this.select(1)
+                  .from('task_assignees as employee_ta')
+                  .join('workspace_members as employee_wm', function () {
+                    this.on('employee_wm.user_id', '=', 'employee_ta.user_id').andOn(
+                      'employee_wm.workspace_id',
+                      '=',
+                      'tasks.department_id',
+                    );
+                  })
+                  .whereRaw('employee_ta.task_id = tasks.id')
+                  .andWhere('employee_ta.tenant_id', ctx.tenantId)
+                  .andWhere('employee_wm.tenant_id', ctx.tenantId)
+                  .andWhere('employee_wm.role', 'employee');
+              });
+          });
+      });
+  });
+}
+
+/**
  * Apply visibility scope to tables WITHOUT a `visibility` column (folders).
  * Filters: workspace_id IN (user's workspaces) only.
  *

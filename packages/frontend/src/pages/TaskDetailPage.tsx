@@ -73,11 +73,19 @@ export default function TaskDetailPage() {
   const canSetVisibility = departmentRole === 'admin' || departmentRole === 'department_head';
   const canManage =
     membership?.role === 'admin' ||
-    membership?.role === 'manager' ||
     departmentRole === 'admin' ||
     departmentRole === 'manager' ||
     departmentRole === 'department_head';
-  const canChangeStatus = canManage || task.assigneeId === user?.id;
+  const canChangeStatus =
+    canManage ||
+    task.assigneeId === user?.id ||
+    task.assignees?.some((assignee) => assignee.userId === user?.id);
+  const assignableMembers =
+    departmentRole === 'manager'
+      ? departmentMembers.filter(
+          (member) => member.role === 'employee' || member.userId === user?.id,
+        )
+      : departmentMembers;
 
   return (
     <div className="mx-auto max-w-4xl p-6">
@@ -108,7 +116,7 @@ export default function TaskDetailPage() {
           <TaskForm
             initialValues={task}
             canSetVisibility={canSetVisibility}
-            assignees={departmentMembers}
+            assignees={assignableMembers}
             onSubmit={handleUpdateTask}
             onCancel={() => setIsEditing(false)}
           />
@@ -156,13 +164,21 @@ export default function TaskDetailPage() {
               </p>
             </div>
             <div>
-              <label className="label">Assignee</label>
-              <p className="mt-1 text-sm text-slate-600">
-                {departmentMembers.find((member) => member.userId === task.assigneeId)
-                  ?.displayName ||
-                  departmentMembers.find((member) => member.userId === task.assigneeId)?.email ||
-                  'Unassigned'}
-              </p>
+              <label className="label">Assignees</label>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {task.assignees && task.assignees.length > 0 ? (
+                  task.assignees.map((assignee) => (
+                    <span
+                      key={assignee.id || assignee.userId}
+                      className="rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700"
+                    >
+                      {assignee.displayName || assignee.email || 'Team member'}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-sm text-slate-500">Unassigned</span>
+                )}
+              </div>
             </div>
           </div>
 

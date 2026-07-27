@@ -37,7 +37,7 @@ export default function ProjectPage() {
   const createTask = useCreateTask();
   const { data: departments = [] } = useWorkspaces();
   const { data: departmentMembers = [] } = useWorkspaceMembers(project?.departmentId || '');
-  const { membership } = useAuth();
+  const { membership, user } = useAuth();
 
   if (projectLoading) {
     return <LoadingSpinner className="mt-20" size="lg" />;
@@ -68,11 +68,16 @@ export default function ProjectPage() {
   )?.departmentRole;
   const canCreate =
     membership?.role === 'admin' ||
-    membership?.role === 'manager' ||
     departmentRole === 'admin' ||
     departmentRole === 'manager' ||
     departmentRole === 'department_head';
   const canSetVisibility = departmentRole === 'admin' || departmentRole === 'department_head';
+  const assignableMembers =
+    departmentRole === 'manager'
+      ? departmentMembers.filter(
+          (member) => member.role === 'employee' || member.userId === user?.id,
+        )
+      : departmentMembers;
 
   async function handleCreateTask(values: Partial<Task> | CreateTaskRequest) {
     try {
@@ -176,7 +181,7 @@ export default function ProjectPage() {
             <h2 className="mb-4 text-lg font-semibold text-slate-900">Create task</h2>
             <TaskForm
               projectId={projectId}
-              assignees={departmentMembers}
+              assignees={assignableMembers}
               canSetVisibility={canSetVisibility}
               isSubmitting={createTask.isPending}
               onSubmit={handleCreateTask}

@@ -28,6 +28,7 @@ import {
   bulkTaskUpdateSchema,
   createDependencySchema,
   createCommentSchema,
+  addTaskAssigneeSchema,
 } from '@wrike-clone/shared';
 
 @Controller('tasks')
@@ -40,6 +41,26 @@ export class TaskController {
   async findAll(@Query() query: unknown) {
     const filter = taskFilterSchema.parse(query || {});
     return this.taskService.findAll(filter);
+  }
+
+  @Get('my')
+  @Permissions('task:read')
+  async findMy(@Query() query: unknown) {
+    const filter = taskFilterSchema.parse(query || {});
+    return this.taskService.findMyTasks(filter);
+  }
+
+  @Post(':id/assignees')
+  @Permissions('task:read')
+  async addAssignee(@Param('id') id: string, @Body() body: unknown) {
+    const input = addTaskAssigneeSchema.parse(body);
+    return this.taskService.addAssignee(id, input.userId);
+  }
+
+  @Delete(':id/assignees/:userId')
+  @Permissions('task:read')
+  async removeAssignee(@Param('id') id: string, @Param('userId') userId: string) {
+    return this.taskService.removeAssignee(id, userId);
   }
 
   @Get(':id/comments')

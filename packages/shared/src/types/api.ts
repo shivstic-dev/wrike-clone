@@ -170,6 +170,7 @@ export interface CreateTaskRequest {
   projectId: string;
   parentTaskId?: string;
   assigneeId?: string;
+  assigneeIds?: string[];
   title: string;
   description?: string;
   status?: TaskStatus;
@@ -187,6 +188,7 @@ export interface UpdateTaskRequest {
   status?: TaskStatus;
   priority?: TaskPriority;
   assigneeId?: string | null;
+  assigneeIds?: string[];
   estimatedHours?: number;
   actualHours?: number;
   startDate?: string;
@@ -206,6 +208,18 @@ export interface TaskFilterParams extends PaginationParams {
   dueDateBefore?: string;
   dueDateAfter?: string;
   folderId?: string;
+}
+
+export interface DepartmentReportFilter {
+  departmentId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  assigneeId?: string;
+  scope?: 'self' | 'individual' | 'combined';
+  targetUserId?: string;
+  format?: 'pdf' | 'xlsx';
 }
 
 export interface BulkTaskUpdateRequest {
