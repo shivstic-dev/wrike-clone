@@ -74,7 +74,9 @@ export function parseCorsOrigins(
 export function loadAppConfig(): AppConfig {
   return {
     nodeEnv: process.env['NODE_ENV'] || 'development',
-    port: parseInt(process.env['APP_PORT'] || process.env['PORT'] || '4000', 10),
+    // Hosting platforms such as Railway inject PORT for their public proxy.
+    // APP_PORT remains the local-development fallback.
+    port: parseInt(process.env['PORT'] || process.env['APP_PORT'] || '4000', 10),
     apiPrefix: process.env['API_PREFIX'] || '/api/v1',
     corsOrigins: parseCorsOrigins(),
     encryptionKey: process.env['ENCRYPTION_KEY'] || 'dev-key-change-in-prod',

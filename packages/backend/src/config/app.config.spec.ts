@@ -17,6 +17,13 @@ describe('application configuration', () => {
     ).toEqual(['https://wrike-clone-three.vercel.app', 'https://preview.example.com']);
   });
 
+  it('uses the hosting platform PORT before the local APP_PORT', () => {
+    process.env.PORT = '8080';
+    process.env.APP_PORT = '4000';
+
+    expect(loadAppConfig().port).toBe(8080);
+  });
+
   it('allows production to boot without optional SMTP and file storage integrations', () => {
     process.env = {
       NODE_ENV: 'production',

@@ -43,7 +43,7 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
 
   // Start listening
-  await app.listen(config.port);
+  await app.listen(config.port, '0.0.0.0');
   console.log(`[${config.nodeEnv}] Work Management API running on port ${config.port}`);
   console.log(`API prefix: ${config.apiPrefix}`);
 }
