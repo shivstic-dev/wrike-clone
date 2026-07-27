@@ -1,4 +1,9 @@
-import { loadAppConfig, parseCorsOrigins, validateProductionConfig } from './app.config';
+import {
+  loadAppConfig,
+  loadCorsOrigins,
+  parseCorsOrigins,
+  validateProductionConfig,
+} from './app.config';
 
 describe('application configuration', () => {
   const originalEnv = process.env;
@@ -24,6 +29,14 @@ describe('application configuration', () => {
     expect(loadAppConfig().port).toBe(8080);
   });
 
+  it('discards localhost while preserving HTTPS origins in production', () => {
+    process.env.NODE_ENV = 'production';
+
+    expect(loadCorsOrigins('https://wrike-clone-three.vercel.app,http://localhost:5173')).toEqual([
+      'https://wrike-clone-three.vercel.app',
+    ]);
+  });
+
   it('allows production to boot without optional SMTP and file storage integrations', () => {
     process.env = {
       NODE_ENV: 'production',
@@ -46,8 +59,6 @@ describe('application configuration', () => {
       DB_SSL: 'true',
     };
 
-    expect(validateProductionConfig).toThrow(
-      'CORS_ORIGINS must contain only explicit HTTPS origins',
-    );
+    expect(validateProductionConfig).toThrow('CORS_ORIGINS is required');
   });
 });

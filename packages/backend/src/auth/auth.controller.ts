@@ -18,7 +18,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { parseCorsOrigins } from '../config/app.config';
+import { loadCorsOrigins } from '../config/app.config';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -162,7 +162,7 @@ export class AuthController {
     const origin = req.headers.origin;
     if (!origin) return;
 
-    const trustedOrigins = parseCorsOrigins(process.env['CORS_ORIGINS'] || '');
+    const trustedOrigins = loadCorsOrigins(process.env['CORS_ORIGINS'] || '');
 
     if (!trustedOrigins.includes(origin)) {
       throw new ForbiddenException('Untrusted request origin');

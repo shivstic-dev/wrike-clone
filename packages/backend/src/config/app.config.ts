@@ -71,6 +71,15 @@ export function parseCorsOrigins(
     });
 }
 
+export function loadCorsOrigins(
+  rawValue = process.env['CORS_ORIGINS'] || 'http://localhost:5173',
+): string[] {
+  const origins = parseCorsOrigins(rawValue);
+  return process.env['NODE_ENV'] === 'production'
+    ? origins.filter((origin) => origin.startsWith('https://'))
+    : origins;
+}
+
 export function loadAppConfig(): AppConfig {
   return {
     nodeEnv: process.env['NODE_ENV'] || 'development',
@@ -78,7 +87,7 @@ export function loadAppConfig(): AppConfig {
     // APP_PORT remains the local-development fallback.
     port: parseInt(process.env['PORT'] || process.env['APP_PORT'] || '4000', 10),
     apiPrefix: process.env['API_PREFIX'] || '/api/v1',
-    corsOrigins: parseCorsOrigins(),
+    corsOrigins: loadCorsOrigins(),
     encryptionKey: process.env['ENCRYPTION_KEY'] || 'dev-key-change-in-prod',
     defaultTenantSlug: process.env['DEFAULT_TENANT_SLUG'] || undefined,
   };
@@ -94,7 +103,8 @@ export function validateProductionConfig(): void {
 
   const problems: string[] = [];
   const jwtSecret = process.env['JWT_SECRET'] || '';
-  const corsOrigins = parseCorsOrigins(process.env['CORS_ORIGINS'] || '');
+  const rawCorsOrigins = parseCorsOrigins(process.env['CORS_ORIGINS'] || '');
+  const corsOrigins = loadCorsOrigins(process.env['CORS_ORIGINS'] || '');
 
   if (!process.env['DATABASE_URL']) problems.push('DATABASE_URL is required');
   if (jwtSecret.length < 32) problems.push('JWT_SECRET must be at least 32 characters');
@@ -103,8 +113,8 @@ export function validateProductionConfig(): void {
   }
   if (corsOrigins.length === 0) {
     problems.push('CORS_ORIGINS is required');
-  } else if (corsOrigins.some((origin) => origin === '*' || !origin.startsWith('https://'))) {
-    problems.push('CORS_ORIGINS must contain only explicit HTTPS origins');
+  } else if (rawCorsOrigins.includes('*')) {
+    problems.push('CORS_ORIGINS must not contain a wildcard');
   }
   if (process.env['DB_APP_ROLE'] && process.env['DB_APP_ROLE'] !== 'openwork_app') {
     problems.push('DB_APP_ROLE must be set to openwork_app');
