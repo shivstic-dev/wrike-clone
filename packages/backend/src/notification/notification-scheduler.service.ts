@@ -142,7 +142,14 @@ export class NotificationSchedulerService {
       .returning('id');
     if (!claimed) return;
 
-    const appUrl = (process.env['APP_PUBLIC_URL'] || 'http://localhost:5173').replace(/\/+$/, '');
+    const appUrl = (
+      process.env['APP_PUBLIC_URL'] ||
+      process.env['CORS_ORIGINS']?.split(',')[0] ||
+      'http://localhost:5173'
+    )
+      .trim()
+      .replace(/^['"]+|['"]+$/g, '')
+      .replace(/\/+$/, '');
     const sent = await this.email.sendTaskAlert(
       task.email,
       task.title,

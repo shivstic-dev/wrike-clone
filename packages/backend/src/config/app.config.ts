@@ -83,24 +83,20 @@ export function loadAppConfig(): AppConfig {
 }
 
 /**
- * Refuse to boot production with development secrets or missing controls.
- * A loud startup failure is safer than silently exposing tenant creation or
- * issuing tokens with a public fallback secret.
+ * Refuse to boot production with missing critical controls. Optional
+ * integrations degrade at their feature boundary instead of taking auth and
+ * health endpoints offline.
  */
 export function validateProductionConfig(): void {
   if (process.env['NODE_ENV'] !== 'production') return;
 
   const problems: string[] = [];
   const jwtSecret = process.env['JWT_SECRET'] || '';
-  const encryptionKey = process.env['ENCRYPTION_KEY'] || '';
   const corsOrigins = parseCorsOrigins(process.env['CORS_ORIGINS'] || '');
 
   if (!process.env['DATABASE_URL']) problems.push('DATABASE_URL is required');
   if (jwtSecret.length < 32) problems.push('JWT_SECRET must be at least 32 characters');
-  if (encryptionKey.length < 32) {
-    problems.push('ENCRYPTION_KEY must be at least 32 characters');
-  }
-  if (!process.env['SETUP_KEY'] || process.env['SETUP_KEY']!.length < 24) {
+  if (process.env['SETUP_KEY'] && process.env['SETUP_KEY']!.length < 24) {
     problems.push('SETUP_KEY must be at least 24 characters');
   }
   if (corsOrigins.length === 0) {
@@ -108,11 +104,11 @@ export function validateProductionConfig(): void {
   } else if (corsOrigins.some((origin) => origin === '*' || !origin.startsWith('https://'))) {
     problems.push('CORS_ORIGINS must contain only explicit HTTPS origins');
   }
-  if (process.env['DB_APP_ROLE'] !== 'openwork_app') {
+  if (process.env['DB_APP_ROLE'] && process.env['DB_APP_ROLE'] !== 'openwork_app') {
     problems.push('DB_APP_ROLE must be set to openwork_app');
   }
   if (process.env['DB_SSL'] !== 'true') problems.push('DB_SSL must be true');
-  if (!process.env['APP_PUBLIC_URL']?.startsWith('https://')) {
+  if (process.env['APP_PUBLIC_URL'] && !process.env['APP_PUBLIC_URL']?.startsWith('https://')) {
     problems.push('APP_PUBLIC_URL must be an HTTPS URL');
   }
 

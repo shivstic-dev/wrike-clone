@@ -59,10 +59,8 @@ export class TenantContextInterceptor implements NestInterceptor {
 
     return from(
       this.rootDb.transaction(async (trx) => {
-        const appRole = process.env['DB_APP_ROLE'];
-        if (appRole) {
-          await trx.raw(`select set_config('role', ?, true)`, [appRole]);
-        }
+        const appRole = process.env['DB_APP_ROLE'] || 'openwork_app';
+        await trx.raw(`select set_config('role', ?, true)`, [appRole]);
         await trx.raw(`select set_config('app.current_tenant_id', ?, true)`, [
           requestContext.tenantId,
         ]);
