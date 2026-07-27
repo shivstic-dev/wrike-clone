@@ -13,6 +13,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
+import * as Sentry from '@sentry/node';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -49,6 +50,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         message = exception.message;
         code = this.statusToCode(status);
       }
+
+      // Capture 500+ errors in Sentry
+      if (status >= 500) {
+        this.captureSentry(exception, request);
+      }
     } else if (exception instanceof Error) {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
       message = 'Internal server error';
@@ -57,6 +63,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         `Unhandled exception on ${request.method} ${request.url}: ${exception.message}`,
         exception.stack,
       );
+      // Capture 500+ errors in Sentry
+      this.captureSentry(exception, request);
     } else {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
       message = 'Unknown error';
@@ -72,6 +80,28 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         ...((request as unknown as Record<string, unknown>).id ? { requestId: (request as unknown as Record<string, unknown>).id as string } : {}),
       },
     });
+  }
+
+  private captureSentry(exception: unknown, request: Request): void {
+    try {
+      Sentry.withScope((scope) => {
+        scope.setTag('status', '500');
+        scope.setExtra('url', request.url);
+        scope.setExtra('method', request.method);
+        scope.setExtra('headers', {
+          'content-type': request.headers['content-type'],
+          'user-agent': request.headers['user-agent'],
+        });
+
+        if (exception instanceof Error) {
+          Sentry.captureException(exception);
+        } else {
+          Sentry.captureMessage(`Non-Error exception: ${String(exception)}`, 'error');
+        }
+      });
+    } catch (err) {
+      this.logger.warn(`Failed to send error to Sentry: ${(err as Error).message}`);
+    }
   }
 
   private statusToCode(status: number): string {

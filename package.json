@@ -23,11 +23,15 @@
   },
   "devDependencies": {
     "prettier": "^3.4.0",
-    "typescript": "^5.7.0",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
   },
   "engines": {
     "node": ">=22.0.0",
     "npm": ">=10.0.0"
+  },
+  "dependencies": {
+    "@sentry/node": "^10.68.0",
+    "@sentry/react": "^10.68.0"
   }
 }

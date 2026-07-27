@@ -52,7 +52,8 @@
     "@apollo/server": "^4.11.0",
     "bcrypt": "^5.1.1",
     "typescript": "^5.7.0",
-    "@nestjs/cli": "^11.0.0"
+    "@nestjs/cli": "^11.0.0",
+    "@sentry/node": "^8.0.0"
   },
   "devDependencies": {
     "@nestjs/testing": "^11.0.0",

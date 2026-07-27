@@ -6,9 +6,13 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { loadAppConfig } from './config/app.config';
+import { initSentry } from './common/sentry';
 import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
+
+// Initialize Sentry error monitoring (must be before any other imports)
+initSentry();
 
 async function bootstrap(): Promise<void> {
   const config = loadAppConfig();
