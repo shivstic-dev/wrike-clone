@@ -1,7 +1,7 @@
 # Operations Atlas Continuation Handoff
 
-**Status date:** 2026-07-28  
-**Completed branch:** `codex/operations-atlas`  
+**Status date:** 2026-07-28
+**Completed branch:** `codex/operations-atlas`
 **Production merge target:** `main`
 
 ## Outcome Already Completed
