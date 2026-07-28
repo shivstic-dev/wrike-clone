@@ -336,10 +336,24 @@ export class ReportService {
     }, {});
   }
 
+  private reportMetadataRows(report: DepartmentReport): Array<[string, string]> {
+    return [
+      ['Scope', report.scope.mode],
+      ['Role', report.scope.role],
+      ['Department', report.scope.departmentId || 'All departments'],
+      ['Created from', report.filters.dateFrom || 'Any'],
+      ['Created to', report.filters.dateTo || 'Any'],
+      ['Status filter', report.filters.status || 'All'],
+      ['Priority filter', report.filters.priority || 'All'],
+      ['Assignee filter', report.filters.assigneeId || 'All'],
+    ];
+  }
+
   private async toXlsx(report: DepartmentReport): Promise<Buffer> {
-    const summary = [
+    const summary: Array<Array<string | number>> = [
       ['Metric', 'Value'],
       ['Generated at', report.generatedAt],
+      ...this.reportMetadataRows(report),
       ['Total tasks', report.totals.tasks],
       ['Completed', report.totals.completed],
       ['Overdue', report.totals.overdue],
@@ -507,6 +521,11 @@ export class ReportService {
         .fillColor('#64748b')
         .text(`Generated ${report.generatedAt}`);
       document.moveDown().fillColor('#0f172a').fontSize(12);
+      for (const [label, value] of this.reportMetadataRows(report)) {
+        document.font('Helvetica-Bold').text(`${label}: `, { continued: true });
+        document.font('Helvetica').text(value);
+      }
+      document.moveDown(0.5);
       document.text(`Total: ${report.totals.tasks}`);
       document.text(`Completed: ${report.totals.completed}`);
       document.text(`Overdue: ${report.totals.overdue}`);
