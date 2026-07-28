@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   help: false,
   logout: vi.fn(),
   mobile: false,
+  path: '/workspaces/department-1',
   role: 'employee',
   workspacesPending: false,
 }));
@@ -51,13 +52,14 @@ let root: Root | undefined;
 
 function shell(helpContent?: ReactNode) {
   return (
-    <MemoryRouter initialEntries={['/workspaces/department-1']}>
+    <MemoryRouter initialEntries={[mocks.path]}>
       <Routes>
         <Route
           element={<AppShell helpContent={helpContent} />}
           path="/"
         >
           <Route path="workspaces/:workspaceId" element={<p>Workspace content</p>} />
+          <Route path="dashboard" element={<p>Dashboard content</p>} />
           <Route path="my-tasks" element={<p>My work content</p>} />
         </Route>
       </Routes>
@@ -87,6 +89,7 @@ beforeEach(() => {
   mocks.help = false;
   mocks.logout.mockReset();
   mocks.mobile = false;
+  mocks.path = '/workspaces/department-1';
   mocks.role = 'employee';
   mocks.workspacesPending = false;
   document.body.innerHTML = '';
@@ -124,6 +127,17 @@ describe('AppShell', () => {
     );
     expect(container.textContent).toContain('Active department');
     expect(container.textContent).toContain('Workspace content');
+  });
+
+  it('marks only Departments active at the department dashboard anchor', () => {
+    mocks.path = '/dashboard#departments';
+    renderShell();
+
+    expect(
+      Array.from(container.querySelectorAll<HTMLAnchorElement>('a[aria-current="page"]')).map(
+        (link) => link.getAttribute('href'),
+      ),
+    ).toEqual(['/dashboard#departments']);
   });
 
   it('shows administration and task creation for an admin', () => {
@@ -172,13 +186,115 @@ describe('AppShell', () => {
     if (!accountTrigger) throw new Error('Account trigger was not rendered');
 
     act(() => accountTrigger.click());
+    expect(accountTrigger.getAttribute('aria-controls')).toBe('account-disclosure');
+    const disclosure = container.querySelector<HTMLElement>('#account-disclosure');
+    if (!disclosure) throw new Error('Account disclosure was not rendered');
+    expect(disclosure.getAttribute('role')).toBeNull();
+    expect(
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Close account menu"]')
+        ?.getAttribute('tabindex'),
+    ).toBe('-1');
     const signOut = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
       (button) => button.textContent?.includes('Sign out'),
     );
     if (!signOut) throw new Error('Sign out action was not rendered');
+    expect(signOut.getAttribute('role')).toBeNull();
 
     act(() => signOut.click());
     expect(mocks.logout).toHaveBeenCalledOnce();
+  });
+
+  it('closes the account disclosure on Escape and restores its trigger', () => {
+    renderShell();
+    const accountTrigger = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Open account menu"]',
+    );
+    if (!accountTrigger) throw new Error('Account trigger was not rendered');
+
+    act(() => accountTrigger.click());
+    const signOut = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent?.includes('Sign out'),
+    );
+    if (!signOut) throw new Error('Sign out action was not rendered');
+    signOut.focus();
+
+    act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    expect(accountTrigger.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('#account-disclosure')).toBeNull();
+    expect(document.activeElement).toBe(accountTrigger);
+  });
+
+  it('moves focus into the mobile navigation when it opens', () => {
+    mocks.mobile = true;
+    renderShell();
+    const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Open navigation"]');
+    if (!trigger) throw new Error('Mobile navigation trigger was not rendered');
+
+    act(() => trigger.click());
+    const dialog = container.querySelector<HTMLElement>('[role="dialog"][aria-label="Navigation"]');
+    const closeButton = dialog?.querySelector<HTMLButtonElement>(
+      'button[aria-label="Close navigation"]',
+    );
+    if (!closeButton) throw new Error('Navigation close button was not rendered');
+
+    expect(document.activeElement).toBe(closeButton);
+  });
+
+  it('contains forward and reverse Tab navigation inside the mobile drawer', () => {
+    mocks.mobile = true;
+    renderShell();
+    const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Open navigation"]');
+    if (!trigger) throw new Error('Mobile navigation trigger was not rendered');
+    act(() => trigger.click());
+
+    const dialog = container.querySelector<HTMLElement>('[role="dialog"][aria-label="Navigation"]');
+    const closeButton = dialog?.querySelector<HTMLButtonElement>(
+      'button[aria-label="Close navigation"]',
+    );
+    const links = dialog?.querySelectorAll<HTMLAnchorElement>('a[href]');
+    const lastLink = links?.item((links?.length ?? 0) - 1);
+    if (!closeButton || !lastLink) throw new Error('Navigation focus targets were not rendered');
+
+    act(() => {
+      closeButton.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          key: 'Tab',
+          shiftKey: true,
+        }),
+      );
+    });
+    expect(document.activeElement).toBe(lastLink);
+
+    act(() => {
+      lastLink.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          key: 'Tab',
+        }),
+      );
+    });
+    expect(document.activeElement).toBe(closeButton);
+  });
+
+  it('restores the mobile trigger when the close button dismisses the drawer', () => {
+    mocks.mobile = true;
+    renderShell();
+    const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Open navigation"]');
+    if (!trigger) throw new Error('Mobile navigation trigger was not rendered');
+    act(() => trigger.click());
+
+    const closeButton = container.querySelector<HTMLButtonElement>(
+      '[role="dialog"] button[aria-label="Close navigation"]',
+    );
+    if (!closeButton) throw new Error('Navigation close button was not rendered');
+    act(() => closeButton.click());
+
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
   });
 
   it('opens and closes the mobile navigation with accessible state', () => {
@@ -207,6 +323,7 @@ describe('AppShell', () => {
     act(() => myWork.click());
 
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
     expect(container.textContent).toContain('My work content');
   });
 });

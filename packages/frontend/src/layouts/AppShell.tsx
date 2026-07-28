@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   type RefObject,
 } from 'react';
@@ -128,7 +129,7 @@ function PrimaryNavigation({
   const activeDepartment = workspaces.find(({ id }) => id === activeDepartmentId);
   const itemIsActive = (item: NavigationItem) => {
     const [path, hash] = item.path.split('#');
-    return currentPath === path && (!hash || currentHash === `#${hash}`);
+    return currentPath === path && (hash ? currentHash === `#${hash}` : currentHash === '');
   };
 
   return (
@@ -236,8 +237,8 @@ function AccountMenu({
   return (
     <div className="relative">
       <button
+        aria-controls="account-disclosure"
         aria-expanded={open}
-        aria-haspopup="menu"
         aria-label="Open account menu"
         className="flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-atlas-ink transition-colors hover:bg-atlas-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
         onClick={() => setOpen((current) => !current)}
@@ -256,11 +257,12 @@ function AccountMenu({
             aria-label="Close account menu"
             className="fixed inset-0 z-20 cursor-default"
             onClick={() => setOpen(false)}
+            tabIndex={-1}
             type="button"
           />
           <div
             className="absolute right-0 z-30 mt-2 w-64 overflow-hidden rounded-xl border border-atlas-mist bg-white shadow-xl"
-            role="menu"
+            id="account-disclosure"
           >
             <div className="border-b border-atlas-mist px-4 py-3">
               <p className="truncate font-atlasDisplay text-sm font-semibold text-atlas-ink">
@@ -276,7 +278,6 @@ function AccountMenu({
                 setOpen(false);
                 onLogout();
               }}
-              role="menuitem"
               type="button"
             >
               Sign out
@@ -395,7 +396,35 @@ function MobileNavigationSheet({
   open,
   workspaces,
 }: MobileNavigationSheetProps) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const sheetRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (open) closeButtonRef.current?.focus();
+  }, [open]);
+
   if (!open) return null;
+
+  const containFocus = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'Tab' || !sheetRef.current) return;
+
+    const focusableElements = Array.from(
+      sheetRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    const firstFocusable = focusableElements[0];
+    const lastFocusable = focusableElements.at(-1);
+    if (!firstFocusable || !lastFocusable) return;
+
+    if (event.shiftKey && document.activeElement === firstFocusable) {
+      event.preventDefault();
+      lastFocusable.focus();
+    } else if (!event.shiftKey && document.activeElement === lastFocusable) {
+      event.preventDefault();
+      firstFocusable.focus();
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-40 md:hidden">
@@ -403,6 +432,7 @@ function MobileNavigationSheet({
         aria-label="Close navigation"
         className="absolute inset-0 bg-atlas-canopy/45 backdrop-blur-[1px]"
         onClick={onClose}
+        tabIndex={-1}
         type="button"
       />
       <aside
@@ -410,6 +440,8 @@ function MobileNavigationSheet({
         aria-modal="true"
         className="relative flex h-full w-[min(20rem,88vw)] flex-col bg-white shadow-2xl"
         id="mobile-navigation"
+        onKeyDown={containFocus}
+        ref={sheetRef}
         role="dialog"
       >
         <div className="flex min-h-16 items-center justify-between border-b border-atlas-mist px-5">
@@ -418,6 +450,7 @@ function MobileNavigationSheet({
             aria-label="Close navigation"
             className="flex h-10 w-10 items-center justify-center rounded-lg text-atlas-canopy hover:bg-atlas-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-atlas-current"
             onClick={onClose}
+            ref={closeButtonRef}
             type="button"
           >
             <span aria-hidden="true" className="text-xl leading-none">
@@ -458,7 +491,10 @@ export default function AppShell({ helpContent }: AppShellProps) {
     creatableDepartments,
   );
 
-  const closeMobileNavigation = useCallback(() => setMobileNavigationOpen(false), []);
+  const closeMobileNavigation = useCallback(() => {
+    setMobileNavigationOpen(false);
+    navigationTriggerRef.current?.focus();
+  }, []);
   const closeQuickTask = useCallback(() => setQuickTaskOpen(false), []);
 
   useEffect(() => {
@@ -471,15 +507,14 @@ export default function AppShell({ helpContent }: AppShellProps) {
     document.body.style.overflow = 'hidden';
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      setMobileNavigationOpen(false);
-      navigationTriggerRef.current?.focus();
+      closeMobileNavigation();
     };
     document.addEventListener('keydown', closeOnEscape);
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', closeOnEscape);
     };
-  }, [mobileNavigationOpen]);
+  }, [closeMobileNavigation, mobileNavigationOpen]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-atlas-paper text-atlas-ink">
