@@ -1,37 +1,57 @@
 # Operations Atlas Continuation Handoff
 
-**Status date:** 2026-07-28
-**Completed branch:** `codex/operations-atlas`
+**Status date:** 2026-07-29
+**Completed branch:** `codex/operations-atlas-dashboard`
 **Production merge target:** `main`
 
-## Outcome Already Completed
+## Completed and Verified
 
-The following work is committed, tested, and passed task-scoped implementation and review gates:
-
-1. Operations Atlas local fonts and visual tokens.
-2. Accessible shared UI primitives.
-3. Typed role-aware navigation.
-4. Responsive `AppShell` with:
+1. Operations Atlas local fonts, semantic tokens, and accessible UI primitives.
+2. Typed role-aware navigation and responsive `AppShell`:
    - desktop sidebar and mobile navigation sheet;
    - keyboard focus containment/restoration;
    - account disclosure;
    - role-safe Create Task visibility;
-   - department links;
-   - optional Help slot.
-5. Redesigned OpenWork Hub login and required-password screens.
-6. Shared 30-day dashboard API contract and validation.
-7. Deterministic dashboard metric builder.
-8. Additive Supabase/Postgres analytics indexes plus safe Knex wrapper.
-9. Tenant- and role-scoped `GET /dashboard/overview` API with:
+   - department links and optional Help slot.
+3. Redesigned OpenWork Hub login and required-password screens.
+4. Shared 30-day dashboard API contract and validation.
+5. Deterministic dashboard metric builder.
+6. Additive Supabase/Postgres analytics indexes and safe Knex wrapper.
+7. Tenant- and role-scoped `GET /dashboard/overview` API:
    - employee, manager, department-head, and admin scopes;
    - current-tenant and soft-delete filtering;
    - legacy/junction assignee deduplication;
    - admin-only department comparison;
    - explicit admin department validation;
    - invalid query responses mapped to HTTP 400.
+8. Accessible live-data dashboard charts:
+   - stable React Query key and optional department scope;
+   - React 19-compatible Recharts setup;
+   - chart and tooltip animation disabled;
+   - exact-value table disclosures;
+   - honest empty states and generated timestamps;
+   - live 30-day created/completed, status, and priority data.
+9. Four role-aware Operations Atlas dashboard compositions:
+   - employee My workload view without task-creation controls;
+   - manager own work, open-task capacity, and unassigned work;
+   - department-head manager/employee lanes and access history;
+   - admin tenant-wide department comparison and setup signals.
+10. The old generic dashboard was replaced by the approved composition:
+    department pulse strip, work movement, attention queue, capacity, and
+    role-specific guidance.
+11. Admin opens on **All departments**. Non-admin viewers open on their first
+    available department. Dashboard composition comes only from the
+    server-returned `overview.scope.role`.
+12. Overview failure remains local. Existing grouped/personal task links,
+    department selection, role controls, and audited role history remain
+    independently usable.
 
 Key completed commits, newest first:
 
+- `8bdb2b5` fix: keep dashboard loading states honest
+- `120a25f` feat: build role-aware Operations Atlas dashboard
+- `a8a2e15` feat: add accessible dashboard charts
+- `9635641` fix: ship dashboard shared contract artifacts
 - `983d246` fix: validate dashboard scope and query input
 - `9bb5a45` feat: add role-scoped dashboard overview API
 - `c8d1891` test: reject task mutations in analytics migration
@@ -48,55 +68,18 @@ Key completed commits, newest first:
 - `ffb0c11`, `7fb62c7`, `a7346b9` accessible UI primitives
 - `d32b7b5`, `00b5d22` Atlas fonts and tokens
 
-## Important Incomplete Work Preserved Locally
+## Archived Interrupted Worktree
 
-Dashboard Task 5 was interrupted before verification/commit. Its working files remain only in:
+The original interrupted dashboard work still exists at:
 
 `D:\wrike-clone\.worktrees\operations-atlas`
 
-Dirty files:
-
-- `package-lock.json`
-- `packages/frontend/package.json`
-- `packages/frontend/src/api/dashboard.ts`
-- `packages/frontend/src/api/dashboard.spec.ts`
-- `packages/frontend/src/components/Dashboard/`
-
-Do not assume these files are correct. Continue with TDD, inspect the diff, finish tests, review, then commit. They are intentionally not part of the production merge described above.
+It is stale recovery material only. Do not copy or merge it. The verified
+implementation is on `codex/operations-atlas-dashboard`.
 
 ## Exact Continuation Order
 
-### 1. Finish Dashboard Task 5
-
-Source plan:
-
-`docs/superpowers/plans/2026-07-28-operations-atlas-dashboards.md`
-
-Complete “Task 5: Add Frontend Dashboard API and Accessible Charts”:
-
-- stable `dashboardKeys.overview(filters)`;
-- `useDashboardOverview(filters, enabled)`;
-- Recharts with Atlas semantic colors;
-- no gradients or delayed metric animation;
-- readable empty states;
-- chart title, period/scope description, generated time;
-- keyboard-openable visible data-table fallback with exact values;
-- focused API/chart tests;
-- frontend typecheck, lint, build, full frontend tests;
-- task-scoped spec and quality review.
-
-### 2. Implement Dashboard Task 6
-
-Compose the four real-data role dashboards and replace the old generic dashboard:
-
-- employee: My workload, due/overdue, personal trend; never Create Task;
-- manager: own workload, employee capacity, unassigned work;
-- department head: manager/employee sections and role-change information;
-- admin: organization pulse, department comparison, setup health;
-- preserve department selector, grouped tasks, task links, and local error boundaries;
-- lazy-load chart modules here.
-
-### 3. Execute the Onboarding Plan
+### 1. Execute the Onboarding Plan
 
 Plan:
 
@@ -112,7 +95,7 @@ Implement all five tasks in order:
 
 Employee onboarding must not show task-creation steps.
 
-### 4. Execute Page Redesign and Hardening
+### 2. Execute Page Redesign and Hardening
 
 Plan:
 
@@ -123,11 +106,11 @@ Implement all six tasks:
 1. My Work;
 2. department/project pages;
 3. task detail;
-4. visual reports using the existing real report/export data;
+4. visual reports using existing real report/export data;
 5. admin/setup health;
 6. accessibility, responsive, browser, and release gates.
 
-### 5. Final Verification and Release
+### 3. Final Verification and Release
 
 Run:
 
@@ -143,36 +126,54 @@ git diff --check
 Then perform authenticated browser checks for:
 
 - login and required password change;
-- mobile/desktop shell;
+- mobile and desktop shell;
 - Quick Task creation and assignee retention;
-- all four dashboard roles;
+- employee, manager, department-head, and admin dashboards;
+- overview failure while task lanes remain usable;
 - report data and PDF/XLSX export;
 - tenant/department access rejection;
 - keyboard navigation and reduced motion.
 
-Run one final whole-branch code/security review before merging.
+Run a final whole-branch code/security review before release.
+
+## Latest Dashboard Verification
+
+Dashboard Tasks 5-6 passed:
+
+- chart/API tests: 12 tests;
+- final role/page dashboard tests: 15 tests;
+- full frontend tests: 23 files, 149 tests;
+- full backend tests: 26 suites, 180 tests;
+- root typecheck, lint, build, and `git diff --check`.
+
+The local browser check confirmed the redesigned authentication screen loads.
+The dashboard still needs an authenticated production browser check for all
+four roles after Vercel deploys the `main` push.
 
 ## Database and Deployment Notes
 
-- Supabase analytics migration exists at:
+- Supabase analytics migration:
   `supabase/migrations/20260728183000_operations_atlas_analytics.sql`
 - Knex wrapper:
   `packages/backend/src/migrations/018_operations_atlas_analytics.ts`
-- The migration is additive only and was **not manually applied to live Supabase** during development.
+- The migration is additive only and was not manually applied to live Supabase
+  during development.
 - Confirm Railway startup migration logs after deployment.
-- Vercel frontend and Railway backend should redeploy from `main`.
-- Production URLs:
-  - Frontend: `https://wrike-clone-three.vercel.app`
-  - API: `https://wrike-clone-production-9894.up.railway.app/api/v1`
+- Vercel frontend and Railway backend redeploy from `main`.
+- Production frontend:
+  `https://wrike-clone-three.vercel.app`
+- Production API:
+  `https://wrike-clone-production-9894.up.railway.app/api/v1`
 
 ## Non-Negotiable Rules
 
 - Keep product name `OpenWork Hub`.
-- Preserve tenant isolation, existing RBAC, routes, auth, Quick Task behavior, and report exports.
+- Preserve tenant isolation, RBAC, routes, auth, Quick Task behavior, and report
+  exports.
 - Use only live permitted data; never add fake dashboard values.
 - Dashboard window remains exactly 30 UTC calendar days.
 - Use `completed_at` for completion trends and `created_at` for creation trends.
 - Employee never receives create controls or creation onboarding.
-- Every graph includes a readable summary and exact table/list fallback.
+- Every graph needs a readable summary and exact table/list fallback.
 - Keep mobile workflows complete and meet WCAG 2.2 AA.
 - Do not activate dormant modules or add paid services.
