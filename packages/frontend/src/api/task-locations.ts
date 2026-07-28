@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MoveTaskLocationRequest, Task, TaskLocationOption } from '@wrike-clone/shared';
 import apiClient from './client';
-import { taskKeys } from './tasks';
-import { folderKeys, workspaceKeys } from './workspaces';
+import { invalidateTaskDependentQueries, taskKeys } from './tasks';
 
 export function useTaskLocations(departmentId: string) {
   return useQuery({
@@ -30,10 +29,7 @@ export function useMoveTaskLocation() {
     },
     onSuccess: (task) => {
       queryClient.setQueryData(taskKeys.detail(task.id), task);
-      queryClient.invalidateQueries({ queryKey: taskKeys.all });
-      queryClient.invalidateQueries({ queryKey: ['reports'] });
-      queryClient.invalidateQueries({ queryKey: folderKeys.all });
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
+      invalidateTaskDependentQueries(queryClient);
     },
   });
 }

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { QueryClient } from '@tanstack/react-query';
 import { TaskPriority, TaskStatus } from '@wrike-clone/shared';
-import { buildTaskSearchParams, taskKeys } from './tasks';
+import {
+  buildTaskSearchParams,
+  invalidateTaskDependentQueries,
+  taskDependentQueryKeys,
+  taskKeys,
+} from './tasks';
 
 describe('task API contract helpers', () => {
   it('uses the canonical home folder when requesting folder tasks', () => {
@@ -43,5 +49,27 @@ describe('task API contract helpers', () => {
     expect(taskKeys.detail('task-1')).toEqual(['tasks', 'detail', 'task-1']);
     expect(taskKeys.mine({ perPage: 100 })).toEqual(['tasks', 'mine', { perPage: 100 }]);
     expect(taskKeys.grouped('department-1')).toEqual(['tasks', 'grouped', 'department-1']);
+  });
+
+  it('defines every task-dependent server-state root', () => {
+    expect(taskDependentQueryKeys).toEqual([
+      ['tasks'],
+      ['reports'],
+      ['workspaces'],
+      ['folders'],
+    ]);
+  });
+
+  it('invalidates every task-dependent cached query', async () => {
+    const queryClient = new QueryClient();
+    for (const queryKey of taskDependentQueryKeys) {
+      queryClient.setQueryData([...queryKey, 'cached'], { current: false });
+    }
+
+    await invalidateTaskDependentQueries(queryClient);
+
+    for (const queryKey of taskDependentQueryKeys) {
+      expect(queryClient.getQueryState([...queryKey, 'cached'])?.isInvalidated).toBe(true);
+    }
   });
 });

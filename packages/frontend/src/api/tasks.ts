@@ -1,6 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import apiClient from './client';
-import { folderKeys, workspaceKeys } from './workspaces';
 import type {
   Task,
   TaskFilterParams,
@@ -19,6 +23,19 @@ export const taskKeys = {
   mine: (filters: TaskFilterParams) => [...taskKeys.all, 'mine', filters] as const,
   grouped: (departmentId: string) => [...taskKeys.all, 'grouped', departmentId] as const,
 };
+
+export const taskDependentQueryKeys = [
+  ['tasks'],
+  ['reports'],
+  ['workspaces'],
+  ['folders'],
+] as const;
+
+export function invalidateTaskDependentQueries(queryClient: QueryClient): void {
+  for (const queryKey of taskDependentQueryKeys) {
+    queryClient.invalidateQueries({ queryKey });
+  }
+}
 
 export interface DepartmentTaskGroup {
   user: {
@@ -106,7 +123,7 @@ export function useAddTaskAssignee() {
       return data;
     },
     onSuccess: (task) => {
-      queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      invalidateTaskDependentQueries(queryClient);
       queryClient.setQueryData(taskKeys.detail(task.id), task);
     },
   });
@@ -120,7 +137,7 @@ export function useRemoveTaskAssignee() {
       return data;
     },
     onSuccess: (task) => {
-      queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      invalidateTaskDependentQueries(queryClient);
       queryClient.setQueryData(taskKeys.detail(task.id), task);
     },
   });
@@ -148,10 +165,7 @@ export function useCreateTask() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: taskKeys.all });
-      queryClient.invalidateQueries({ queryKey: ['reports'] });
-      queryClient.invalidateQueries({ queryKey: folderKeys.all });
-      queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
+      invalidateTaskDependentQueries(queryClient);
     },
   });
 }
@@ -165,7 +179,7 @@ export function useUpdateTask() {
       return data;
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
+      invalidateTaskDependentQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(result.id) });
     },
   });
@@ -179,7 +193,7 @@ export function useDeleteTask() {
       await apiClient.delete(`/tasks/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
+      invalidateTaskDependentQueries(queryClient);
     },
   });
 }
