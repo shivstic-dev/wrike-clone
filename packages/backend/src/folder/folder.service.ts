@@ -2,7 +2,7 @@
  * Folder service — recursive hierarchy (Spaces > Folders > Projects container).
  */
 
-import { Injectable, NotFoundException, Inject, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject, Logger } from '@nestjs/common';
 import { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
 import { DATABASE_PROVIDER } from '../database/database.module';
@@ -70,7 +70,10 @@ export class FolderService {
 
   async update(id: string, input: UpdateFolderRequest) {
     const ctx = requireTenantContext();
-    await this.findById(id);
+    const existing = await this.findById(id);
+    if (existing.is_system_general) {
+      throw new ForbiddenException('The General folder is managed by the system');
+    }
     const updates: Record<string, unknown> = {};
     if (input.name !== undefined) updates['name'] = input.name;
     if (input.description !== undefined) updates['description'] = input.description;
@@ -86,7 +89,10 @@ export class FolderService {
 
   async remove(id: string): Promise<void> {
     const ctx = requireTenantContext();
-    await this.findById(id);
+    const existing = await this.findById(id);
+    if (existing.is_system_general) {
+      throw new ForbiddenException('The General folder is managed by the system');
+    }
     await this.db('folders')
       .where({ id, tenant_id: ctx.tenantId })
       .update({ deleted_at: new Date() });

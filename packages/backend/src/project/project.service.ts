@@ -2,7 +2,7 @@
  * Project service — manages projects within folders.
  */
 
-import { Injectable, NotFoundException, Inject, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject, Logger } from '@nestjs/common';
 import { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
 import { DATABASE_PROVIDER } from '../database/database.module';
@@ -32,7 +32,8 @@ export class ProjectService {
 
     let query = this.db('projects')
       .where('projects.tenant_id', ctx.tenantId)
-      .whereNull('projects.deleted_at');
+      .whereNull('projects.deleted_at')
+      .where('projects.is_system', false);
 
     // Apply visibility scope
     query = query.leftJoin('folders', 'projects.folder_id', 'folders.id').select('projects.*'); // re-select after join
@@ -59,7 +60,7 @@ export class ProjectService {
     };
   }
 
-  async findById(id: string) {
+  async findById(id: string, options: { includeSystem?: boolean } = {}) {
     const ctx = requireTenantContext();
     const project = await this.db('projects')
       .leftJoin('folders', 'projects.folder_id', 'folders.id')
@@ -68,8 +69,10 @@ export class ProjectService {
       .whereNull('projects.deleted_at')
       .select('projects.*', 'folders.workspace_id as department_id')
       .modify((qb: any) => {
-        if (ctx.role !== 'admin')
+        if (!options.includeSystem) qb.where('projects.is_system', false);
+        if (ctx.role !== 'admin') {
           applyVisibilityScope(qb, ctx, 'folders.workspace_id', 'projects.visibility');
+        }
       })
       .first();
 
@@ -115,7 +118,10 @@ export class ProjectService {
 
   async update(id: string, input: UpdateProjectRequest) {
     const ctx = requireTenantContext();
-    await this.findById(id);
+    const existing = await this.findById(id, { includeSystem: true });
+    if (existing.is_system) {
+      throw new ForbiddenException('System projects are managed automatically');
+    }
     const updates: Record<string, unknown> = {};
     if (input.name !== undefined) updates['name'] = input.name;
     if (input.description !== undefined) updates['description'] = input.description;
@@ -137,7 +143,10 @@ export class ProjectService {
 
   async remove(id: string): Promise<void> {
     const ctx = requireTenantContext();
-    await this.findById(id);
+    const existing = await this.findById(id, { includeSystem: true });
+    if (existing.is_system) {
+      throw new ForbiddenException('System projects are managed automatically');
+    }
     await this.db('projects')
       .where({ id, tenant_id: ctx.tenantId })
       .update({ deleted_at: new Date() });
