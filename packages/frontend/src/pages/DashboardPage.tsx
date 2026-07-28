@@ -319,46 +319,78 @@ export default function DashboardPage() {
                 </p>
               </header>
 
-              <div className="divide-y divide-atlas-mist">
-                {(members.data || []).map((member) => (
-                  <div key={member.userId} className="flex items-center gap-3 px-5 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-atlas-ink">
-                        {member.displayName || member.email}
-                      </p>
-                      <p className="text-xs text-slate-500">{member.email}</p>
+              {members.isLoading ? (
+                <div className="px-5 py-8 text-center">
+                  <LoadingSpinner className="py-2" size="sm" />
+                  <p className="mt-2 text-sm text-slate-600">Loading team roles…</p>
+                </div>
+              ) : members.error ? (
+                <ErrorDisplay
+                  className="rounded-none border-0 shadow-none"
+                  title="Team roles are unavailable"
+                  message="The member list could not be loaded."
+                  onRetry={() => void members.refetch()}
+                />
+              ) : (members.data || []).length === 0 ? (
+                <p className="px-5 py-8 text-sm text-slate-600">
+                  No department members are available.
+                </p>
+              ) : (
+                <div className="divide-y divide-atlas-mist">
+                  {members.data!.map((member) => (
+                    <div key={member.userId} className="flex items-center gap-3 px-5 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-atlas-ink">
+                          {member.displayName || member.email}
+                        </p>
+                        <p className="text-xs text-slate-500">{member.email}</p>
+                      </div>
+                      {member.role === 'department_head' ? (
+                        <span className="text-xs font-semibold text-atlas-current">
+                          Department head
+                        </span>
+                      ) : (
+                        <select
+                          aria-label={`Role for ${member.displayName || member.email}`}
+                          className="w-36 rounded-lg border-atlas-mist text-sm focus:border-atlas-current focus:ring-atlas-current"
+                          value={member.role}
+                          disabled={changeRole.isPending}
+                          onChange={(event) =>
+                            updateRole(
+                              member.userId,
+                              member.role as 'employee' | 'manager',
+                              event.target.value as 'employee' | 'manager',
+                            )
+                          }
+                        >
+                          <option value="employee">Employee</option>
+                          <option value="manager">Manager</option>
+                        </select>
+                      )}
                     </div>
-                    {member.role === 'department_head' ? (
-                      <span className="text-xs font-semibold text-atlas-current">
-                        Department head
-                      </span>
-                    ) : (
-                      <select
-                        aria-label={`Role for ${member.displayName || member.email}`}
-                        className="w-36 rounded-lg border-atlas-mist text-sm focus:border-atlas-current focus:ring-atlas-current"
-                        value={member.role}
-                        disabled={changeRole.isPending}
-                        onChange={(event) =>
-                          updateRole(
-                            member.userId,
-                            member.role as 'employee' | 'manager',
-                            event.target.value as 'employee' | 'manager',
-                          )
-                        }
-                      >
-                        <option value="employee">Employee</option>
-                        <option value="manager">Manager</option>
-                      </select>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               <div className="border-t border-atlas-mist bg-atlas-paper px-5 py-4">
                 <h3 className="font-atlasMono text-xs font-medium uppercase tracking-[0.1em] text-atlas-current">
                   Recent role changes
                 </h3>
-                {(changes.data || []).length === 0 ? (
+                {changes.isLoading ? (
+                  <div className="py-4 text-center">
+                    <LoadingSpinner className="py-1" size="sm" />
+                    <p className="mt-2 text-xs text-slate-600">
+                      Loading role-change history…
+                    </p>
+                  </div>
+                ) : changes.error ? (
+                  <ErrorDisplay
+                    className="mt-3 border-rose-200 px-4 py-6 shadow-none"
+                    title="Role-change history is unavailable"
+                    message="The audit trail could not be loaded."
+                    onRetry={() => void changes.refetch()}
+                  />
+                ) : (changes.data || []).length === 0 ? (
                   <p className="mt-2 text-xs text-slate-600">
                     No recent role changes are recorded.
                   </p>

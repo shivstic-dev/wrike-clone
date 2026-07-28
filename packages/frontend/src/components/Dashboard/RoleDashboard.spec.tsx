@@ -87,13 +87,16 @@ let container: HTMLDivElement;
 let root: Root | undefined;
 const retryOverview = vi.fn();
 
-async function renderDashboard(value: DashboardOverview): Promise<void> {
+async function renderDashboard(
+  value: DashboardOverview,
+  groupedValue: GroupedDepartmentTasks | null = grouped,
+): Promise<void> {
   await act(async () => {
     root = createRoot(container);
     root.render(
       <RoleDashboard
         overview={value}
-        grouped={grouped}
+        grouped={groupedValue ?? undefined}
         onRetryOverview={retryOverview}
       />,
     );
@@ -141,6 +144,21 @@ describe('RoleDashboard', () => {
     expect(container.textContent).not.toContain('Department comparison');
   });
 
+  it.each([
+    ['manager', ['My workload', 'Unassigned work', 'Employee work']],
+    ['department_head', ['My work', 'Unassigned work', 'Manager work', 'Employee work']],
+  ] as const)(
+    'keeps %s overview panels visible without rendering false empty grouped lanes',
+    async (role, hiddenLanes) => {
+      await renderDashboard(overview({ role }), null);
+
+      expect(container.textContent).toContain('Department pulse');
+      expect(container.textContent).toContain('Attention queue');
+      expect(container.textContent).toContain('Team capacity');
+      hiddenLanes.forEach((lane) => expect(container.textContent).not.toContain(lane));
+    },
+  );
+
   it('links every attention item directly to its task', async () => {
     await renderDashboard(overview({ role: 'manager' }));
 
@@ -158,6 +176,22 @@ describe('RoleDashboard', () => {
     expect(container.textContent).toContain('3 open');
     expect(container.textContent).toContain('Open task counts');
     expect(container.textContent).not.toContain('68%');
+  });
+
+  it('stacks each capacity bar below the name and count until the small breakpoint', async () => {
+    await renderDashboard(overview({ role: 'manager' }));
+
+    const bar = container.querySelector<HTMLElement>(
+      '[aria-label="Maya Manager: 5 open tasks"]',
+    );
+    const row = bar?.closest('li');
+    expect(row?.className).toContain('grid-cols-[2rem_minmax(0,1fr)_auto]');
+    expect(row?.className).toContain(
+      'sm:grid-cols-[2rem_minmax(5rem,0.65fr)_minmax(5rem,1fr)_auto]',
+    );
+    expect(bar?.className).toContain('col-span-3');
+    expect(bar?.className).toContain('row-start-2');
+    expect(bar?.className).toContain('sm:col-span-1');
   });
 
   it('shows an honest comparison state when the prior window has no baseline', async () => {

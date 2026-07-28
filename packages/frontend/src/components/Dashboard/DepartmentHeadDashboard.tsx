@@ -22,12 +22,16 @@ export function DepartmentHeadDashboard({
         <GettingStarted overview={overview} />
       </div>
 
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <TaskList title="My work" tasks={grouped?.myTasks ?? []} />
-        <TaskList title="Unassigned work" tasks={grouped?.unassigned ?? []} />
-      </div>
-      <PeopleWork title="Manager work" groups={grouped?.managerGroups ?? []} />
-      <PeopleWork title="Employee work" groups={grouped?.employeeGroups ?? []} />
+      {grouped && (
+        <>
+          <div className="grid items-start gap-4 xl:grid-cols-2">
+            <TaskList title="My work" tasks={grouped.myTasks} />
+            <TaskList title="Unassigned work" tasks={grouped.unassigned} />
+          </div>
+          <PeopleWork title="Manager work" groups={grouped.managerGroups} />
+          <PeopleWork title="Employee work" groups={grouped.employeeGroups} />
+        </>
+      )}
 
       <AtlasPanel eyebrow="Audited access trail" title="Recent role changes">
         <p className="px-5 py-5 text-sm leading-6 text-slate-600">

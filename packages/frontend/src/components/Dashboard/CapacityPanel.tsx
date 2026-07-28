@@ -46,7 +46,7 @@ export function CapacityPanel({ capacity }: CapacityPanelProps) {
             return (
               <li
                 key={person.userId}
-                className="grid grid-cols-[2rem_minmax(5rem,0.65fr)_minmax(5rem,1fr)_auto] items-center gap-3"
+                className="grid min-w-0 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 sm:grid-cols-[2rem_minmax(5rem,0.65fr)_minmax(5rem,1fr)_auto]"
               >
                 <span
                   aria-hidden="true"
@@ -60,7 +60,7 @@ export function CapacityPanel({ capacity }: CapacityPanelProps) {
                 <span
                   role="img"
                   aria-label={`${person.name}: ${person.openTasks} open tasks`}
-                  className="h-2 overflow-hidden rounded-full bg-atlas-mist"
+                  className="col-span-3 row-start-2 h-2 min-w-0 overflow-hidden rounded-full bg-atlas-mist sm:col-span-1 sm:col-start-3 sm:row-start-1"
                 >
                   <span
                     className={`block h-full rounded-full ${
@@ -69,7 +69,7 @@ export function CapacityPanel({ capacity }: CapacityPanelProps) {
                     style={{ width: `${width}%` }}
                   />
                 </span>
-                <span className="text-right">
+                <span className="col-start-3 row-start-1 text-right sm:col-start-4">
                   <span className="block font-atlasMono text-xs font-medium text-atlas-ink">
                     {person.openTasks} open
                   </span>

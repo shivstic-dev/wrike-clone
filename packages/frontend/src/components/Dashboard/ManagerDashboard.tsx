@@ -21,15 +21,19 @@ export function ManagerDashboard({
         <GettingStarted overview={overview} />
       </div>
 
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <TaskList title="My workload" tasks={grouped?.myTasks ?? []} />
-        <TaskList title="Unassigned work" tasks={grouped?.unassigned ?? []} />
-      </div>
+      {grouped && (
+        <>
+          <div className="grid items-start gap-4 xl:grid-cols-2">
+            <TaskList title="My workload" tasks={grouped.myTasks} />
+            <TaskList title="Unassigned work" tasks={grouped.unassigned} />
+          </div>
 
-      {!!grouped?.managerGroups.length && (
-        <PeopleWork title="Manager work" groups={grouped.managerGroups} />
+          {!!grouped.managerGroups.length && (
+            <PeopleWork title="Manager work" groups={grouped.managerGroups} />
+          )}
+          <PeopleWork title="Employee work" groups={grouped.employeeGroups} />
+        </>
       )}
-      <PeopleWork title="Employee work" groups={grouped?.employeeGroups ?? []} />
     </div>
   );
 }
