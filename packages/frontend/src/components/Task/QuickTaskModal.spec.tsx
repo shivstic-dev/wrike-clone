@@ -213,6 +213,36 @@ describe('QuickTaskModal', () => {
     expect(assigneeText).not.toContain('Morgan Manager');
   });
 
+  it('keeps selected assignees when queued change events render later', async () => {
+    mocks.mutateAsync.mockResolvedValue(createdTask);
+    renderModal();
+    const select = document.querySelector<HTMLSelectElement>('#quick-task-assignees');
+    const employee = Array.from(select?.options ?? []).find(
+      (option) => option.value === 'employee-1',
+    );
+    if (!select || !employee) throw new Error('Expected assignee option was not rendered');
+
+    employee.selected = true;
+    act(() => {
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    enterTitle('Prepare volunteer briefing');
+    const form = document.querySelector('form');
+    if (!form) throw new Error('Quick task form was not rendered');
+
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    expect(mocks.mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ assigneeIds: ['employee-1'] }),
+    );
+  });
+
   it('closes on Escape and restores focus to the trigger when unmounted', () => {
     const onClose = renderModal();
 

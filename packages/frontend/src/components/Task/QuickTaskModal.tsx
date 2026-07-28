@@ -345,12 +345,13 @@ export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTask
                     disabled={!state.departmentId || membersPending}
                     className={inputClasses}
                     onChange={(event) => {
+                      const assigneeIds = Array.from(
+                        event.currentTarget.selectedOptions,
+                        (option) => option.value,
+                      );
                       setState((current) => ({
                         ...current,
-                        assigneeIds: Array.from(
-                          event.currentTarget.selectedOptions,
-                          (option) => option.value,
-                        ),
+                        assigneeIds,
                       }));
                     }}
                   >
