@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { TaskPriority } from '@wrike-clone/shared';
 import {
   canCreateQuickTask,
+  canSetQuickTaskVisibility,
+  changeQuickTaskFolder,
   changeQuickTaskDepartment,
   createQuickTaskFormState,
+  creatableQuickTaskDepartments,
   normalizeQuickTaskInput,
   permittedQuickTaskAssignees,
+  resolveQuickTaskInitialDepartmentId,
 } from './quick-task-form';
 
 describe('quick task form helpers', () => {
@@ -138,23 +142,80 @@ describe('quick task form helpers', () => {
     });
   });
 
-  it('allows quick task creation for tenant admins or department leaders', () => {
+  it('hides quick task from employee-only users', () => {
+    expect(canCreateQuickTask([{ id: 'dept-1', departmentRole: 'employee' }], 'member')).toBe(
+      false,
+    );
+  });
+
+  it('shows quick task to a department manager', () => {
+    expect(canCreateQuickTask([{ id: 'dept-1', departmentRole: 'manager' }], 'member')).toBe(true);
+  });
+
+  it('shows quick task to tenant admins without a department', () => {
     expect(canCreateQuickTask([], 'admin')).toBe(true);
-    expect(canCreateQuickTask([{ departmentRole: 'manager' }], 'member')).toBe(true);
-    expect(canCreateQuickTask([{ departmentRole: 'employee' }], 'member')).toBe(false);
+  });
+
+  it('preselects the department supplied by the current route', () => {
+    expect(createQuickTaskFormState('dept-1').departmentId).toBe('dept-1');
+  });
+
+  it('preselects a route department only when it is available to create in', () => {
+    const departments = [{ id: 'dept-1' }, { id: 'dept-2' }];
+
+    expect(resolveQuickTaskInitialDepartmentId('dept-2', departments)).toBe('dept-2');
+    expect(resolveQuickTaskInitialDepartmentId('employee-only-dept', departments)).toBe('');
+  });
+
+  it('lists every department for tenant admins and only managed departments for members', () => {
+    const departments = [
+      { id: 'dept-admin', departmentRole: 'admin' },
+      { id: 'dept-head', departmentRole: 'department_head' },
+      { id: 'dept-manager', departmentRole: 'manager' },
+      { id: 'dept-employee', departmentRole: 'employee' },
+    ];
+
+    expect(
+      creatableQuickTaskDepartments(departments, 'member').map((department) => department.id),
+    ).toEqual(['dept-admin', 'dept-head', 'dept-manager']);
+    expect(
+      creatableQuickTaskDepartments(departments, 'admin').map((department) => department.id),
+    ).toEqual(['dept-admin', 'dept-head', 'dept-manager', 'dept-employee']);
+  });
+
+  it('clears the selected project when the folder changes', () => {
+    expect(
+      changeQuickTaskFolder(
+        {
+          ...createQuickTaskFormState('dept-1'),
+          folderId: 'folder-1',
+          projectId: 'project-1',
+        },
+        'folder-2',
+      ),
+    ).toMatchObject({
+      folderId: 'folder-2',
+      projectId: '',
+    });
+  });
+
+  it('shows visibility only to tenant admins and department admins or heads', () => {
+    expect(canSetQuickTaskVisibility('admin', 'employee')).toBe(true);
+    expect(canSetQuickTaskVisibility('member', 'admin')).toBe(true);
+    expect(canSetQuickTaskVisibility('member', 'department_head')).toBe(true);
+    expect(canSetQuickTaskVisibility('member', 'manager')).toBe(false);
   });
 
   it('limits manager assignees to self and employees', () => {
     const members = [
       { userId: 'manager-1', role: 'manager' },
+      { userId: 'manager-2', role: 'manager' },
       { userId: 'employee-1', role: 'employee' },
       { userId: 'head-1', role: 'department_head' },
     ];
 
-    expect(permittedQuickTaskAssignees(members, 'manager', 'manager-1')).toEqual([
-      members[0],
-      members[1],
-    ]);
-    expect(permittedQuickTaskAssignees(members, 'department_head', 'head-1')).toEqual(members);
+    expect(
+      permittedQuickTaskAssignees(members, 'manager', 'manager-1').map((member) => member.userId),
+    ).toEqual(['manager-1', 'employee-1']);
   });
 });

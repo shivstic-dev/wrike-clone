@@ -3,6 +3,13 @@ import { Outlet, Link, useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkspaces } from '../api/workspaces';
 import { clsx } from 'clsx';
+import { Toaster } from 'react-hot-toast';
+import { QuickTaskModal } from '../components/Task/QuickTaskModal';
+import {
+  canCreateQuickTask,
+  creatableQuickTaskDepartments,
+  resolveQuickTaskInitialDepartmentId,
+} from '../components/Task/quick-task-form';
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(
@@ -20,7 +27,7 @@ function useIsMobile(breakpoint = 768) {
 
 export default function DashboardLayout() {
   const { user, membership, logout } = useAuth();
-  const { data: workspaces } = useWorkspaces();
+  const { data: workspaces, isPending: workspacesPending } = useWorkspaces();
   const { workspaceId } = useParams();
   const location = useLocation();
   const isMobile = useIsMobile();
@@ -28,6 +35,15 @@ export default function DashboardLayout() {
   // Start with sidebar closed on mobile, open on desktop
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [quickTaskOpen, setQuickTaskOpen] = useState(false);
+
+  const creatableDepartments = creatableQuickTaskDepartments(workspaces || [], membership?.role);
+  const canQuickCreate =
+    !workspacesPending && canCreateQuickTask(workspaces || [], membership?.role);
+  const initialQuickTaskDepartmentId = resolveQuickTaskInitialDepartmentId(
+    workspaceId,
+    creatableDepartments,
+  );
 
   // Close sidebar on route change when on mobile
   useEffect(() => {
@@ -46,6 +62,10 @@ export default function DashboardLayout() {
   const closeSidebar = useCallback(() => {
     if (isMobile) setSidebarOpen(false);
   }, [isMobile]);
+
+  const closeQuickTask = useCallback(() => {
+    setQuickTaskOpen(false);
+  }, []);
 
   const navLinks = [
     {
@@ -262,60 +282,79 @@ export default function DashboardLayout() {
             </p>
           </div>
 
-          {/* User menu */}
-          <div className="relative shrink-0">
-            <button
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 rounded-lg px-2 sm:px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 transition-colors"
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-xs font-bold text-white">
-                {user?.email?.charAt(0).toUpperCase() || 'U'}
-              </span>
-              <span className="hidden sm:inline text-sm truncate max-w-[120px]">{user?.email}</span>
-              <svg
-                className="h-4 w-4 shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
+          <div className="flex shrink-0 items-center gap-2">
+            {canQuickCreate && (
+              <button
+                type="button"
+                className="btn-primary btn-sm whitespace-nowrap sm:text-sm"
+                onClick={() => setQuickTaskOpen(true)}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                />
-              </svg>
-            </button>
-
-            {userMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
-                <div className="absolute right-0 z-20 mt-1 w-48 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                  <div className="border-b border-slate-100 px-4 py-2">
-                    <p className="text-sm font-medium text-slate-900 truncate">{user?.email}</p>
-                  </div>
-                  <button
-                    onClick={logout}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={1.5}
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"
-                      />
-                    </svg>
-                    Sign out
-                  </button>
-                </div>
-              </>
+                <span aria-hidden="true" className="text-base leading-none">
+                  +
+                </span>
+                Create task
+              </button>
             )}
+
+            {/* User menu */}
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-2 rounded-lg px-2 sm:px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 transition-colors"
+                aria-label="Open user menu"
+                aria-expanded={userMenuOpen}
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-xs font-bold text-white">
+                  {user?.email?.charAt(0).toUpperCase() || 'U'}
+                </span>
+                <span className="hidden sm:inline text-sm truncate max-w-[120px]">
+                  {user?.email}
+                </span>
+                <svg
+                  className="h-4 w-4 shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                  />
+                </svg>
+              </button>
+
+              {userMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
+                  <div className="absolute right-0 z-20 mt-1 w-48 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                    <div className="border-b border-slate-100 px-4 py-2">
+                      <p className="text-sm font-medium text-slate-900 truncate">{user?.email}</p>
+                    </div>
+                    <button
+                      onClick={logout}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"
+                        />
+                      </svg>
+                      Sign out
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
@@ -324,6 +363,15 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+
+      {quickTaskOpen && (
+        <QuickTaskModal
+          open
+          initialDepartmentId={initialQuickTaskDepartmentId}
+          onClose={closeQuickTask}
+        />
+      )}
+      <Toaster position="bottom-right" />
     </div>
   );
 }
