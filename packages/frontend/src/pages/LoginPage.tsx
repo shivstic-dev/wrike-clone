@@ -1,13 +1,29 @@
 import { useState, type FormEvent } from 'react';
+import toast from 'react-hot-toast';
+import { Button, Panel } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { useTenant } from '../contexts/TenantContext';
-import toast from 'react-hot-toast';
 
 export function resolveLoginTenantSlug(
   enteredSlug: string,
   savedTenantSlug: string,
 ): string | undefined {
   return enteredSlug.trim() || savedTenantSlug.trim() || undefined;
+}
+
+function resolveAuthError(error: unknown, fallback: string): string {
+  if (error instanceof Object && 'response' in error) {
+    const responseMessage = (
+      error as { response?: { data?: { error?: { message?: unknown } } } }
+    ).response?.data?.error?.message;
+    if (typeof responseMessage === 'string' && responseMessage.trim()) {
+      return responseMessage;
+    }
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return fallback;
 }
 
 export default function LoginPage() {
@@ -18,20 +34,21 @@ export default function LoginPage() {
   const [slug, setSlug] = useState(tenantSlug);
   const [showSlugField, setShowSlugField] = useState(!tenantSlug);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError('');
 
-    // Slug is optional — if DEFAULT_TENANT_SLUG is set on the backend, it's resolved automatically
     if (!email.trim() || !password.trim()) {
-      toast.error('Please fill in email and password');
+      const message = 'Enter your email address and password to continue.';
+      setError(message);
+      toast.error(message);
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // A saved tenant hides the field, but the API still needs its slug when
-      // DEFAULT_TENANT_SLUG is not configured on the backend.
       const finalSlug = resolveLoginTenantSlug(slug, tenantSlug);
       if (finalSlug) setTenantSlug(finalSlug);
       await login({
@@ -39,12 +56,12 @@ export default function LoginPage() {
         email: email.trim(),
         password,
       });
-    } catch (err: unknown) {
-      const message =
-        err instanceof Object && 'response' in err
-          ? (err as { response: { data: { error: { message: string } } } }).response?.data?.error
-              ?.message
-          : 'Login failed. Please check your credentials.';
+    } catch (caughtError: unknown) {
+      const message = resolveAuthError(
+        caughtError,
+        'Sign-in failed. Check your email, password, and organization workspace.',
+      );
+      setError(message);
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -52,88 +69,124 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="w-full max-w-sm">
-      <div className="card px-6 py-8">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary-600">
-            <span className="text-xl font-bold text-white">WC</span>
+    <div className="w-full">
+      <Panel className="px-6 py-8 sm:px-8 sm:py-9" padding="none">
+        <div className="mb-8">
+          <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-lg bg-atlas-canopy">
+            <svg
+              aria-hidden="true"
+              className="h-6 w-6 text-atlas-fieldNote"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.8}
+              viewBox="0 0 24 24"
+            >
+              <path d="M4 17 9 7l5 7 3-5 3 8H4Z" />
+              <path d="M7 17h10" />
+            </svg>
           </div>
-          <h1 className="text-xl font-bold text-slate-900">Sign in to OpenWork Hub</h1>
-          <p className="mt-1 text-sm text-slate-500">Enter your email to continue</p>
+          <p className="font-atlasMono text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-atlas-current">
+            OpenWork Hub
+          </p>
+          <h1 className="mt-3 font-atlasDisplay text-2xl font-semibold leading-tight tracking-[-0.015em] text-atlas-canopy sm:text-3xl">
+            Sign in to your organization workspace
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-atlas-current">
+            Use the account details provided by your organization.
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Tenant slug field — hidden by default when DEFAULT_TENANT_SLUG is set */}
+        {error && (
+          <div
+            className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+            role="alert"
+          >
+            {error}
+          </div>
+        )}
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
           {showSlugField && (
             <div>
-              <label htmlFor="slug" className="label">
-                Tenant slug
+              <label htmlFor="slug" className="mb-1.5 block text-sm font-semibold text-atlas-ink">
+                Organization workspace
               </label>
               <input
-                id="slug"
-                type="text"
-                className="input"
-                placeholder="my-company"
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
+                autoComplete="organization"
                 autoFocus
+                className="block min-h-11 w-full rounded-lg border-atlas-mist bg-white px-3 text-sm text-atlas-ink placeholder:text-atlas-current/60 focus:border-atlas-current focus:ring-atlas-current"
+                id="slug"
+                onChange={(event) => setSlug(event.target.value)}
+                placeholder="my-company"
+                type="text"
+                value={slug}
               />
             </div>
           )}
 
           <div>
-            <label htmlFor="email" className="label">
+            <label htmlFor="email" className="mb-1.5 block text-sm font-semibold text-atlas-ink">
               Email address
             </label>
             <input
-              id="email"
-              type="email"
-              className="input"
-              placeholder="you@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
+              autoComplete="email"
               autoFocus={!showSlugField}
+              className="block min-h-11 w-full rounded-lg border-atlas-mist bg-white px-3 text-sm text-atlas-ink placeholder:text-atlas-current/60 focus:border-atlas-current focus:ring-atlas-current"
+              id="email"
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@company.com"
+              required
+              type="email"
+              value={email}
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="label">
+            <label
+              htmlFor="password"
+              className="mb-1.5 block text-sm font-semibold text-atlas-ink"
+            >
               Password
             </label>
             <input
+              autoComplete="current-password"
+              className="block min-h-11 w-full rounded-lg border-atlas-mist bg-white px-3 text-sm text-atlas-ink placeholder:text-atlas-current/60 focus:border-atlas-current focus:ring-atlas-current"
               id="password"
-              type="password"
-              className="input"
+              onChange={(event) => setPassword(event.target.value)}
               placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               required
+              type="password"
+              value={password}
             />
           </div>
 
-          <button type="submit" disabled={isSubmitting} className="btn-primary w-full">
+          <Button className="w-full" disabled={isSubmitting} size="lg" type="submit">
             {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              <span className="flex items-center gap-2" role="status">
+                <span
+                  aria-hidden="true"
+                  className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+                />
                 Signing in...
               </span>
             ) : (
               'Sign in'
             )}
-          </button>
+          </Button>
 
           {!showSlugField && (
             <button
-              type="button"
+              className="min-h-10 w-full rounded-lg text-center text-xs font-semibold text-atlas-current hover:bg-atlas-paper hover:text-atlas-canopy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
               onClick={() => setShowSlugField(true)}
-              className="w-full text-center text-xs text-slate-400 hover:text-slate-600"
+              type="button"
             >
-              Need to use a different tenant slug?
+              Use a different organization workspace
             </button>
           )}
         </form>
-      </div>
+      </Panel>
     </div>
   );
 }
