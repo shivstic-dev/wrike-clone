@@ -94,7 +94,7 @@ export class ReportService {
       .orderBy('tasks.created_at', 'desc');
 
     if (scope.departmentId) query.where('tasks.department_id', scope.departmentId);
-    if (scope.userIds) this.whereAssignedTo(query, scope.userIds);
+    this.applyAudience(query, scope);
     if (filter.dateFrom) query.where('tasks.created_at', '>=', filter.dateFrom);
     if (filter.dateTo) {
       const end = new Date(filter.dateTo);
@@ -183,6 +183,32 @@ export class ReportService {
           .whereIn('report_scope_ta.user_id', userIds);
       }),
     );
+  }
+
+  private applyAudience(query: Knex.QueryBuilder, audience: ResolvedReportAudience): void {
+    if (!audience.userIds) return;
+    const ctx = requireTenantContext();
+    query.andWhere((visible) => {
+      visible
+        .whereIn('tasks.assignee_id', audience.userIds!)
+        .orWhereExists(function () {
+          this.select(1)
+            .from('task_assignees as report_scope_ta')
+            .whereRaw('report_scope_ta.task_id = tasks.id')
+            .andWhere('report_scope_ta.tenant_id', ctx.tenantId)
+            .whereIn('report_scope_ta.user_id', audience.userIds!);
+        });
+      if (audience.includeUnassigned) {
+        visible.orWhere((unassigned) =>
+          unassigned.whereNull('tasks.assignee_id').whereNotExists(function () {
+            this.select(1)
+              .from('task_assignees as report_any_ta')
+              .whereRaw('report_any_ta.task_id = tasks.id')
+              .andWhere('report_any_ta.tenant_id', ctx.tenantId);
+          }),
+        );
+      }
+    });
   }
 
   private async assertReportTargetAllowed(
