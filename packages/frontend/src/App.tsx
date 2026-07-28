@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { TenantProvider } from './contexts/TenantContext';
-import DashboardLayout from './layouts/DashboardLayout';
+import AppShell from './layouts/AppShell';
 import AuthLayout from './layouts/AuthLayout';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 
@@ -75,7 +75,7 @@ export default function App() {
                 <Route
                   element={
                     <ProtectedRoute>
-                      <DashboardLayout />
+                      <AppShell />
                     </ProtectedRoute>
                   }
                 >
