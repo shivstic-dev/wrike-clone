@@ -109,8 +109,12 @@ function compareAttention(left: AttentionItem, right: AttentionItem): number {
 export function buildDashboardMetrics(
   rows: DashboardTaskRow[],
   now: Date,
-  windowDays: 30 = 30,
+  windowDays: 30,
 ): DashboardMetrics {
+  if (windowDays !== 30) {
+    throw new RangeError('Dashboard metrics require a 30-day window');
+  }
+
   const currentEndExclusive = utcDayStart(now) + DAY_MS;
   const currentStart = currentEndExclusive - windowDays * DAY_MS;
   const previousStart = currentStart - windowDays * DAY_MS;

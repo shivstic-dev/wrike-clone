@@ -97,6 +97,18 @@ describe('buildDashboardMetrics', () => {
     );
   });
 
+  it('rejects a non-30-day window received from an untyped runtime caller', () => {
+    const callWithRuntimeWindow = buildDashboardMetrics as (
+      rows: DashboardTaskRow[],
+      now: Date,
+      windowDays: number,
+    ) => unknown;
+
+    expect(() => callWithRuntimeWindow([], now, 29)).toThrow(
+      new RangeError('Dashboard metrics require a 30-day window'),
+    );
+  });
+
   it('returns null percent changes when the previous window has no matching events', () => {
     const result = buildDashboardMetrics(
       [
