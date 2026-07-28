@@ -31,25 +31,11 @@ CREATE UNIQUE INDEX idx_task_assignees_one_primary
 CREATE INDEX idx_task_assignees_tenant ON task_assignees(tenant_id);
 CREATE INDEX idx_task_assignees_user ON task_assignees(user_id, assigned_at DESC);
 CREATE INDEX idx_task_assignees_task ON task_assignees(task_id);
-CREATE INDEX idx_task_assignees_assigned_by ON task_assignees(assigned_by_id);
 
--- Keep every legacy primary assignee. The task creator is the best available
--- historical actor for rows that predate explicit assignment auditing.
 INSERT INTO task_assignees (
-  tenant_id,
-  task_id,
-  user_id,
-  assigned_by_id,
-  is_primary,
-  assigned_at
+  tenant_id, task_id, user_id, assigned_by_id, is_primary, assigned_at
 )
-SELECT
-  tenant_id,
-  id,
-  assignee_id,
-  created_by_id,
-  true,
-  created_at
+SELECT tenant_id, id, assignee_id, created_by_id, true, created_at
 FROM tasks
 WHERE assignee_id IS NOT NULL
 ON CONFLICT (task_id, user_id) DO NOTHING;
@@ -86,3 +72,18 @@ CREATE POLICY tenant_isolation ON role_change_log FOR ALL TO openwork_app
   WITH CHECK (tenant_id = current_tenant_id());
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON task_assignees, role_change_log TO openwork_app;
+
+DO $$
+BEGIN
+  IF to_regclass('public.knex_migrations') IS NOT NULL THEN
+    ALTER TABLE knex_migrations ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE knex_migrations FORCE ROW LEVEL SECURITY;
+    REVOKE ALL ON knex_migrations FROM anon, authenticated;
+  END IF;
+  IF to_regclass('public.knex_migrations_lock') IS NOT NULL THEN
+    ALTER TABLE knex_migrations_lock ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE knex_migrations_lock FORCE ROW LEVEL SECURITY;
+    REVOKE ALL ON knex_migrations_lock FROM anon, authenticated;
+  END IF;
+END
+$$;

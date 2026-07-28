@@ -5,7 +5,7 @@ import type { Knex } from 'knex';
 export async function up(knex: Knex): Promise<void> {
   const migrationPath = resolve(
     __dirname,
-    '../../../../supabase/migrations/20260727121000_department_head_assigned_by_index.sql',
+    '../../../../supabase/migrations/20260727122109_department_head_assigned_by_index.sql',
   );
   await knex.raw(await readFile(migrationPath, 'utf8'));
 }

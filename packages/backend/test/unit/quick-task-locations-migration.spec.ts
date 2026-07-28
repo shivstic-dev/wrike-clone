@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const sql = readFileSync(
-  resolve(__dirname, '../../../../supabase/migrations/20260728114500_quick_task_locations.sql'),
+  resolve(__dirname, '../../../../supabase/migrations/20260728094925_quick_task_locations.sql'),
   'utf8',
 );
 

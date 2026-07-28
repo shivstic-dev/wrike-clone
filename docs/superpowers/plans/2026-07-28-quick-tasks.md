@@ -31,7 +31,7 @@ check.
 
 ## File Structure
 
-- `supabase/migrations/20260728114500_quick_task_locations.sql`: schema flags, uniqueness, home-link backfill and indexes.
+- `supabase/migrations/20260728094925_quick_task_locations.sql`: schema flags, uniqueness, home-link backfill and indexes.
 - `packages/backend/src/migrations/017_quick_task_locations.ts`: Railway/Knex wrapper for the Supabase SQL migration.
 - `packages/backend/test/unit/quick-task-locations-migration.spec.ts`: migration contract tests.
 - `packages/shared/src/validation/index.ts`: location-aware creation and movement schemas.
@@ -66,7 +66,7 @@ check.
 ### Task 1: Add system-container and canonical-home schema
 
 **Files:**
-- Create: `supabase/migrations/20260728114500_quick_task_locations.sql`
+- Create: `supabase/migrations/20260728094925_quick_task_locations.sql`
 - Create: `packages/backend/src/migrations/017_quick_task_locations.ts`
 - Create: `packages/backend/test/unit/quick-task-locations-migration.spec.ts`
 
@@ -84,7 +84,7 @@ $generated = Get-ChildItem -LiteralPath 'supabase\migrations' -Filter '*_quick_t
   Sort-Object LastWriteTimeUtc -Descending |
   Select-Object -First 1
 if (-not $generated) { throw 'Supabase did not create the migration file' }
-$target = (Resolve-Path 'supabase\migrations').Path + '\20260728114500_quick_task_locations.sql'
+$target = (Resolve-Path 'supabase\migrations').Path + '\20260728094925_quick_task_locations.sql'
 if (-not $generated.FullName.StartsWith((Resolve-Path 'supabase\migrations').Path)) {
   throw 'Generated migration is outside the repository migration directory'
 }
@@ -94,7 +94,7 @@ if ($generated.FullName -ne $target) {
 ```
 
 Expected: one empty migration exists at
-`supabase/migrations/20260728114500_quick_task_locations.sql`.
+`supabase/migrations/20260728094925_quick_task_locations.sql`.
 
 - [ ] **Step 2: Write the failing migration contract test**
 
@@ -103,7 +103,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const sql = readFileSync(
-  resolve(__dirname, '../../../../supabase/migrations/20260728114500_quick_task_locations.sql'),
+  resolve(__dirname, '../../../../supabase/migrations/20260728094925_quick_task_locations.sql'),
   'utf8',
 );
 
@@ -200,7 +200,7 @@ import type { Knex } from 'knex';
 export async function up(knex: Knex): Promise<void> {
   const migrationPath = resolve(
     __dirname,
-    '../../../../supabase/migrations/20260728114500_quick_task_locations.sql',
+    '../../../../supabase/migrations/20260728094925_quick_task_locations.sql',
   );
   await knex.raw(await readFile(migrationPath, 'utf8'));
 }
@@ -232,7 +232,7 @@ Expected: test PASS and one compiled wrapper is listed.
 - [ ] **Step 7: Commit**
 
 ```powershell
-git add -- 'supabase/migrations/20260728114500_quick_task_locations.sql' `
+git add -- 'supabase/migrations/20260728094925_quick_task_locations.sql' `
   'packages/backend/src/migrations/017_quick_task_locations.ts' `
   'packages/backend/test/unit/quick-task-locations-migration.spec.ts'
 git commit -m "feat: add quick task location schema"
@@ -2098,7 +2098,7 @@ unstaged outside the planned work.
 
 Use the connected Supabase migration tool with project
 `lsjeobyrmxiqewehhjai` and the exact contents of
-`supabase/migrations/20260728114500_quick_task_locations.sql`.
+`supabase/migrations/20260728094925_quick_task_locations.sql`.
 
 Expected: migration succeeds once. Do not reapply if its migration history
 already records success.
@@ -2141,7 +2141,7 @@ table warnings are documented separately and are not application-data tables.
 If no correction was needed, skip this commit. If a correction was required:
 
 ```powershell
-git add -- 'supabase/migrations/20260728114500_quick_task_locations.sql' `
+git add -- 'supabase/migrations/20260728094925_quick_task_locations.sql' `
   'packages/backend/src/migrations/017_quick_task_locations.ts' `
   'packages/backend/test/unit/quick-task-locations-migration.spec.ts' `
   'packages/backend/src/task/task-location.types.ts' `
