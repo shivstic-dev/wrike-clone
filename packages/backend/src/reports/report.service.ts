@@ -242,6 +242,7 @@ export class ReportService {
             'workspace_members.user_id as userId',
             this.db.raw(`
               CASE
+                WHEN tenant_memberships.role = 'admin' THEN 'admin'
                 WHEN department_heads.id IS NOT NULL THEN 'department_head'
                 WHEN workspace_members.role = 'manager'
                   OR tenant_memberships.role = 'manager' THEN 'manager'

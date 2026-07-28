@@ -1,3 +1,5 @@
+import knex, { type Knex } from 'knex';
+import { tenantContext } from '../../src/common/tenant-context';
 import type { DepartmentRole } from '../../src/rbac/department-access.service';
 import {
   buildExactAudience,
@@ -6,6 +8,7 @@ import {
   resolveReportMode,
   type ReportDepartmentMember,
 } from '../../src/reports/report-audience';
+import { ReportService } from '../../src/reports/report.service';
 
 describe('resolveReportMode', () => {
   it.each([
@@ -48,13 +51,73 @@ describe('buildManagerAudience', () => {
     { userId: 'employee-1', role: 'employee', isDepartmentHead: false },
     { userId: 'head-1', role: 'department_head', isDepartmentHead: true },
     { userId: 'head-stored-as-employee', role: 'employee', isDepartmentHead: true },
+    { userId: 'admin-1', role: 'admin', isDepartmentHead: false },
   ];
 
-  it('includes self and employees but excludes heads and other managers', () => {
+  it('includes self and employees but excludes heads, admins, and other managers', () => {
     expect(buildManagerAudience('manager-1', members)).toEqual({
       userIds: ['manager-1', 'employee-1'],
       includeUnassigned: true,
     });
+  });
+});
+
+describe('ReportService department-member audience query', () => {
+  it('classifies active tenant admins before department roles so managers cannot target them', async () => {
+    const queryCompiler = knex({ client: 'pg' });
+    let compiledMemberQuery: Knex.Sql | undefined;
+    const effectiveMembers: ReportDepartmentMember[] = [
+      { userId: 'admin-1', role: 'admin', isDepartmentHead: false },
+      { userId: 'employee-1', role: 'employee', isDepartmentHead: false },
+    ];
+    const db = ((tableName: string) => {
+      const query = queryCompiler(tableName);
+      if (tableName === 'workspace_members') {
+        const compile = query.toSQL.bind(query);
+        query.then = ((onFulfilled, onRejected) => {
+          compiledMemberQuery = compile();
+          return Promise.resolve(effectiveMembers).then(onFulfilled, onRejected);
+        }) as typeof query.then;
+      }
+      return query;
+    }) as Knex;
+    db.raw = queryCompiler.raw.bind(queryCompiler);
+    const departmentAccess = {
+      getReportScope: jest.fn().mockResolvedValue({
+        departmentId: 'department-1',
+        role: 'manager',
+        ownTasksOnly: false,
+      }),
+    };
+    const service = new ReportService(db, departmentAccess as never);
+
+    try {
+      const audience = await tenantContext.run(
+        {
+          tenantId: 'tenant-1',
+          userId: 'manager-1',
+          membershipId: 'membership-1',
+          role: 'manager',
+          permissions: [],
+        },
+        () => (service as any).resolveAudience({ departmentId: 'department-1' }),
+      );
+      const sql = compiledMemberQuery!.sql.replace(/\s+/g, ' ');
+      const adminBranch = "WHEN tenant_memberships.role = 'admin' THEN 'admin'";
+      const headBranch = "WHEN department_heads.id IS NOT NULL THEN 'department_head'";
+
+      expect(sql).toContain(adminBranch);
+      expect(sql.indexOf(adminBranch)).toBeLessThan(sql.indexOf(headBranch));
+      expect(sql).toContain('inner join "tenant_memberships"');
+      expect(sql).toContain('"tenant_memberships"."is_active" = ?');
+      expect(compiledMemberQuery!.bindings).toEqual(
+        expect.arrayContaining(['tenant-1', 'department-1', true]),
+      );
+      expect(audience.userIds).toEqual(['manager-1', 'employee-1']);
+      expect(audience.allowedTargetUserIds).toEqual(['manager-1', 'employee-1']);
+    } finally {
+      await queryCompiler.destroy();
+    }
   });
 });
 
