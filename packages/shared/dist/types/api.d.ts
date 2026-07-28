@@ -224,6 +224,53 @@ export interface FileUploadResponse {
     url: string;
     thumbnailUrl: string | null;
 }
+export type DashboardViewerRole = 'employee' | 'manager' | 'department_head' | 'admin';
+export interface DashboardOverview {
+    generatedAt: string;
+    windowDays: 30;
+    scope: {
+        departmentId?: string;
+        role: DashboardViewerRole;
+    };
+    totals: {
+        active: number;
+        completed: number;
+        overdue: number;
+        blocked: number;
+        unassigned: number;
+    };
+    comparison: {
+        completedPercentChange: number | null;
+        createdPercentChange: number | null;
+    };
+    daily: Array<{
+        date: string;
+        created: number;
+        completed: number;
+    }>;
+    byStatus: Record<string, number>;
+    byPriority: Record<string, number>;
+    capacity: Array<{
+        userId: string;
+        name: string;
+        openTasks: number;
+        overdue: number;
+    }>;
+    attention: Array<{
+        id: string;
+        title: string;
+        reason: 'overdue' | 'blocked' | 'unassigned';
+        dueDate: string | null;
+        assigneeName: string | null;
+    }>;
+    departments: Array<{
+        id: string;
+        name: string;
+        active: number;
+        overdue: number;
+        completionRate: number;
+    }>;
+}
 export interface DashboardWidget {
     id: string;
     type: 'task_count' | 'overdue' | 'workload' | 'project_progress' | 'custom';

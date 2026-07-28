@@ -20,7 +20,7 @@ describe('operations atlas analytics migration', () => {
   });
 
   it('creates exactly the tenant-scoped dashboard indexes with their query predicates', () => {
-    const sql = readFileSync(migrationSqlPath, 'utf8');
+    const sql = readFileSync(migrationSqlPath, 'utf8').replace(/\r\n/g, '\n');
 
     expect(sql.match(/\bCREATE\s+(?:UNIQUE\s+)?INDEX\b/gi)).toHaveLength(3);
     expect(sql).toContain(
@@ -35,7 +35,7 @@ describe('operations atlas analytics migration', () => {
   });
 
   it('contains no destructive or security-changing SQL', () => {
-    const sql = readFileSync(migrationSqlPath, 'utf8');
+    const sql = readFileSync(migrationSqlPath, 'utf8').replace(/\r\n/g, '\n');
 
     expect(sql).not.toMatch(
       /\b(?:DROP|ALTER\s+TABLE|TRUNCATE|DELETE|INSERT|UPDATE|CREATE\s+TABLE|GRANT|REVOKE|POLICY|RLS)\b/i,
