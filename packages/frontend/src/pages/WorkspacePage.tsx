@@ -287,14 +287,29 @@ export default function WorkspacePage() {
   const { membership } = useAuth();
   const [modal, setModal] = useState<SetupModal>(null);
   const [continueToProject, setContinueToProject] = useState(false);
-  const [selectedFolderId, setSelectedFolderId] = useState('');
-  const { data: workspace, isLoading: wsLoading, error: wsError } = useWorkspace(workspaceId!);
-  const { data: folders, isLoading: foldersLoading } = useFolderTree(workspaceId!);
+  const [folderSelection, setFolderSelection] = useState({
+    workspaceId: workspaceId || '',
+    folderId: '',
+  });
+  const selectedFolderId =
+    folderSelection.workspaceId === workspaceId ? folderSelection.folderId : '';
+  const {
+    data: workspace,
+    isLoading: wsLoading,
+    error: wsError,
+    refetch: refetchWorkspace,
+  } = useWorkspace(workspaceId!);
+  const {
+    data: folders,
+    isLoading: foldersLoading,
+    error: foldersError,
+    refetch: refetchFolders,
+  } = useFolderTree(workspaceId!);
   const {
     data: projects,
     isLoading: projectsLoading,
     error: projectsError,
-    refetch,
+    refetch: refetchProjects,
   } = useWorkspaceProjects(workspaceId!);
   const folderTasks = useTasks(
     { folderId: selectedFolderId, perPage: 100 },
@@ -344,10 +359,28 @@ export default function WorkspacePage() {
     return <LoadingSpinner className="mt-20" size="lg" />;
   }
 
-  if (wsError || projectsError) {
+  if (wsError || foldersError || projectsError) {
+    const failedSources = [
+      wsError ? 'workspace details' : '',
+      foldersError ? 'folders' : '',
+      projectsError ? 'projects' : '',
+    ].filter(Boolean);
+    const failedSourceText =
+      failedSources.length > 1
+        ? `${failedSources.slice(0, -1).join(', ')} and ${failedSources.at(-1)}`
+        : failedSources[0];
+
     return (
       <div className="p-6">
-        <ErrorDisplay message="Failed to load workspace" onRetry={() => refetch()} />
+        <ErrorDisplay
+          title="Workspace could not be loaded"
+          message={`We couldn't load ${failedSourceText}.`}
+          onRetry={() => {
+            if (wsError) void refetchWorkspace();
+            if (foldersError) void refetchFolders();
+            if (projectsError) void refetchProjects();
+          }}
+        />
       </div>
     );
   }
@@ -420,7 +453,12 @@ export default function WorkspacePage() {
               <FolderTree
                 folders={folders}
                 selectedFolderId={selectedFolderId}
-                onSelect={(folder) => setSelectedFolderId(folder.id)}
+                onSelect={(folder) =>
+                  setFolderSelection({
+                    workspaceId: workspaceId || '',
+                    folderId: folder.id,
+                  })
+                }
               />
             ) : (
               <p className="text-sm text-slate-400">No folders yet</p>
@@ -451,7 +489,12 @@ export default function WorkspacePage() {
                 <button
                   type="button"
                   className="btn-ghost btn-sm"
-                  onClick={() => setSelectedFolderId('')}
+                  onClick={() =>
+                    setFolderSelection({
+                      workspaceId: workspaceId || '',
+                      folderId: '',
+                    })
+                  }
                 >
                   Show all projects
                 </button>

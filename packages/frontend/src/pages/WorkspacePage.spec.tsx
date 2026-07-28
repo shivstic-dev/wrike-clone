@@ -6,14 +6,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import WorkspacePage from './WorkspacePage';
 
 const mocks = vi.hoisted(() => ({
+  workspaceId: 'department-1',
+  workspaceError: null as Error | null,
+  folderError: null as Error | null,
+  projectsError: null as Error | null,
   navigate: vi.fn(),
   useTasks: vi.fn(),
   createFolder: vi.fn(),
   createProject: vi.fn(),
+  refetchWorkspace: vi.fn(),
+  refetchFolders: vi.fn(),
+  refetchProjects: vi.fn(),
 }));
 
 vi.mock('react-router-dom', () => ({
-  useParams: () => ({ workspaceId: 'department-1' }),
+  useParams: () => ({ workspaceId: mocks.workspaceId }),
   useNavigate: () => mocks.navigate,
   Link: ({ children, to, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { to: string }) => (
     <a href={to} {...props}>
@@ -40,54 +47,79 @@ vi.mock('../api/tasks', () => ({
 }));
 
 vi.mock('../api/workspaces', () => ({
-  useWorkspace: () => ({
+  useWorkspace: (workspaceId: string) => ({
     data: {
-      id: 'department-1',
-      name: 'Community programs',
+      id: workspaceId,
+      name: workspaceId === 'department-2' ? 'Health services' : 'Community programs',
       description: 'Program delivery',
     },
     isLoading: false,
-    error: null,
+    error: mocks.workspaceError,
+    refetch: mocks.refetchWorkspace,
   }),
-  useFolderTree: () => ({
-    data: [
-      {
-        id: 'general-folder',
-        name: 'General',
-        workspaceId: 'department-1',
-        parentFolderId: null,
-        isSystemGeneral: true,
-      },
-      {
-        id: 'campaigns-folder',
-        name: 'Campaigns',
-        workspaceId: 'department-1',
-        parentFolderId: null,
-        isSystemGeneral: false,
-      },
-    ],
+  useFolderTree: (workspaceId: string) => ({
+    data:
+      workspaceId === 'department-2'
+        ? [
+            {
+              id: 'clinics-folder',
+              name: 'Clinics',
+              workspaceId: 'department-2',
+              parentFolderId: null,
+              isSystemGeneral: false,
+            },
+          ]
+        : [
+            {
+              id: 'general-folder',
+              name: 'General',
+              workspaceId: 'department-1',
+              parentFolderId: null,
+              isSystemGeneral: true,
+            },
+            {
+              id: 'campaigns-folder',
+              name: 'Campaigns',
+              workspaceId: 'department-1',
+              parentFolderId: null,
+              isSystemGeneral: false,
+            },
+          ],
     isLoading: false,
+    error: mocks.folderError,
+    refetch: mocks.refetchFolders,
   }),
-  useWorkspaceProjects: () => ({
-    data: [
-      {
-        id: 'system-project',
-        folderId: 'general-folder',
-        name: 'General Tasks',
-        status: 'active',
-        isSystem: true,
-      },
-      {
-        id: 'campaign-project',
-        folderId: 'campaigns-folder',
-        name: 'Autumn appeal',
-        status: 'active',
-        isSystem: false,
-      },
-    ],
+  useWorkspaceProjects: (workspaceId: string) => ({
+    data:
+      workspaceId === 'department-2'
+        ? [
+            {
+              id: 'health-project',
+              folderId: 'clinics-folder',
+              name: 'Health fair',
+              status: 'active',
+              isSystem: false,
+            },
+          ]
+        : [
+            {
+              id: 'system-project',
+              folderId: 'general-folder',
+              name: 'General Tasks',
+              status: 'active',
+              isSystem: true,
+            },
+            {
+              id: 'campaign-project',
+              folderId: 'campaigns-folder',
+              name: 'Autumn appeal',
+              status: 'active',
+              isSystem: false,
+            },
+          ],
     isLoading: false,
-    error: null,
-    refetch: vi.fn(),
+    error: mocks.projectsError,
+    refetch: mocks.refetchProjects,
   }),
   useCreateFolder: () => ({
     mutateAsync: mocks.createFolder,
@@ -108,6 +140,13 @@ beforeEach(() => {
       IS_REACT_ACT_ENVIRONMENT: boolean;
     }
   ).IS_REACT_ACT_ENVIRONMENT = true;
+  mocks.workspaceId = 'department-1';
+  mocks.workspaceError = null;
+  mocks.folderError = null;
+  mocks.projectsError = null;
+  mocks.refetchWorkspace.mockReset();
+  mocks.refetchFolders.mockReset();
+  mocks.refetchProjects.mockReset();
   mocks.useTasks.mockReset();
   mocks.useTasks.mockReturnValue({
     data: {
@@ -181,5 +220,69 @@ describe('WorkspacePage folder browsing', () => {
 
     expect(container.textContent).not.toContain('General Tasks');
     expect(container.textContent).not.toContain('Autumn appeal');
+  });
+
+  it('clears the selected folder before querying a newly routed workspace', () => {
+    act(() => {
+      root = createRoot(container);
+      root.render(<WorkspacePage />);
+    });
+    const campaigns = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent?.includes('Campaigns'),
+    );
+    if (!campaigns) throw new Error('Campaigns folder was not rendered');
+    act(() => campaigns.click());
+    expect(mocks.useTasks).toHaveBeenLastCalledWith(
+      { folderId: 'campaigns-folder', perPage: 100 },
+      true,
+    );
+
+    mocks.workspaceId = 'department-2';
+    act(() => root?.render(<WorkspacePage />));
+
+    expect(mocks.useTasks).toHaveBeenLastCalledWith(
+      { folderId: '', perPage: 100 },
+      false,
+    );
+    expect(container.textContent).toContain('Health fair');
+    expect(container.textContent).not.toContain('Tasks in');
+  });
+
+  it('identifies a workspace-details failure and retries that query', () => {
+    mocks.workspaceError = new Error('workspace failed');
+    act(() => {
+      root = createRoot(container);
+      root.render(<WorkspacePage />);
+    });
+
+    expect(container.textContent).toContain('workspace details');
+    const retry = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'Try again',
+    );
+    if (!retry) throw new Error('Workspace retry was not rendered');
+    act(() => retry.click());
+
+    expect(mocks.refetchWorkspace).toHaveBeenCalledOnce();
+    expect(mocks.refetchFolders).not.toHaveBeenCalled();
+    expect(mocks.refetchProjects).not.toHaveBeenCalled();
+  });
+
+  it('identifies a folder failure and retries the folder query', () => {
+    mocks.folderError = new Error('folders failed');
+    act(() => {
+      root = createRoot(container);
+      root.render(<WorkspacePage />);
+    });
+
+    expect(container.textContent).toContain('folders');
+    const retry = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'Try again',
+    );
+    if (!retry) throw new Error('Folder retry was not rendered');
+    act(() => retry.click());
+
+    expect(mocks.refetchFolders).toHaveBeenCalledOnce();
+    expect(mocks.refetchWorkspace).not.toHaveBeenCalled();
+    expect(mocks.refetchProjects).not.toHaveBeenCalled();
   });
 });
