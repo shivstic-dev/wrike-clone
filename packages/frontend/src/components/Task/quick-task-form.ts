@@ -44,6 +44,21 @@ export function changeQuickTaskDepartment(
   };
 }
 
+function normalizeQuickTaskDate(value: string): string | undefined {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return undefined;
+
+  const timestamp = new Date(trimmedValue).getTime();
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
+}
+
+function normalizeQuickTaskEstimatedHours(value: QuickTaskFormState['estimatedHours']): number | undefined {
+  if (value === '') return undefined;
+
+  const estimatedHours = Number(value);
+  return Number.isFinite(estimatedHours) && estimatedHours >= 0 ? estimatedHours : undefined;
+}
+
 export function normalizeQuickTaskInput(state: QuickTaskFormState): CreateTaskRequest {
   return {
     title: state.title.trim(),
@@ -51,11 +66,11 @@ export function normalizeQuickTaskInput(state: QuickTaskFormState): CreateTaskRe
     folderId: state.folderId.trim() || undefined,
     projectId: state.projectId.trim() || undefined,
     assigneeIds: state.assigneeIds,
-    dueDate: state.dueDate ? new Date(state.dueDate).toISOString() : undefined,
+    dueDate: normalizeQuickTaskDate(state.dueDate),
     description: state.description.trim() || undefined,
     priority: state.priority,
-    startDate: state.startDate ? new Date(state.startDate).toISOString() : undefined,
-    estimatedHours: state.estimatedHours === '' ? undefined : Number(state.estimatedHours),
+    startDate: normalizeQuickTaskDate(state.startDate),
+    estimatedHours: normalizeQuickTaskEstimatedHours(state.estimatedHours),
     visibility: state.visibility,
   };
 }

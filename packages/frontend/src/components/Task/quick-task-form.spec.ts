@@ -78,6 +78,47 @@ describe('quick task form helpers', () => {
     });
   });
 
+  it.each(['   ', 'not-a-date'])('omits invalid due and start dates: %s', (dateValue) => {
+    const state = {
+      ...createQuickTaskFormState('department-1'),
+      dueDate: dateValue,
+      startDate: dateValue,
+    };
+
+    expect(() => normalizeQuickTaskInput(state)).not.toThrow();
+    expect(normalizeQuickTaskInput(state)).toMatchObject({
+      dueDate: undefined,
+      startDate: undefined,
+    });
+  });
+
+  it.each([NaN, Infinity])('omits a non-finite estimated hour value', (estimatedHours) => {
+    expect(
+      normalizeQuickTaskInput({
+        ...createQuickTaskFormState('department-1'),
+        estimatedHours,
+      }),
+    ).toMatchObject({ estimatedHours: undefined });
+  });
+
+  it('omits a negative estimated hour value', () => {
+    expect(
+      normalizeQuickTaskInput({
+        ...createQuickTaskFormState('department-1'),
+        estimatedHours: -0.25,
+      }),
+    ).toMatchObject({ estimatedHours: undefined });
+  });
+
+  it('preserves a finite nonnegative estimated hour value', () => {
+    expect(
+      normalizeQuickTaskInput({
+        ...createQuickTaskFormState('department-1'),
+        estimatedHours: 2.25,
+      }),
+    ).toMatchObject({ estimatedHours: 2.25 });
+  });
+
   it('clears location and assignee state when the department changes', () => {
     expect(
       changeQuickTaskDepartment(
