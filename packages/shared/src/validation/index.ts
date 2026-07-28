@@ -394,6 +394,15 @@ export const departmentReportFilterSchema = z
 
 // ── Type exports (infer from schemas) ──────────────────────────
 
+export const dashboardOverviewQuerySchema: z.ZodType<
+  { departmentId?: string; days: 30 },
+  z.ZodTypeDef,
+  { departmentId?: string; days?: number }
+> = z.object({
+  departmentId: uuidField.optional(),
+  days: z.coerce.number().default(30).refine((days): days is 30 => days === 30),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type AdminResetPasswordInput = z.infer<typeof adminResetPasswordSchema>;
