@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpStatus } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import type { DashboardOverview } from '@wrike-clone/shared';
 import knex, { type Knex } from 'knex';
@@ -133,18 +133,25 @@ describe('DashboardService', () => {
   };
 
   const dbRows = jest.fn<Promise<DashboardTaskRow[]>, []>();
+  const workspaceExists = jest.fn<Promise<{ id: string } | undefined>, []>();
   const departmentAccess = {
     getReportScope: jest.fn(),
   };
   let db: jest.MockedFunction<Knex>;
+  let workspaceQuery: {
+    where: jest.Mock;
+    whereNull: jest.Mock;
+    first: jest.Mock;
+  };
   let service: DashboardService;
 
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(new Date('2026-07-28T12:00:00.000Z'));
     dbRows.mockReset();
+    workspaceExists.mockReset();
     departmentAccess.getReportScope.mockReset();
 
-    const query = {
+    const taskRowsQuery = {
       join: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       whereNull: jest.fn().mockReturnThis(),
@@ -156,7 +163,14 @@ describe('DashboardService', () => {
         onRejected?: (reason: unknown) => unknown,
       ) => dbRows().then(onFulfilled, onRejected),
     };
-    const database = jest.fn(() => query) as unknown as jest.MockedFunction<Knex>;
+    workspaceQuery = {
+      where: jest.fn().mockReturnThis(),
+      whereNull: jest.fn().mockReturnThis(),
+      first: jest.fn(() => workspaceExists()),
+    };
+    const database = jest.fn((table: string) =>
+      table === 'workspaces' ? workspaceQuery : taskRowsQuery,
+    ) as unknown as jest.MockedFunction<Knex>;
     database.raw = jest.fn((sql: string) => sql) as unknown as typeof database.raw;
     db = database;
     service = new DashboardService(db, departmentAccess as never);
@@ -227,6 +241,9 @@ describe('DashboardService', () => {
       context.userId,
     ]);
     expect(result.departments).toEqual([]);
+    expect(db).toHaveBeenCalledTimes(1);
+    expect(db).toHaveBeenCalledWith('tasks');
+    expect(workspaceExists).not.toHaveBeenCalled();
   });
 
   it('counts a task and its capacity once when legacy and junction assignments overlap', async () => {
@@ -303,6 +320,52 @@ describe('DashboardService', () => {
     expect(dbRows).toHaveBeenCalledTimes(1);
   });
 
+  it('validates an explicit admin department in the current tenant before querying tasks', async () => {
+    const departmentId = 'e7d22702-f992-4590-8d20-f74bfe13ac8c';
+    departmentAccess.getReportScope.mockResolvedValue({
+      role: 'admin',
+      departmentId,
+      ownTasksOnly: false,
+    });
+    workspaceExists.mockResolvedValue({ id: departmentId });
+    dbRows.mockResolvedValue([]);
+
+    const result = await tenantContext.run(context, () =>
+      service.overview({ departmentId, days: 30 }),
+    );
+
+    expect(result.scope.departmentId).toBe(departmentId);
+    expect(db).toHaveBeenNthCalledWith(1, 'workspaces');
+    expect(db).toHaveBeenNthCalledWith(2, 'tasks');
+    expect(workspaceQuery.where).toHaveBeenCalledWith({
+      id: departmentId,
+      tenant_id: context.tenantId,
+    });
+    expect(workspaceQuery.whereNull).toHaveBeenCalledWith('deleted_at');
+    expect(workspaceExists).toHaveBeenCalledTimes(1);
+    expect(dbRows).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a foreign admin department before the task-row query', async () => {
+    const foreignDepartmentId = 'f517ea4b-c009-4465-bd2c-6064489f07c7';
+    departmentAccess.getReportScope.mockResolvedValue({
+      role: 'admin',
+      departmentId: foreignDepartmentId,
+      ownTasksOnly: false,
+    });
+    workspaceExists.mockResolvedValue(undefined);
+
+    await expect(
+      tenantContext.run(context, () =>
+        service.overview({ departmentId: foreignDepartmentId, days: 30 }),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(db).toHaveBeenCalledTimes(1);
+    expect(db).toHaveBeenCalledWith('workspaces');
+    expect(workspaceExists).toHaveBeenCalledTimes(1);
+    expect(dbRows).not.toHaveBeenCalled();
+  });
+
   it('fails closed if the access service does not resolve a dashboard role', async () => {
     departmentAccess.getReportScope.mockResolvedValue({
       role: 'none',
@@ -354,11 +417,25 @@ describe('DashboardController', () => {
     expect(overview).toHaveBeenCalledWith({ departmentId, days: 30 });
   });
 
-  it('rejects unsupported windows before calling the service', async () => {
+  it('returns a safe 400 response for unsupported windows without calling the service', async () => {
     const overview = jest.fn<Promise<DashboardOverview>, [{ departmentId?: string; days: 30 }]>();
     const controller = new DashboardController({ overview } as never);
 
-    await expect(controller.overview({ days: 7 })).rejects.toBeInstanceOf(ZodError);
+    let thrown: unknown;
+    try {
+      await controller.overview({ days: 7 });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(BadRequestException);
+    expect((thrown as BadRequestException).getStatus()).toBe(HttpStatus.BAD_REQUEST);
+    expect((thrown as BadRequestException).getResponse()).toEqual({
+      statusCode: 400,
+      message: 'Invalid dashboard query',
+      issues: [{ code: 'custom', path: ['days'], message: 'Invalid input' }],
+    });
+    expect(thrown).not.toBeInstanceOf(ZodError);
     expect(overview).not.toHaveBeenCalled();
   });
 });

@@ -298,12 +298,23 @@ export class DashboardService {
     if (resolved.role !== 'admin' && !resolved.departmentId) {
       throw new ForbiddenException('A department is required for dashboard access');
     }
+    const departmentId =
+      resolved.role === 'admin' ? input.departmentId : resolved.departmentId;
+    if (resolved.role === 'admin' && departmentId) {
+      const department = await this.db('workspaces')
+        .where({ id: departmentId, tenant_id: ctx.tenantId })
+        .whereNull('deleted_at')
+        .first('id');
+      if (!department) {
+        throw new ForbiddenException('Department access denied');
+      }
+    }
 
     const scope: DashboardQueryScope = {
       tenantId: ctx.tenantId,
       userId: ctx.userId,
       role: resolved.role,
-      departmentId: resolved.departmentId,
+      departmentId,
     };
     const now = new Date();
     const rows = (await buildDashboardRowsQuery(this.db, scope)) as DashboardTaskRow[];
@@ -313,7 +324,7 @@ export class DashboardService {
       generatedAt: now.toISOString(),
       windowDays: input.days,
       scope: {
-        departmentId: resolved.departmentId,
+        departmentId,
         role: resolved.role,
       },
       ...metrics,
