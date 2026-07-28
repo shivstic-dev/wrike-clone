@@ -4,6 +4,7 @@ import type { DashboardOverview, Task } from '@wrike-clone/shared';
 import type { DepartmentTaskGroup, GroupedDepartmentTasks } from '../../api/tasks';
 import { AttentionQueue } from './AttentionQueue';
 import { DepartmentPulse } from './DepartmentPulse';
+import { ProgressPanel } from './ProgressPanel';
 
 const WorkMovementChart = lazy(() => import('./WorkMovementChart'));
 const DistributionChart = lazy(() => import('./DistributionChart'));
@@ -11,7 +12,6 @@ const DistributionChart = lazy(() => import('./DistributionChart'));
 export interface RoleCompositionProps {
   overview: DashboardOverview;
   grouped?: GroupedDepartmentTasks;
-  onRetryOverview(): void;
 }
 
 function ChartLoading() {
@@ -32,7 +32,7 @@ export function AtlasPanel({
   title: string;
 }) {
   return (
-    <section className="workboard-card overflow-hidden rounded-2xl border border-atlas-mist bg-white">
+    <section className="workboard-card h-full overflow-hidden rounded-2xl border border-atlas-mist bg-white">
       <header className="border-b border-atlas-mist px-5 py-4">
         <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
           {eyebrow}
@@ -44,80 +44,31 @@ export function AtlasPanel({
   );
 }
 
-export function OverviewCore({
-  overview,
-  onRetryOverview,
-}: Pick<RoleCompositionProps, 'overview' | 'onRetryOverview'>) {
-  const generated = new Date(overview.generatedAt);
-  const generatedLabel = Number.isNaN(generated.getTime())
-    ? 'Update time unavailable'
-    : `Updated ${new Intl.DateTimeFormat(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(generated)}`;
-
-  return (
-    <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
-          Live scope · {overview.windowDays}-day field note · {generatedLabel}
-        </p>
-        <button
-          type="button"
-          onClick={onRetryOverview}
-          className="rounded-xl border border-atlas-mist bg-white px-3 py-1.5 font-atlasMono text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-atlas-canopy shadow-sm hover:border-atlas-current focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
-        >
-          Refresh overview
-        </button>
-      </div>
-
-      <DepartmentPulse overview={overview} />
-
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.65fr)]">
-        <div className="min-w-0">
-          <span className="sr-only">Work movement</span>
-          <Suspense fallback={<ChartLoading />}>
-            <WorkMovementChart generatedAt={overview.generatedAt} daily={overview.daily} />
-          </Suspense>
-        </div>
-        <AttentionQueue attention={overview.attention} />
-      </div>
-    </>
-  );
+export function OverviewCore({ overview }: Pick<RoleCompositionProps, 'overview'>) {
+  return <DepartmentPulse overview={overview} />;
 }
 
-export function GettingStarted({ overview }: { overview: DashboardOverview }) {
-  const fieldNotes = [
-    { label: 'Open work in view', value: overview.totals.active },
-    { label: 'Flagged for review', value: overview.attention.length },
-    { label: `Completed in ${overview.windowDays} days`, value: overview.totals.completed },
-  ];
-
+export function WorkMovementPanel({ overview }: { overview: DashboardOverview }) {
   return (
-    <AtlasPanel eyebrow="Live orientation" title="Getting started">
-      <p className="px-5 pt-4 text-sm leading-6 text-slate-600">
-        Start with the current scope. These checkpoints update with the overview.
-      </p>
-      <dl className="divide-y divide-atlas-mist px-5 pb-2 pt-3">
-        {fieldNotes.map((note) => (
-          <div key={note.label} className="flex items-center justify-between gap-4 py-3">
-            <dt className="text-sm text-atlas-ink">{note.label}</dt>
-            <dd className="font-atlasMono text-sm font-medium text-atlas-canopy">{note.value}</dd>
-          </div>
-        ))}
-      </dl>
-    </AtlasPanel>
+    <div className="h-full min-w-0">
+      <span className="sr-only">Work movement</span>
+      <Suspense fallback={<ChartLoading />}>
+        <WorkMovementChart generatedAt={overview.generatedAt} daily={overview.daily} />
+      </Suspense>
+    </div>
   );
 }
 
 export function TaskList({ tasks, title }: { tasks: Task[]; title: string }) {
+  const visibleTasks = tasks.slice(0, 5);
+
   return (
     <AtlasPanel eyebrow={`${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}`} title={title}>
       {tasks.length === 0 ? (
         <p className="px-5 py-8 text-sm text-slate-600">No tasks are available in this lane.</p>
       ) : (
         <ul className="divide-y divide-atlas-mist px-5">
-          {tasks.map((task) => (
+          {visibleTasks.map((task) => (
             <li key={task.id}>
               <Link
                 to={`/tasks/${task.id}`}
@@ -134,44 +85,96 @@ export function TaskList({ tasks, title }: { tasks: Task[]; title: string }) {
           ))}
         </ul>
       )}
+      {tasks.length > visibleTasks.length && (
+        <p className="border-t border-atlas-mist bg-slate-50 px-5 py-3 text-xs text-slate-500">
+          {tasks.length - visibleTasks.length} more tasks in this lane
+        </p>
+      )}
     </AtlasPanel>
   );
 }
 
 export function PeopleWork({ groups, title }: { groups: DepartmentTaskGroup[]; title: string }) {
   return (
-    <section className="space-y-3" aria-label={title}>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="font-atlasDisplay text-lg font-semibold text-atlas-ink">{title}</h2>
-        <span className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.08em] text-atlas-current">
-          {groups.length} people
-        </span>
-      </div>
+    <AtlasPanel
+      eyebrow={`${groups.length} ${groups.length === 1 ? 'person' : 'people'}`}
+      title={title}
+    >
       {groups.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-atlas-mist bg-white px-5 py-8 text-sm text-slate-600">
+        <div className="px-5 py-8 text-sm text-slate-600">
           No grouped work is available in this lane.
         </div>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {groups.map((group) => (
-            <TaskList
-              key={group.user.userId}
-              title={group.user.displayName || group.user.email}
-              tasks={group.tasks}
-            />
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[34rem] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-atlas-mist bg-slate-50 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-slate-500">
+                <th className="px-5 py-3 font-medium" scope="col">
+                  Person
+                </th>
+                <th className="px-4 py-3 text-right font-medium" scope="col">
+                  Tasks
+                </th>
+                <th className="px-4 py-3 text-right font-medium" scope="col">
+                  Open
+                </th>
+                <th className="px-5 py-3 font-medium" scope="col">
+                  Current item
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map((group) => {
+                const currentTask =
+                  group.tasks.find((task) => task.status !== 'completed') ?? group.tasks[0];
+                const openCount = group.tasks.filter((task) => task.status !== 'completed').length;
+
+                return (
+                  <tr className="border-b border-atlas-mist last:border-0" key={group.user.userId}>
+                    <th className="px-5 py-3 font-semibold text-atlas-ink" scope="row">
+                      {group.user.displayName || group.user.email}
+                    </th>
+                    <td className="px-4 py-3 text-right font-atlasMono text-slate-600">
+                      {group.tasks.length}
+                    </td>
+                    <td className="px-4 py-3 text-right font-atlasMono text-atlas-ink">
+                      {openCount}
+                    </td>
+                    <td className="max-w-64 px-5 py-3">
+                      {currentTask ? (
+                        <Link
+                          className="block truncate font-medium text-atlas-current hover:text-atlas-canopy"
+                          to={`/tasks/${currentTask.id}`}
+                        >
+                          {currentTask.title}
+                        </Link>
+                      ) : (
+                        <span className="text-slate-400">No tasks</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
-    </section>
+    </AtlasPanel>
   );
 }
 
-export function EmployeeDashboard({ overview, onRetryOverview }: RoleCompositionProps) {
+export function EmployeeDashboard({ overview }: RoleCompositionProps) {
   return (
-    <div className="space-y-4" data-dashboard-role="employee">
-      <OverviewCore overview={overview} onRetryOverview={onRetryOverview} />
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <div className="min-w-0">
+    <div className="space-y-5" data-dashboard-role="employee">
+      <OverviewCore overview={overview} />
+      <div className="grid items-stretch gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-8">
+          <WorkMovementPanel overview={overview} />
+        </div>
+        <div className="min-w-0 xl:col-span-4">
+          <AttentionQueue attention={overview.attention} />
+        </div>
+        <div className="min-w-0 xl:col-span-7">
           <span className="sr-only">My workload</span>
           <Suspense fallback={<ChartLoading />}>
             <DistributionChart
@@ -182,7 +185,9 @@ export function EmployeeDashboard({ overview, onRetryOverview }: RoleComposition
             />
           </Suspense>
         </div>
-        <GettingStarted overview={overview} />
+        <div className="min-w-0 xl:col-span-5">
+          <ProgressPanel overview={overview} />
+        </div>
       </div>
     </div>
   );

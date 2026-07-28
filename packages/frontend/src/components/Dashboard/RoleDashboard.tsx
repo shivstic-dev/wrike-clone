@@ -8,7 +8,6 @@ import { ManagerDashboard } from './ManagerDashboard';
 export interface RoleDashboardProps {
   overview: DashboardOverview;
   grouped?: GroupedDepartmentTasks;
-  onRetryOverview(): void;
 }
 
 export function RoleDashboard(props: RoleDashboardProps) {

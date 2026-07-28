@@ -17,7 +17,7 @@ export default function CalendarPage() {
   const tasks = tasksData?.data || [];
 
   return (
-    <div className="mx-auto max-w-7xl p-6">
+    <div className="mx-auto max-w-[96rem] p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Calendar</h1>
         <p className="mt-1 text-sm text-slate-500">View tasks by due date across all projects.</p>

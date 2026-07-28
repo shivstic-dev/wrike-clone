@@ -13,6 +13,7 @@ import { clsx } from 'clsx';
 import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useWorkspaces } from '../api/workspaces';
+import { ProductGuide } from '../components/Guidance/ProductGuide';
 import { QuickTaskModal } from '../components/Task/QuickTaskModal';
 import {
   canCreateQuickTask,
@@ -49,19 +50,22 @@ interface MobileNavigationSheetProps extends PrimaryNavigationProps {
 const iconPaths: Record<NavigationItem['icon'], string> = {
   admin:
     'M12 15.75A3.75 3.75 0 1 0 12 8.25a3.75 3.75 0 0 0 0 7.5Zm7.5-3.75a7.7 7.7 0 0 0-.12-1.35l1.62-1.26-1.8-3.12-1.95.78a7.56 7.56 0 0 0-2.34-1.35L14.61 3h-3.6l-.3 2.7a7.56 7.56 0 0 0-2.34 1.35l-1.95-.78-1.8 3.12 1.62 1.26A7.7 7.7 0 0 0 6.12 12c0 .46.04.91.12 1.35l-1.62 1.26 1.8 3.12 1.95-.78a7.56 7.56 0 0 0 2.34 1.35l.3 2.7h3.6l.3-2.7a7.56 7.56 0 0 0 2.34-1.35l1.95.78 1.8-3.12-1.62-1.26c.08-.44.12-.89.12-1.35Z',
+  calendar: 'M6 3v3m12-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Zm3 8h3v3H8v-3Z',
   dashboard: 'M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z',
   department: 'M4 20V7l8-3 8 3v13M8 10h2m4 0h2m-8 4h2m4 0h2M9 20v-3h6v3',
+  portfolio: 'M4 7h16v12H4V7Zm5 0V5h6v2m-4 5h2',
   reports: 'M5 20V10h3v10H5Zm6 0V4h3v16h-3Zm6 0v-7h3v7h-3Z',
   tasks: 'm5 12 3 3L19 6M5 6h6M5 20h14',
+  timesheets: 'M12 7v5l3 2m5-2a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z',
 };
 
 const sectionLabels: Record<NavigationItem['section'], string> = {
-  manage: 'Manage',
-  overview: 'Overview',
+  manage: 'Insights',
+  overview: 'Menu',
   workspace: 'Workspace',
 };
 
-function useIsMobile(breakpoint = 768) {
+function useIsMobile(breakpoint = 1100) {
   const [mobile, setMobile] = useState(
     typeof window !== 'undefined' ? window.innerWidth < breakpoint : false,
   );
@@ -286,6 +290,7 @@ function TopBar({
   navigationTriggerRef,
   onCreateTask,
   onLogout,
+  onOpenGuide,
   onOpenNavigation,
 }: {
   accountUser: AccountUser | null;
@@ -296,6 +301,7 @@ function TopBar({
   navigationTriggerRef: RefObject<HTMLButtonElement | null>;
   onCreateTask: () => void;
   onLogout: () => void;
+  onOpenGuide: () => void;
   onOpenNavigation: () => void;
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
@@ -352,6 +358,9 @@ function TopBar({
         )}
       </div>
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+        <Button onClick={onOpenGuide} size="sm" variant="ghost">
+          Guide
+        </Button>
         {helpContent && (
           <div className="relative">
             <Button
@@ -379,7 +388,7 @@ function TopBar({
             <span aria-hidden="true" className="text-base leading-none">
               +
             </span>
-            Create task
+            <span className="hidden sm:inline">Create task</span>
           </Button>
         )}
         <AccountMenu onLogout={onLogout} user={accountUser} />
@@ -429,7 +438,7 @@ function MobileNavigationSheet({
   };
 
   return (
-    <div className="fixed inset-0 z-40 md:hidden">
+    <div className="fixed inset-0 z-40 min-[1100px]:hidden">
       <button
         aria-label="Close navigation"
         className="absolute inset-0 bg-atlas-ink/35 backdrop-blur-[2px]"
@@ -482,13 +491,16 @@ export default function AppShell({ helpContent }: AppShellProps) {
   const navigationTriggerRef = useRef<HTMLButtonElement>(null);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [quickTaskOpen, setQuickTaskOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const shellRole = shellRoleFor(membership?.role, workspaces);
+  const dashboardDepartmentId = new URLSearchParams(location.search).get('department') || undefined;
+  const activeDepartmentId = workspaceId || dashboardDepartmentId;
   const navigationItems = useMemo(() => navigationForRole(shellRole), [shellRole]);
   const creatableDepartments = creatableQuickTaskDepartments(workspaces, membership?.role);
   const canQuickCreate = !workspacesPending && canCreateQuickTask(workspaces, membership?.role);
   const initialQuickTaskDepartmentId = resolveQuickTaskInitialDepartmentId(
-    workspaceId,
+    activeDepartmentId,
     creatableDepartments,
   );
 
@@ -497,6 +509,22 @@ export default function AppShell({ helpContent }: AppShellProps) {
     navigationTriggerRef.current?.focus();
   }, []);
   const closeQuickTask = useCallback(() => setQuickTaskOpen(false), []);
+  const closeGuide = useCallback(() => {
+    setGuideOpen(false);
+    try {
+      window.localStorage.setItem('openwork.field-guide.v1', 'seen');
+    } catch {
+      // The guide remains usable when browser storage is unavailable.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      setGuideOpen(window.localStorage.getItem('openwork.field-guide.v1') !== 'seen');
+    } catch {
+      setGuideOpen(false);
+    }
+  }, []);
 
   useEffect(() => {
     setMobileNavigationOpen(false);
@@ -520,7 +548,7 @@ export default function AppShell({ helpContent }: AppShellProps) {
   return (
     <div className="workboard-canvas flex h-screen overflow-hidden text-atlas-ink">
       {!mobile && (
-        <aside className="flex w-64 shrink-0 flex-col border-r border-atlas-mist bg-[#f7f8f7]">
+        <aside className="flex w-[15.5rem] shrink-0 flex-col border-r border-atlas-mist bg-[#f7f8f7]">
           <div className="flex min-h-[4.5rem] items-center border-b border-atlas-mist px-5">
             <Link
               className="flex items-center gap-2.5 font-atlasDisplay text-lg font-semibold text-atlas-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-atlas-current"
@@ -536,7 +564,7 @@ export default function AppShell({ helpContent }: AppShellProps) {
             </Link>
           </div>
           <PrimaryNavigation
-            activeDepartmentId={workspaceId}
+            activeDepartmentId={activeDepartmentId}
             currentHash={location.hash}
             currentPath={location.pathname}
             items={navigationItems}
@@ -554,6 +582,7 @@ export default function AppShell({ helpContent }: AppShellProps) {
           navigationTriggerRef={navigationTriggerRef}
           onCreateTask={() => setQuickTaskOpen(true)}
           onLogout={logout}
+          onOpenGuide={() => setGuideOpen(true)}
           onOpenNavigation={() => setMobileNavigationOpen(true)}
         />
         <main className="min-h-0 flex-1 overflow-y-auto">
@@ -562,7 +591,7 @@ export default function AppShell({ helpContent }: AppShellProps) {
       </div>
       {mobile && (
         <MobileNavigationSheet
-          activeDepartmentId={workspaceId}
+          activeDepartmentId={activeDepartmentId}
           currentHash={location.hash}
           currentPath={location.pathname}
           items={navigationItems}
@@ -579,6 +608,17 @@ export default function AppShell({ helpContent }: AppShellProps) {
           open
         />
       )}
+      {guideOpen ? (
+        <ProductGuide
+          canQuickCreate={canQuickCreate}
+          onClose={closeGuide}
+          onCreateTask={() => {
+            closeGuide();
+            setQuickTaskOpen(true);
+          }}
+          role={shellRole}
+        />
+      ) : null}
       <Toaster position="bottom-right" />
     </div>
   );

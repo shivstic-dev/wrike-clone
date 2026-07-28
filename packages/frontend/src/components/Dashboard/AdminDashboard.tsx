@@ -3,8 +3,12 @@ import {
   OverviewCore,
   PeopleWork,
   TaskList,
+  WorkMovementPanel,
   type RoleCompositionProps,
 } from './EmployeeDashboard';
+import { AttentionQueue } from './AttentionQueue';
+import { CapacityPanel } from './CapacityPanel';
+import { ProgressPanel } from './ProgressPanel';
 
 function DepartmentComparison({
   departments,
@@ -63,9 +67,9 @@ function DepartmentComparison({
     </AtlasPanel>
   );
 }
-function SetupHealth({ overview }: Pick<RoleCompositionProps, 'overview'>) {
+function WorkCoverage({ overview }: Pick<RoleCompositionProps, 'overview'>) {
   const measures = [
-    { label: 'Departments reporting', value: overview.departments.length },
+    { label: 'Departments with task data', value: overview.departments.length },
     {
       label: 'Assigned active work',
       value: Math.max(0, overview.totals.active - overview.totals.unassigned),
@@ -75,7 +79,7 @@ function SetupHealth({ overview }: Pick<RoleCompositionProps, 'overview'>) {
   ];
 
   return (
-    <AtlasPanel eyebrow="Live configuration signals" title="Setup health">
+    <AtlasPanel eyebrow="Current ownership signals" title="Work coverage">
       <dl className="grid grid-cols-2 gap-px bg-atlas-mist">
         {measures.map((measure) => (
           <div key={measure.label} className="bg-white px-5 py-5">
@@ -90,24 +94,48 @@ function SetupHealth({ overview }: Pick<RoleCompositionProps, 'overview'>) {
   );
 }
 
-export function AdminDashboard({ grouped, overview, onRetryOverview }: RoleCompositionProps) {
+export function AdminDashboard({ grouped, overview }: RoleCompositionProps) {
   return (
-    <div className="space-y-4" data-dashboard-role="admin">
-      <OverviewCore overview={overview} onRetryOverview={onRetryOverview} />
+    <div className="space-y-5" data-dashboard-role="admin">
+      <OverviewCore overview={overview} />
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)]">
-        <DepartmentComparison departments={overview.departments} />
-        <SetupHealth overview={overview} />
-      </div>
-
-      {grouped && (
-        <div className="space-y-4">
-          <TaskList title="My work" tasks={grouped.myTasks} />
-          <PeopleWork title="Manager work" groups={grouped.managerGroups} />
-          <PeopleWork title="Employee work" groups={grouped.employeeGroups} />
-          <TaskList title="Unassigned work" tasks={grouped.unassigned} />
+      <div className="grid items-stretch gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-8">
+          <DepartmentComparison departments={overview.departments} />
         </div>
-      )}
+        <div className="min-w-0 xl:col-span-4">
+          <WorkCoverage overview={overview} />
+        </div>
+        <div className="min-w-0 xl:col-span-8">
+          <WorkMovementPanel overview={overview} />
+        </div>
+        <div className="min-w-0 xl:col-span-4">
+          <AttentionQueue attention={overview.attention} />
+        </div>
+        <div className="min-w-0 xl:col-span-7">
+          <CapacityPanel capacity={overview.capacity} />
+        </div>
+        <div className="min-w-0 xl:col-span-5">
+          <ProgressPanel overview={overview} />
+        </div>
+
+        {grouped && (
+          <>
+            <div className="min-w-0 xl:col-span-6">
+              <TaskList title="My work" tasks={grouped.myTasks} />
+            </div>
+            <div className="min-w-0 xl:col-span-6">
+              <TaskList title="Unassigned work" tasks={grouped.unassigned} />
+            </div>
+            <div className="min-w-0 xl:col-span-12">
+              <PeopleWork title="Manager work" groups={grouped.managerGroups} />
+            </div>
+            <div className="min-w-0 xl:col-span-12">
+              <PeopleWork title="Employee work" groups={grouped.employeeGroups} />
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

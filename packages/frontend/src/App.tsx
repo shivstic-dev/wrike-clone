@@ -16,6 +16,10 @@ const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'));
 const MyTasksPage = lazy(() => import('./pages/MyTasksPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
+const SearchPage = lazy(() => import('./pages/SearchPage'));
+const CalendarPage = lazy(() => import('./pages/CalendarPage'));
+const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
+const TimesheetsPage = lazy(() => import('./pages/TimesheetsPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,6 +88,10 @@ export default function App() {
                   <Route path="/my-tasks" element={<MyTasksPage />} />
                   <Route path="/admin" element={<AdminPage />} />
                   <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/search" element={<SearchPage />} />
+                  <Route path="/calendar" element={<CalendarPage />} />
+                  <Route path="/portfolio" element={<PortfolioPage />} />
+                  <Route path="/timesheets" element={<TimesheetsPage />} />
                   <Route path="/workspaces/:workspaceId" element={<WorkspacePage />} />
                   <Route path="/projects/:projectId" element={<ProjectPage />} />
                   <Route path="/tasks/:taskId" element={<TaskDetailPage />} />

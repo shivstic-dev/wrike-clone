@@ -4,21 +4,19 @@ export interface DepartmentPulseProps {
   overview: DashboardOverview;
 }
 
-function comparisonValue(change: number | null): { value: string; detail: string } {
+function comparisonDetail(change: number | null): string {
   if (change === null) {
-    return { value: 'No baseline', detail: 'No prior completions to compare' };
+    return 'No prior 30-day baseline';
   }
 
-  const direction = change > 0 ? '↑' : change < 0 ? '↓' : '→';
+  const direction = change > 0 ? 'increased' : change < 0 ? 'decreased' : 'unchanged';
   const prefix = change > 0 ? '+' : '';
-  return {
-    value: `${direction} ${prefix}${change}%`,
-    detail: 'Completed vs prior 30 days',
-  };
+  return `${prefix}${change}% ${direction} from prior period`;
 }
 
 export function DepartmentPulse({ overview }: DepartmentPulseProps) {
-  const comparison = comparisonValue(overview.comparison.completedPercentChange);
+  const completed30Days = overview.daily.reduce((total, day) => total + day.completed, 0);
+  const created30Days = overview.daily.reduce((total, day) => total + day.created, 0);
   const attentionDetail = [
     overview.totals.overdue > 0 ? `${overview.totals.overdue} overdue` : null,
     overview.totals.blocked > 0 ? `${overview.totals.blocked} blocked` : null,
@@ -29,23 +27,23 @@ export function DepartmentPulse({ overview }: DepartmentPulseProps) {
 
   const cells = [
     {
-      label: 'Completion trend',
-      value: comparison.value,
-      detail: comparison.detail,
+      label: 'Active work',
+      value: String(overview.totals.active),
+      detail: overview.totals.active === 1 ? 'Open task in this scope' : 'Open tasks in this scope',
       className: 'workboard-feature border-primary-900 text-white',
       mutedClassName: 'text-emerald-100/75',
     },
     {
-      label: 'Active work',
-      value: String(overview.totals.active),
-      detail: 'Open tasks in this scope',
+      label: 'Completed',
+      value: String(completed30Days),
+      detail: comparisonDetail(overview.comparison.completedPercentChange),
       className: 'workboard-card border-atlas-mist bg-white text-atlas-ink',
       mutedClassName: 'text-slate-500',
     },
     {
-      label: 'Completed',
-      value: String(overview.totals.completed),
-      detail: `Last ${overview.windowDays} days`,
+      label: 'Created',
+      value: String(created30Days),
+      detail: comparisonDetail(overview.comparison.createdPercentChange),
       className: 'workboard-card border-atlas-mist bg-white text-atlas-ink',
       mutedClassName: 'text-slate-500',
     },

@@ -1,12 +1,4 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ChartFrame } from './ChartFrame';
 
 export interface DistributionChartProps {
@@ -79,38 +71,38 @@ export function DistributionChart({
       fallback={fallback}
     >
       <div className="min-w-0">
-        <div className="h-64 w-full min-w-0">
+        <div className="h-56 w-full min-w-0 sm:h-60">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
               layout="vertical"
               margin={{ top: 4, right: 12, bottom: 4, left: 8 }}
             >
-              <CartesianGrid stroke="#DCE9E6" strokeDasharray="3 3" horizontal={false} />
+              <CartesianGrid stroke="#DDE5E0" strokeDasharray="3 3" horizontal={false} />
               <XAxis
                 type="number"
                 allowDecimals={false}
-                stroke="#25766F"
-                tick={{ fill: '#25766F', fontSize: 11 }}
+                stroke="#65736C"
+                tick={{ fill: '#65736C', fontSize: 11 }}
                 tickLine={false}
               />
               <YAxis
                 type="category"
                 dataKey="label"
                 width={88}
-                stroke="#25766F"
-                tick={{ fill: '#183432', fontSize: 11 }}
+                stroke="#65736C"
+                tick={{ fill: '#181C1A', fontSize: 11 }}
                 tickLine={false}
               />
               <Tooltip
                 isAnimationActive={false}
-                contentStyle={{ borderColor: '#DCE9E6', borderRadius: 8, color: '#183432' }}
+                contentStyle={{ borderColor: '#DDE5E0', borderRadius: 12, color: '#181C1A' }}
               />
               <Bar
                 className="dashboard-series-distribution"
                 dataKey="value"
                 name="Tasks"
-                fill="#25766F"
+                fill="#147A50"
                 radius={[0, 6, 6, 0]}
                 isAnimationActive={false}
               />

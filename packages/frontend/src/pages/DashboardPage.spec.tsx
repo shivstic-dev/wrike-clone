@@ -2,6 +2,7 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DashboardPage from './DashboardPage';
 
@@ -106,7 +107,11 @@ let root: Root | undefined;
 async function renderPage(): Promise<void> {
   await act(async () => {
     root = createRoot(container);
-    root.render(<DashboardPage />);
+    root.render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>,
+    );
     await Promise.resolve();
   });
 }

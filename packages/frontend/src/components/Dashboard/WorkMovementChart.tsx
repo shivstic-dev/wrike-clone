@@ -85,33 +85,31 @@ export function WorkMovementChart({ daily, generatedAt }: WorkMovementChartProps
       generatedAt={generatedAt}
       summary={summary}
       emptyMessage={
-        daily.length === 0
-          ? 'No work movement was recorded for this 30-day period.'
-          : undefined
+        daily.length === 0 ? 'No work movement was recorded for this 30-day period.' : undefined
       }
       fallback={fallback}
     >
       <div className="min-w-0">
-        <div className="h-64 w-full min-w-0">
+        <div className="h-56 w-full min-w-0 sm:h-60">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={daily} margin={{ top: 8, right: 8, bottom: 4, left: -16 }}>
-              <CartesianGrid stroke="#DCE9E6" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke="#DDE5E0" strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="date"
                 tickFormatter={formatDashboardDate}
-                stroke="#25766F"
-                tick={{ fill: '#25766F', fontSize: 11 }}
+                stroke="#65736C"
+                tick={{ fill: '#65736C', fontSize: 11 }}
                 tickLine={false}
               />
               <YAxis
                 allowDecimals={false}
-                stroke="#25766F"
-                tick={{ fill: '#25766F', fontSize: 11 }}
+                stroke="#65736C"
+                tick={{ fill: '#65736C', fontSize: 11 }}
                 tickLine={false}
               />
               <Tooltip
                 isAnimationActive={false}
-                contentStyle={{ borderColor: '#DCE9E6', borderRadius: 8, color: '#183432' }}
+                contentStyle={{ borderColor: '#DDE5E0', borderRadius: 12, color: '#181C1A' }}
                 labelFormatter={(label) => formatDashboardDate(String(label))}
               />
               <Legend />
@@ -120,7 +118,7 @@ export function WorkMovementChart({ daily, generatedAt }: WorkMovementChartProps
                 type="monotone"
                 dataKey="created"
                 name="Created"
-                stroke="#25766F"
+                stroke="#147A50"
                 strokeWidth={2.5}
                 dot={false}
                 isAnimationActive={false}
@@ -130,7 +128,7 @@ export function WorkMovementChart({ daily, generatedAt }: WorkMovementChartProps
                 type="monotone"
                 dataKey="completed"
                 name="Completed"
-                stroke="#123C3A"
+                stroke="#0D3B2A"
                 strokeDasharray="6 4"
                 strokeWidth={2.5}
                 dot={false}

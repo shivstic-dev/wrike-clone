@@ -1,44 +1,50 @@
+import { AttentionQueue } from './AttentionQueue';
 import { CapacityPanel } from './CapacityPanel';
+import { ProgressPanel } from './ProgressPanel';
 import {
-  AtlasPanel,
-  GettingStarted,
   OverviewCore,
   PeopleWork,
   TaskList,
+  WorkMovementPanel,
   type RoleCompositionProps,
 } from './EmployeeDashboard';
 
-export function DepartmentHeadDashboard({
-  grouped,
-  overview,
-  onRetryOverview,
-}: RoleCompositionProps) {
+export function DepartmentHeadDashboard({ grouped, overview }: RoleCompositionProps) {
   return (
-    <div className="space-y-4" data-dashboard-role="department_head">
-      <OverviewCore overview={overview} onRetryOverview={onRetryOverview} />
+    <div className="space-y-5" data-dashboard-role="department_head">
+      <OverviewCore overview={overview} />
 
-      <div className="grid items-start gap-4 xl:grid-cols-2">
-        <CapacityPanel capacity={overview.capacity} />
-        <GettingStarted overview={overview} />
+      <div className="grid items-stretch gap-4 xl:grid-cols-12">
+        <div className="min-w-0 xl:col-span-8">
+          <WorkMovementPanel overview={overview} />
+        </div>
+        <div className="min-w-0 xl:col-span-4">
+          <AttentionQueue attention={overview.attention} />
+        </div>
+        <div className="min-w-0 xl:col-span-7">
+          <CapacityPanel capacity={overview.capacity} />
+        </div>
+        <div className="min-w-0 xl:col-span-5">
+          <ProgressPanel overview={overview} />
+        </div>
+
+        {grouped && (
+          <>
+            <div className="min-w-0 xl:col-span-6">
+              <TaskList title="My work" tasks={grouped.myTasks} />
+            </div>
+            <div className="min-w-0 xl:col-span-6">
+              <TaskList title="Unassigned work" tasks={grouped.unassigned} />
+            </div>
+            <div className="min-w-0 xl:col-span-12">
+              <PeopleWork title="Manager work" groups={grouped.managerGroups} />
+            </div>
+            <div className="min-w-0 xl:col-span-12">
+              <PeopleWork title="Employee work" groups={grouped.employeeGroups} />
+            </div>
+          </>
+        )}
       </div>
-
-      {grouped && (
-        <>
-          <div className="grid items-start gap-4 xl:grid-cols-2">
-            <TaskList title="My work" tasks={grouped.myTasks} />
-            <TaskList title="Unassigned work" tasks={grouped.unassigned} />
-          </div>
-          <PeopleWork title="Manager work" groups={grouped.managerGroups} />
-          <PeopleWork title="Employee work" groups={grouped.employeeGroups} />
-        </>
-      )}
-
-      <AtlasPanel eyebrow="Audited access trail" title="Recent role changes">
-        <p className="px-5 py-5 text-sm leading-6 text-slate-600">
-          Review the live role-change history and department access controls in the field note
-          below.
-        </p>
-      </AtlasPanel>
     </div>
   );
 }

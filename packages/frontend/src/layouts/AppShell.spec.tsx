@@ -54,13 +54,15 @@ function shell(helpContent?: ReactNode) {
   return (
     <MemoryRouter initialEntries={[mocks.path]}>
       <Routes>
-        <Route
-          element={<AppShell helpContent={helpContent} />}
-          path="/"
-        >
+        <Route element={<AppShell helpContent={helpContent} />} path="/">
           <Route path="workspaces/:workspaceId" element={<p>Workspace content</p>} />
           <Route path="dashboard" element={<p>Dashboard content</p>} />
           <Route path="my-tasks" element={<p>My work content</p>} />
+          <Route path="calendar" element={<p>Calendar content</p>} />
+          <Route path="portfolio" element={<p>Portfolio content</p>} />
+          <Route path="reports" element={<p>Reports content</p>} />
+          <Route path="timesheets" element={<p>Timesheets content</p>} />
+          <Route path="search" element={<p>Search content</p>} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -111,12 +113,15 @@ describe('AppShell', () => {
     renderShell();
 
     expect(container.textContent).toContain('Dashboard');
-    expect(container.textContent).toContain('My Work');
+    expect(container.textContent).toContain('My Tasks');
+    expect(container.textContent).toContain('Calendar');
+    expect(container.textContent).toContain('Portfolio');
+    expect(container.textContent).toContain('Timesheets');
     expect(container.textContent).not.toContain('Administration');
     expect(container.textContent).not.toContain('Create task');
     expect(
       container.querySelector<HTMLAnchorElement>('a[href="/my-tasks"]')?.textContent,
-    ).toContain('My Work');
+    ).toContain('My Tasks');
   });
 
   it('preserves department navigation and identifies the active department', () => {

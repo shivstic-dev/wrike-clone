@@ -7,9 +7,12 @@ describe('navigationForRole', () => {
     (role) => {
       expect(navigationForRole(role).map((item) => item.label)).toEqual([
         'Dashboard',
-        'My Work',
+        'My Tasks',
+        'Calendar',
         'Departments',
+        'Portfolio',
         'Reports',
+        'Timesheets',
       ]);
     },
   );
@@ -25,7 +28,10 @@ describe('navigationForRole', () => {
         '/dashboard',
         '/dashboard#departments',
         '/my-tasks',
+        '/calendar',
+        '/portfolio',
         '/reports',
+        '/timesheets',
         '/admin',
       ]);
 

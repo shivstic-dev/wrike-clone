@@ -16,9 +16,10 @@ function initials(name: string): string {
 
 export function CapacityPanel({ capacity }: CapacityPanelProps) {
   const maxOpenTasks = Math.max(1, ...capacity.map((item) => item.openTasks));
+  const visibleCapacity = capacity.slice(0, 6);
 
   return (
-    <section className="workboard-card overflow-hidden rounded-2xl border border-atlas-mist bg-white">
+    <section className="workboard-card flex h-full min-h-[21rem] flex-col overflow-hidden rounded-2xl border border-atlas-mist bg-white">
       <header className="flex items-start justify-between gap-4 border-b border-atlas-mist px-5 py-4">
         <div>
           <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
@@ -41,7 +42,7 @@ export function CapacityPanel({ capacity }: CapacityPanelProps) {
         </p>
       ) : (
         <ul className="space-y-4 px-5 py-5">
-          {capacity.map((person) => {
+          {visibleCapacity.map((person) => {
             const width = person.openTasks === 0 ? 0 : (person.openTasks / maxOpenTasks) * 100;
             return (
               <li
@@ -81,6 +82,11 @@ export function CapacityPanel({ capacity }: CapacityPanelProps) {
             );
           })}
         </ul>
+      )}
+      {capacity.length > visibleCapacity.length && (
+        <p className="mt-auto border-t border-atlas-mist bg-slate-50 px-5 py-3 text-xs text-slate-500">
+          {capacity.length - visibleCapacity.length} more people carry open work
+        </p>
       )}
     </section>
   );

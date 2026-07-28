@@ -19,8 +19,10 @@ function dueLabel(dueDate: string | null): string {
 }
 
 export function AttentionQueue({ attention }: AttentionQueueProps) {
+  const visibleAttention = attention.slice(0, 5);
+
   return (
-    <section className="workboard-card overflow-hidden rounded-2xl border border-atlas-mist bg-white">
+    <section className="workboard-card flex h-full min-h-[21rem] flex-col overflow-hidden rounded-2xl border border-atlas-mist bg-white">
       <header className="flex items-start justify-between gap-4 border-b border-atlas-mist px-5 py-4">
         <div>
           <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
@@ -41,7 +43,7 @@ export function AttentionQueue({ attention }: AttentionQueueProps) {
         </p>
       ) : (
         <ol className="divide-y divide-atlas-mist px-5">
-          {attention.map((item) => (
+          {visibleAttention.map((item) => (
             <li key={item.id}>
               <Link
                 to={`/tasks/${item.id}`}
@@ -73,6 +75,11 @@ export function AttentionQueue({ attention }: AttentionQueueProps) {
             </li>
           ))}
         </ol>
+      )}
+      {attention.length > visibleAttention.length && (
+        <p className="mt-auto border-t border-atlas-mist bg-slate-50 px-5 py-3 text-xs text-slate-500">
+          {attention.length - visibleAttention.length} more flagged tasks
+        </p>
       )}
     </section>
   );

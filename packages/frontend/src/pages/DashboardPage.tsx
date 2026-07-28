@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { Task } from '@wrike-clone/shared';
 import { useDashboardOverview } from '../api/dashboard';
@@ -115,7 +115,8 @@ function greeting(displayName?: string | null, email?: string): string {
 }
 
 export default function DashboardPage() {
-  const [departmentId, setDepartmentId] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const departmentId = searchParams.get('department') || '';
   const { membership, user } = useAuth();
   const departments = useWorkspaces();
   const departmentList = departments.data ?? [];
@@ -146,9 +147,28 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!tenantAdmin && !departmentId && departmentList.length > 0) {
-      setDepartmentId(departmentList[0]!.id);
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.set('department', departmentList[0]!.id);
+          return next;
+        },
+        { replace: true },
+      );
     }
-  }, [departmentId, departmentList, tenantAdmin]);
+  }, [departmentId, departmentList, setSearchParams, tenantAdmin]);
+
+  function selectDepartment(nextDepartmentId: string) {
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (nextDepartmentId) next.set('department', nextDepartmentId);
+        else next.delete('department');
+        return next;
+      },
+      { replace: true },
+    );
+  }
 
   async function updateRole(
     userId: string,
@@ -175,6 +195,12 @@ export default function DashboardPage() {
       : attentionCount === 0
         ? 'No open work is currently flagged for attention.'
         : `${attentionCount} ${attentionCount === 1 ? 'item needs' : 'items need'} attention in this scope.`;
+  const generatedAt = overview.data?.generatedAt
+    ? new Date(overview.data.generatedAt).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
 
   const showGroupedFallback = managementView && !!departmentId && !overview.data && !!grouped.data;
   const showPersonalTasks = !managementView && !!departmentId;
@@ -183,24 +209,49 @@ export default function DashboardPage() {
     <div className="workboard-canvas min-h-full p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-[96rem]">
         <div className="space-y-5">
-          <header className="flex flex-col gap-5 border-b border-atlas-mist pb-5 lg:flex-row lg:items-end lg:justify-between">
+          <header className="flex flex-col gap-5 rounded-[1.5rem] border border-atlas-mist bg-white px-5 py-5 shadow-[0_12px_40px_rgba(13,59,42,0.05)] sm:px-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-3xl">
               <p className="font-atlasMono text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-atlas-current">
-                {scopeName} · Live operations
+                {scopeName} · Operations overview
               </p>
-              <h1 className="mt-2 font-atlasDisplay text-3xl font-semibold tracking-[-0.045em] text-atlas-ink sm:text-4xl">
-                {greeting(user?.displayName, user?.email)}
+              <h1 className="mt-1 font-atlasDisplay text-3xl font-semibold tracking-[-0.045em] text-atlas-ink sm:text-4xl">
+                Dashboard
               </h1>
-              <p className="mt-2 text-sm leading-6 text-slate-500">{scopeSummary}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                <span className="font-semibold text-atlas-ink">
+                  {greeting(user?.displayName, user?.email)}
+                </span>{' '}
+                {scopeSummary}
+              </p>
             </div>
 
-            <label className="text-xs font-medium text-slate-500">
-              Department
+            <div
+              className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[22rem]"
+              id="departments"
+              tabIndex={-1}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.1em] text-slate-500">
+                  {generatedAt ? `Updated ${generatedAt}` : 'Loading live data'}
+                </span>
+                <button
+                  className="text-xs font-semibold text-atlas-current hover:text-atlas-canopy disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={!overviewEnabled || overview.isFetching}
+                  onClick={() => void overview.refetch()}
+                  type="button"
+                >
+                  {overview.isFetching ? 'Refreshing…' : 'Refresh'}
+                </button>
+              </div>
+              <label className="sr-only" htmlFor="dashboard-department">
+                Department
+              </label>
               <select
-                className="mt-1 block min-w-64 rounded-xl border-atlas-mist bg-white text-sm font-medium shadow-sm focus:border-atlas-current focus:ring-atlas-current"
-                value={departmentId}
-                onChange={(event) => setDepartmentId(event.target.value)}
+                className="block w-full rounded-xl border-atlas-mist bg-atlas-paper text-sm font-semibold text-atlas-ink shadow-sm focus:border-atlas-current focus:ring-atlas-current"
                 disabled={departments.isLoading || departmentList.length === 0}
+                id="dashboard-department"
+                onChange={(event) => selectDepartment(event.target.value)}
+                value={departmentId}
               >
                 {tenantAdmin && <option value="">All departments</option>}
                 {departmentList.map((department) => (
@@ -209,7 +260,13 @@ export default function DashboardPage() {
                   </option>
                 ))}
               </select>
-            </label>
+              <Link
+                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-atlas-canopy px-4 text-sm font-semibold text-atlas-canopy transition-colors hover:bg-atlas-canopy hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
+                to="/reports"
+              >
+                Open reports
+              </Link>
+            </div>
           </header>
 
           {departments.error && (
@@ -255,13 +312,7 @@ export default function DashboardPage() {
             />
           )}
 
-          {overview.data && (
-            <RoleDashboard
-              overview={overview.data}
-              grouped={grouped.data}
-              onRetryOverview={() => void overview.refetch()}
-            />
-          )}
+          {overview.data && <RoleDashboard overview={overview.data} grouped={grouped.data} />}
 
           {(grouped.error || mine.error) && (
             <ErrorDisplay

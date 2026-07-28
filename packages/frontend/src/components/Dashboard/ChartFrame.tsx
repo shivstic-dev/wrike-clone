@@ -39,11 +39,11 @@ export function ChartFrame({
 
   return (
     <figure
-      className="workboard-card min-w-0 rounded-2xl border border-atlas-mist bg-white p-4 sm:p-5"
+      className="workboard-card h-full min-w-0 rounded-2xl border border-atlas-mist bg-white p-4 sm:p-5"
       aria-labelledby={titleId}
       aria-describedby={`${descriptionId} ${summaryId}`}
     >
-      <figcaption className="flex flex-col gap-2 border-b border-atlas-mist pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+      <figcaption className="border-b border-atlas-mist pb-4">
         <span>
           <span
             id={titleId}
@@ -55,12 +55,6 @@ export function ChartFrame({
             {description}
           </span>
         </span>
-        <time
-          dateTime={generated.dateTime}
-          className="shrink-0 font-atlasMono text-[0.6875rem] uppercase tracking-[0.08em] text-atlas-current"
-        >
-          {generated.label}
-        </time>
       </figcaption>
 
       <p id={summaryId} className="mt-4 text-sm font-semibold text-atlas-ink">
@@ -83,6 +77,12 @@ export function ChartFrame({
         </summary>
         <div className="overflow-x-auto border-t border-atlas-mist p-4">{fallback}</div>
       </details>
+      <time
+        dateTime={generated.dateTime}
+        className="mt-3 block font-atlasMono text-[0.625rem] uppercase tracking-[0.08em] text-slate-400"
+      >
+        {generated.label}
+      </time>
     </figure>
   );
 }

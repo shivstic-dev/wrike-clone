@@ -82,21 +82,13 @@ const grouped: GroupedDepartmentTasks = {
 
 let container: HTMLDivElement;
 let root: Root | undefined;
-const retryOverview = vi.fn();
-
 async function renderDashboard(
   value: DashboardOverview,
   groupedValue: GroupedDepartmentTasks | null = grouped,
 ): Promise<void> {
   await act(async () => {
     root = createRoot(container);
-    root.render(
-      <RoleDashboard
-        overview={value}
-        grouped={groupedValue ?? undefined}
-        onRetryOverview={retryOverview}
-      />,
-    );
+    root.render(<RoleDashboard overview={value} grouped={groupedValue ?? undefined} />);
     await Promise.resolve();
   });
 }
@@ -107,7 +99,6 @@ beforeEach(() => {
       IS_REACT_ACT_ENVIRONMENT: boolean;
     }
   ).IS_REACT_ACT_ENVIRONMENT = true;
-  retryOverview.mockReset();
   container = document.createElement('div');
   document.body.append(container);
 });
@@ -124,8 +115,8 @@ describe('RoleDashboard', () => {
   it.each([
     ['employee', ['My workload'], ['Team capacity', 'Create task']],
     ['manager', ['My workload', 'Team capacity', 'Unassigned work'], []],
-    ['department_head', ['Manager work', 'Employee work', 'Recent role changes'], []],
-    ['admin', ['Department comparison', 'Setup health'], []],
+    ['department_head', ['Manager work', 'Employee work', 'Team capacity'], []],
+    ['admin', ['Department comparison', 'Work coverage'], []],
   ] as const)('renders %s dashboard capabilities', async (role, shown, hidden) => {
     await renderDashboard(overview({ role }));
 
@@ -149,7 +140,7 @@ describe('RoleDashboard', () => {
     async (role, hiddenLanes) => {
       await renderDashboard(overview({ role }), null);
 
-      expect(container.textContent).toContain('Completion trend');
+      expect(container.textContent).toContain('Active work');
       expect(container.textContent).toContain('Attention queue');
       expect(container.textContent).toContain('Team capacity');
       hiddenLanes.forEach((lane) => expect(container.textContent).not.toContain(lane));
@@ -192,19 +183,6 @@ describe('RoleDashboard', () => {
     value.comparison.completedPercentChange = null;
     await renderDashboard(value);
 
-    expect(container.textContent).toContain('No baseline');
-    expect(container.textContent).toContain('No prior completions to compare');
-  });
-
-  it('refreshes only the overview from the field-note control', async () => {
-    await renderDashboard(overview({ role: 'employee' }));
-    const refresh = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
-      (button) => button.textContent === 'Refresh overview',
-    );
-    if (!refresh) throw new Error('Overview refresh button was not rendered');
-
-    act(() => refresh.click());
-
-    expect(retryOverview).toHaveBeenCalledOnce();
+    expect(container.textContent).toContain('No prior 30-day baseline');
   });
 });
