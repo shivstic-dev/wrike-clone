@@ -7,7 +7,10 @@ export function Skeleton({ className, ...props }: SkeletonProps) {
   return (
     <div
       aria-hidden="true"
-      className={clsx('animate-pulse rounded-md bg-atlas-mist', className)}
+      className={clsx(
+        'animate-pulse rounded-md bg-atlas-mist motion-reduce:animate-none',
+        className,
+      )}
       {...props}
     />
   );

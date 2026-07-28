@@ -1,13 +1,12 @@
 import { clsx } from 'clsx';
-import type { HTMLAttributes, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Panel } from './Panel';
 
-export interface StatePanelProps extends HTMLAttributes<HTMLDivElement> {
+export interface StatePanelProps {
   title: string;
   description: string;
   action?: ReactNode;
   tone?: 'empty' | 'error' | 'forbidden';
-  icon?: ReactNode;
 }
 
 const toneClasses = {
@@ -16,26 +15,12 @@ const toneClasses = {
   forbidden: 'border-amber-200 bg-amber-50',
 } as const;
 
-export function StatePanel({
-  action,
-  className,
-  description,
-  icon,
-  title,
-  tone = 'empty',
-  ...props
-}: StatePanelProps) {
+export function StatePanel({ action, description, title, tone = 'empty' }: StatePanelProps) {
   return (
     <Panel
-      className={clsx(
-        'flex flex-col items-center justify-center text-center',
-        toneClasses[tone],
-        className,
-      )}
+      className={clsx('flex flex-col items-center justify-center text-center', toneClasses[tone])}
       role={tone === 'error' ? 'alert' : undefined}
-      {...props}
     >
-      {icon && <div className="mb-4">{icon}</div>}
       <h2 className="font-atlasDisplay text-lg font-bold text-atlas-ink">{title}</h2>
       <p className="mt-2 max-w-xl text-sm text-slate-600">{description}</p>
       {action && <div className="mt-5">{action}</div>}

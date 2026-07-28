@@ -7,13 +7,12 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses = {
-  primary:
-    'bg-atlas-current text-white hover:bg-atlas-canopy focus-visible:outline-atlas-field-note',
+  primary: 'bg-atlas-current text-white hover:bg-atlas-canopy focus-visible:outline-atlas-canopy',
   secondary:
     'border border-atlas-mist bg-white text-atlas-canopy hover:bg-atlas-paper focus-visible:outline-atlas-current',
   ghost: 'text-atlas-canopy hover:bg-atlas-mist focus-visible:outline-atlas-current',
   danger:
-    'bg-atlas-signalCoral text-white hover:bg-[#D96745] focus-visible:outline-atlas-field-note',
+    'bg-atlas-signalCoral text-atlas-ink hover:bg-[#D96745] focus-visible:outline-atlas-canopy',
 } as const;
 
 const sizeClasses = {
