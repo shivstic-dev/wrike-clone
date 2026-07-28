@@ -1,0 +1,23 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+const sql = readFileSync(
+  resolve(__dirname, '../../../../supabase/migrations/20260728114500_quick_task_locations.sql'),
+  'utf8',
+);
+
+describe('quick task locations migration', () => {
+  it('adds explicit system flags and one-home uniqueness', () => {
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS is_system_general BOOLEAN');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS is_system BOOLEAN');
+    expect(sql).toContain('CREATE UNIQUE INDEX IF NOT EXISTS ux_folders_system_general');
+    expect(sql).toContain('CREATE UNIQUE INDEX IF NOT EXISTS ux_projects_system_folder');
+    expect(sql).toContain('CREATE UNIQUE INDEX IF NOT EXISTS ux_task_folder_links_home');
+  });
+
+  it('backfills missing task home folders from the current project folder', () => {
+    expect(sql).toContain('INSERT INTO task_folder_links');
+    expect(sql).toContain('JOIN projects p ON p.id = t.project_id');
+    expect(sql).toContain('WHERE NOT EXISTS');
+  });
+});
