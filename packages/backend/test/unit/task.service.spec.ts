@@ -7,6 +7,7 @@ import { TaskService } from '../../src/task/task.service';
 import { DATABASE_PROVIDER } from '../../src/database/database.module';
 import { tenantContext } from '../../src/common/tenant-context';
 import { DepartmentAccessService } from '../../src/rbac/department-access.service';
+import { TaskLocationService } from '../../src/task/task-location.service';
 
 const noop = () => {};
 
@@ -23,6 +24,7 @@ function createQb(): any {
     'join',
     'leftJoin',
     'orderBy',
+    'orderByRaw',
     'limit',
     'offset',
     'clearSelect',
@@ -51,6 +53,13 @@ describe('TaskService', () => {
     assertCanManageTask: jest.fn().mockResolvedValue('admin'),
     assertCanSetVisibility: jest.fn().mockResolvedValue('admin'),
     assertCanChangeStatus: jest.fn().mockResolvedValue(undefined),
+    assertCanAssignTo: jest.fn().mockResolvedValue(undefined),
+    assertCanViewGroupedTasks: jest.fn().mockResolvedValue('department_head'),
+  };
+  const taskLocations = {
+    resolveForCreate: jest.fn(),
+    writeHomeLink: jest.fn(),
+    move: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -61,12 +70,21 @@ describe('TaskService', () => {
     qb.first.mockResolvedValue(null);
     qb.returning.mockResolvedValue([{}]);
     qb.del.mockResolvedValue(1);
+    taskLocations.resolveForCreate.mockResolvedValue({
+      departmentId: 'dept-1',
+      folderId: 'folder-1',
+      folderName: 'Folder',
+      projectId: 'proj-1',
+      projectName: 'Project',
+      isSystemProject: false,
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TaskService,
         { provide: DATABASE_PROVIDER, useValue: mockDb },
         { provide: DepartmentAccessService, useValue: departmentAccess },
+        { provide: TaskLocationService, useValue: taskLocations },
       ],
     }).compile();
 
@@ -126,6 +144,32 @@ describe('TaskService', () => {
       expect(result.data).toHaveLength(0);
       expect(result.meta.total).toBe(0);
     });
+
+    it('hydrates canonical home and project metadata and filters only the home folder', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      qb.first.mockResolvedValueOnce({ count: '0' });
+      qb.offset.mockResolvedValue([]);
+
+      await service.findAll({ page: 1, perPage: 25, folderId: 'folder-home' });
+
+      expectCanonicalLocationJoin(qb);
+      expect(qb.andWhere).toHaveBeenCalledWith('home_link.folder_id', 'folder-home');
+      expect(qb.select).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        'home_folder.id as folder_id',
+        'home_folder.name as folder_name',
+        'task_project.name as project_name',
+        'task_project.is_system as is_system_project',
+        expect.anything(),
+      );
+    });
   });
 
   describe('findById', () => {
@@ -160,10 +204,35 @@ describe('TaskService', () => {
       qb.first.mockResolvedValue(null);
       await expect(service.findById('nonexistent')).rejects.toThrow('Task not found');
     });
+
+    it('hydrates canonical home and project metadata for a visible task', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      qb.first.mockResolvedValue({ id: 'task-1', tenant_id: 't1' });
+      qb.then = (resolve: any) => resolve([]);
+      qb.catch = noop;
+
+      await service.findById('task-1');
+
+      expectCanonicalLocationJoin(qb);
+      expect(qb.select).toHaveBeenCalledWith(
+        'tasks.*',
+        'workspaces.name as department_name',
+        'home_folder.id as folder_id',
+        'home_folder.name as folder_name',
+        'task_project.name as project_name',
+        'task_project.is_system as is_system_project',
+      );
+    });
   });
 
   describe('create', () => {
-    it('creates a task successfully', async () => {
+    it('keeps project-only creation routed through canonical location resolution', async () => {
       tenantContext.enterWith({
         tenantId: 't1',
         userId: 'u1',
@@ -171,18 +240,29 @@ describe('TaskService', () => {
         role: 'admin',
         permissions: ['*'],
       });
-      qb.first.mockResolvedValueOnce({ id: 'proj-1', tenant_id: 't1', department_id: 'dept-1' });
       qb.returning.mockResolvedValue([{ id: 'task-new', title: 'New Task', status: 'todo' }]);
 
-      const result = await service.create({
+      const input = {
         projectId: 'proj-1',
         title: 'New Task',
         visibility: 'department',
+      } as const;
+      const result = await service.create(input);
+
+      expect(taskLocations.resolveForCreate).toHaveBeenCalledWith(input, mockDb);
+      expect(taskLocations.writeHomeLink).toHaveBeenCalledWith(
+        expect.any(String),
+        'folder-1',
+        mockDb,
+      );
+      expect(result).toMatchObject({
+        id: 'task-new',
+        folderId: 'folder-1',
+        projectId: 'proj-1',
       });
-      expect(result.id).toBe('task-new');
     });
 
-    it('throws when project missing', async () => {
+    it('creates a department-only quick task using the resolved system project', async () => {
       tenantContext.enterWith({
         tenantId: 't1',
         userId: 'u1',
@@ -190,10 +270,71 @@ describe('TaskService', () => {
         role: 'admin',
         permissions: ['*'],
       });
-      qb.first.mockResolvedValue(null);
-      await expect(
-        service.create({ projectId: 'nope', title: 'Task', visibility: 'department' }),
-      ).rejects.toThrow('Project not found');
+      taskLocations.resolveForCreate.mockResolvedValue({
+        departmentId: 'dept-1',
+        folderId: 'folder-general',
+        folderName: 'General',
+        projectId: 'project-general',
+        projectName: 'General Tasks',
+        isSystemProject: true,
+      });
+      qb.returning.mockResolvedValue([
+        { id: 'task-quick', title: 'Quick task', status: 'todo' },
+      ]);
+
+      const result = await service.create({
+        departmentId: 'dept-1',
+        title: 'Quick task',
+      });
+
+      expect(taskLocations.writeHomeLink).toHaveBeenCalledWith(
+        expect.any(String),
+        'folder-general',
+        mockDb,
+      );
+      expect(result).toMatchObject({
+        id: 'task-quick',
+        folderId: 'folder-general',
+        folderName: 'General',
+        projectId: 'project-general',
+        projectName: 'General Tasks',
+        isSystemProject: true,
+      });
+    });
+
+    it('validates visibility and assignees against the resolved department', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      taskLocations.resolveForCreate.mockResolvedValue({
+        departmentId: 'resolved-dept',
+        folderId: 'folder-1',
+        folderName: 'Folder',
+        projectId: 'proj-1',
+        projectName: 'Project',
+        isSystemProject: false,
+      });
+      qb.first.mockResolvedValue({ user_id: 'assignee-1' });
+      qb.returning.mockResolvedValue([
+        { id: 'task-new', title: 'New Task', assignee_id: 'assignee-1' },
+      ]);
+
+      await service.create({
+        projectId: 'proj-1',
+        title: 'New Task',
+        visibility: 'global',
+        assigneeIds: ['assignee-1'],
+      });
+
+      expect(departmentAccess.assertCanSetVisibility).toHaveBeenCalledWith('resolved-dept');
+      expect(departmentAccess.assertCanAssignTo).toHaveBeenCalledWith(
+        'resolved-dept',
+        'assignee-1',
+      );
     });
   });
 
@@ -276,6 +417,67 @@ describe('TaskService', () => {
     });
   });
 
+  describe('findDepartmentTasksGrouped', () => {
+    it('hydrates canonical home and project metadata for grouped tasks', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      qb.then = (resolve: any) => resolve([]);
+      qb.catch = noop;
+
+      await service.findDepartmentTasksGrouped('dept-1');
+
+      expectCanonicalLocationJoin(qb);
+      expect(qb.select).toHaveBeenCalledWith(
+        'tasks.*',
+        'workspaces.name as department_name',
+        'home_folder.id as folder_id',
+        'home_folder.name as folder_name',
+        'task_project.name as project_name',
+        'task_project.is_system as is_system_project',
+      );
+    });
+  });
+
+  describe('moveLocation', () => {
+    it('moves through the location service and returns the fully hydrated task', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      qb.first.mockResolvedValue({
+        id: 'task-1',
+        tenant_id: 't1',
+        folder_id: 'folder-2',
+        project_id: 'project-2',
+      });
+      qb.then = (resolve: any) => resolve([]);
+      qb.catch = noop;
+
+      const result = await service.moveLocation('task-1', { folderId: 'folder-2' });
+
+      expect(taskLocations.move).toHaveBeenCalledWith('task-1', {
+        folderId: 'folder-2',
+      });
+      expect(result).toMatchObject({
+        id: 'task-1',
+        folder_id: 'folder-2',
+        project_id: 'project-2',
+        assignees: [],
+        comments: [],
+        dependencies: [],
+        attachments: [],
+      });
+    });
+  });
+
   describe('remove', () => {
     it('soft-deletes a task', async () => {
       tenantContext.enterWith({
@@ -352,3 +554,38 @@ describe('TaskService', () => {
     });
   });
 });
+
+function expectCanonicalLocationJoin(qb: any) {
+  const homeJoin = qb.leftJoin.mock.calls.find(
+    ([table]: [Record<string, string>]) => table?.home_link === 'task_folder_links',
+  );
+  expect(homeJoin).toBeDefined();
+
+  const joinClause: any = {
+    on: jest.fn(),
+    andOn: jest.fn(),
+    andOnVal: jest.fn(),
+  };
+  joinClause.on.mockReturnValue(joinClause);
+  joinClause.andOn.mockReturnValue(joinClause);
+  joinClause.andOnVal.mockReturnValue(joinClause);
+  homeJoin[1].call(joinClause);
+
+  expect(joinClause.on).toHaveBeenCalledWith('home_link.task_id', '=', 'tasks.id');
+  expect(joinClause.andOn).toHaveBeenCalledWith(
+    'home_link.tenant_id',
+    '=',
+    'tasks.tenant_id',
+  );
+  expect(joinClause.andOnVal).toHaveBeenCalledWith('home_link.is_home', '=', true);
+  expect(qb.leftJoin).toHaveBeenCalledWith(
+    { task_project: 'projects' },
+    'task_project.id',
+    'tasks.project_id',
+  );
+  expect(qb.leftJoin).toHaveBeenCalledWith(
+    { home_folder: 'folders' },
+    'home_folder.id',
+    'home_link.folder_id',
+  );
+}

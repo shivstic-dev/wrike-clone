@@ -4,6 +4,7 @@ import { Permissions } from '../common/decorators/permissions.decorator';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { WorkspaceService } from '../workspace/workspace.service';
+import { TaskLocationService } from './task-location.service';
 import { TaskService } from './task.service';
 
 @Controller('departments')
@@ -12,12 +13,19 @@ export class DepartmentWorkflowController {
   constructor(
     private readonly taskService: TaskService,
     private readonly workspaceService: WorkspaceService,
+    private readonly taskLocations: TaskLocationService,
   ) {}
 
   @Get(':id/tasks/grouped')
   @Permissions('task:read')
   async groupedTasks(@Param('id') id: string) {
     return this.taskService.findDepartmentTasksGrouped(id);
+  }
+
+  @Get(':id/task-locations')
+  @Permissions('task:read')
+  async listLocations(@Param('id') id: string) {
+    return this.taskLocations.listDepartmentLocations(id);
   }
 
   @Patch(':id/members/:userId/role')

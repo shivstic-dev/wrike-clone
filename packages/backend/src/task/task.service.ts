@@ -23,9 +23,11 @@ import type {
   BulkTaskUpdateInput,
   CreateDependencyInput,
   CreateCommentInput,
+  MoveTaskLocationInput,
 } from '@wrike-clone/shared';
 import { TaskStatus, TaskPriority } from '@wrike-clone/shared';
 import { DepartmentAccessService } from '../rbac/department-access.service';
+import { TaskLocationService } from './task-location.service';
 
 @Injectable()
 export class TaskService {
@@ -51,6 +53,7 @@ export class TaskService {
   constructor(
     @Inject(DATABASE_PROVIDER) private readonly db: Knex,
     private readonly departmentAccess: DepartmentAccessService,
+    private readonly taskLocations: TaskLocationService,
   ) {}
 
   /**
@@ -82,12 +85,16 @@ export class TaskService {
       .where('tasks.tenant_id', ctx.tenantId)
       .whereNull('tasks.deleted_at');
 
-    // Apply visibility scope (Phase 1: department-based access control)
-    // Join through project → folder → workspace to resolve workspace_id
+    // Apply visibility scope and expose the canonical task home.
     query = query
-      .leftJoin('projects', 'tasks.project_id', 'projects.id')
-      .leftJoin('folders', 'projects.folder_id', 'folders.id')
-      .leftJoin('workspaces', 'tasks.department_id', 'workspaces.id');
+      .leftJoin('workspaces', 'tasks.department_id', 'workspaces.id')
+      .leftJoin({ home_link: 'task_folder_links' }, function () {
+        this.on('home_link.task_id', '=', 'tasks.id')
+          .andOn('home_link.tenant_id', '=', 'tasks.tenant_id')
+          .andOnVal('home_link.is_home', '=', true);
+      })
+      .leftJoin({ task_project: 'projects' }, 'task_project.id', 'tasks.project_id')
+      .leftJoin({ home_folder: 'folders' }, 'home_folder.id', 'home_link.folder_id');
 
     if (!tenantAdmin) {
       query = applyTaskAccessScope(query, { ...ctx, role: 'member' });
@@ -110,11 +117,7 @@ export class TaskService {
     if (priority && priority.length > 0) query = query.whereIn('tasks.priority', priority);
     if (dueDateBefore) query = query.andWhere('tasks.due_date', '<=', dueDateBefore);
     if (dueDateAfter) query = query.andWhere('tasks.due_date', '>=', dueDateAfter);
-    if (folderId) {
-      query = query
-        .join('task_folder_links', 'tasks.id', 'task_folder_links.task_id')
-        .andWhere('task_folder_links.folder_id', folderId);
-    }
+    if (folderId) query = query.andWhere('home_link.folder_id', folderId);
     if (departmentId) {
       query = query.andWhere('tasks.department_id', departmentId);
     }
@@ -135,6 +138,10 @@ export class TaskService {
       .select(
         'tasks.*',
         'workspaces.name as department_name',
+        'home_folder.id as folder_id',
+        'home_folder.name as folder_name',
+        'task_project.name as project_name',
+        'task_project.is_system as is_system_project',
         this.db.raw(
           `json_build_object('id', u.id, 'display_name', u.display_name, 'avatar_url', u.avatar_url) as assignee`,
         ),
@@ -160,10 +167,24 @@ export class TaskService {
     const tenantAdmin = await this.departmentAccess.isTenantAdmin();
     const task = await this.db('tasks')
       .leftJoin('workspaces', 'tasks.department_id', 'workspaces.id')
+      .leftJoin({ home_link: 'task_folder_links' }, function () {
+        this.on('home_link.task_id', '=', 'tasks.id')
+          .andOn('home_link.tenant_id', '=', 'tasks.tenant_id')
+          .andOnVal('home_link.is_home', '=', true);
+      })
+      .leftJoin({ task_project: 'projects' }, 'task_project.id', 'tasks.project_id')
+      .leftJoin({ home_folder: 'folders' }, 'home_folder.id', 'home_link.folder_id')
       .where('tasks.id', id)
       .andWhere('tasks.tenant_id', ctx.tenantId)
       .whereNull('tasks.deleted_at')
-      .select('tasks.*', 'workspaces.name as department_name')
+      .select(
+        'tasks.*',
+        'workspaces.name as department_name',
+        'home_folder.id as folder_id',
+        'home_folder.name as folder_name',
+        'task_project.name as project_name',
+        'task_project.is_system as is_system_project',
+      )
       .modify((qb: Knex.QueryBuilder) => {
         if (!tenantAdmin) {
           applyTaskAccessScope(qb, { ...ctx, role: 'member' });
@@ -332,32 +353,22 @@ export class TaskService {
   async create(input: CreateTaskInput) {
     const ctx = requireTenantContext();
     const id = uuidv4();
-
-    // Verify project exists and belongs to tenant
-    const project = await this.db('projects')
-      .join('folders', 'projects.folder_id', 'folders.id')
-      .where('projects.id', input.projectId)
-      .andWhere('projects.tenant_id', ctx.tenantId)
-      .select('projects.*', 'folders.workspace_id as department_id')
-      .first();
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
-
-    await this.departmentAccess.assertCanCreateTask(project.department_id);
-    if (input.visibility === 'global') {
-      await this.departmentAccess.assertCanSetVisibility(project.department_id);
-    }
     const assigneeIds = this.uniqueAssigneeIds(input);
-    await this.validateAssignees(project.department_id, assigneeIds);
 
     const task = await this.db.transaction(async (trx) => {
+      const location = await this.taskLocations.resolveForCreate(input, trx);
+      await this.departmentAccess.assertCanCreateTask(location.departmentId);
+      if (input.visibility === 'global') {
+        await this.departmentAccess.assertCanSetVisibility(location.departmentId);
+      }
+      await this.validateAssignees(location.departmentId, assigneeIds);
+
       const [created] = await trx('tasks')
         .insert({
           id,
           tenant_id: ctx.tenantId,
-          project_id: input.projectId,
-          department_id: project.department_id,
+          project_id: location.projectId,
+          department_id: location.departmentId,
           parent_task_id: input.parentTaskId || null,
           assignee_id: assigneeIds[0] || null,
           created_by_id: ctx.userId,
@@ -374,7 +385,8 @@ export class TaskService {
         })
         .returning('*');
       await this.replaceTaskAssignees(id, assigneeIds, trx);
-      return created;
+      await this.taskLocations.writeHomeLink(id, location.folderId, trx);
+      return { ...created, ...location };
     });
 
     // Log activity
@@ -386,7 +398,7 @@ export class TaskService {
       await this.createAssignmentNotification(task);
     }
 
-    this.logger.log(`Task ${id} created in project ${input.projectId}`);
+    this.logger.log(`Task ${id} created in project ${task.projectId}`);
     return { ...task, assignees: await this.getTaskAssignees(id) };
   }
 
@@ -533,6 +545,11 @@ export class TaskService {
     return this.findAll({ ...filter, assigneeId: ctx.userId });
   }
 
+  async moveLocation(id: string, input: MoveTaskLocationInput) {
+    await this.taskLocations.move(id, input);
+    return this.findById(id);
+  }
+
   async findDepartmentTasksGrouped(departmentId: string) {
     const ctx = requireTenantContext();
     const viewerRole = await this.departmentAccess.assertCanViewGroupedTasks(departmentId);
@@ -580,12 +597,26 @@ export class TaskService {
 
     let taskQuery = this.db('tasks')
       .leftJoin('workspaces', 'tasks.department_id', 'workspaces.id')
+      .leftJoin({ home_link: 'task_folder_links' }, function () {
+        this.on('home_link.task_id', '=', 'tasks.id')
+          .andOn('home_link.tenant_id', '=', 'tasks.tenant_id')
+          .andOnVal('home_link.is_home', '=', true);
+      })
+      .leftJoin({ task_project: 'projects' }, 'task_project.id', 'tasks.project_id')
+      .leftJoin({ home_folder: 'folders' }, 'home_folder.id', 'home_link.folder_id')
       .where({
         'tasks.tenant_id': ctx.tenantId,
         'tasks.department_id': departmentId,
       })
       .whereNull('tasks.deleted_at')
-      .select('tasks.*', 'workspaces.name as department_name')
+      .select(
+        'tasks.*',
+        'workspaces.name as department_name',
+        'home_folder.id as folder_id',
+        'home_folder.name as folder_name',
+        'task_project.name as project_name',
+        'task_project.is_system as is_system_project',
+      )
       .orderByRaw(
         `CASE WHEN tasks.due_date < NOW() AND tasks.status <> 'completed' THEN 0 ELSE 1 END`,
       )

@@ -8,6 +8,7 @@ import { DATABASE_PROVIDER } from '../../src/database/database.module';
 import { AuthGuard } from '../../src/common/guards/auth.guard';
 import { RolesGuard } from '../../src/common/guards/roles.guard';
 import { tenantContext } from '../../src/common/tenant-context';
+import { TaskLocationService } from '../../src/task/task-location.service';
 
 function queryBuilder() {
   const builder: any = {};
@@ -46,6 +47,7 @@ describe('Department permission checks through the HTTP API', () => {
       controllers: [TaskController],
       providers: [
         TaskService,
+        TaskLocationService,
         DepartmentAccessService,
         { provide: DATABASE_PROVIDER, useValue: database },
       ],

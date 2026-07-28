@@ -29,6 +29,7 @@ import {
   createDependencySchema,
   createCommentSchema,
   addTaskAssigneeSchema,
+  moveTaskLocationSchema,
 } from '@wrike-clone/shared';
 
 @Controller('tasks')
@@ -97,6 +98,12 @@ export class TaskController {
   async update(@Param('id') id: string, @Body() body: unknown) {
     const input = updateTaskSchema.parse(body);
     return this.taskService.update(id, input);
+  }
+
+  @Patch(':taskId/location')
+  @Permissions('task:read')
+  async moveLocation(@Param('taskId') taskId: string, @Body() body: unknown) {
+    return this.taskService.moveLocation(taskId, moveTaskLocationSchema.parse(body));
   }
 
   @Delete(':id')
