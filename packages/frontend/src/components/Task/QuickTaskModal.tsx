@@ -28,7 +28,7 @@ const inputClasses = 'input mt-1 focus:ring-2 focus:ring-primary-500/20';
 const quickTaskErrorFallback = 'Task could not be created. Review the details and try again.';
 
 export function getQuickTaskErrorMessage(error: unknown): string {
-  const responseMessage =
+  const responseData =
     typeof error === 'object' &&
     error !== null &&
     'response' in error &&
@@ -36,11 +36,23 @@ export function getQuickTaskErrorMessage(error: unknown): string {
     error.response !== null &&
     'data' in error.response &&
     typeof error.response.data === 'object' &&
-    error.response.data !== null &&
-    'message' in error.response.data &&
-    typeof error.response.data.message === 'string'
-      ? error.response.data.message.trim()
+    error.response.data !== null
+      ? error.response.data
+      : null;
+  const directMessage =
+    responseData && 'message' in responseData && typeof responseData.message === 'string'
+      ? responseData.message.trim()
       : '';
+  const envelopeMessage =
+    responseData &&
+    'error' in responseData &&
+    typeof responseData.error === 'object' &&
+    responseData.error !== null &&
+    'message' in responseData.error &&
+    typeof responseData.error.message === 'string'
+      ? responseData.error.message.trim()
+      : '';
+  const responseMessage = envelopeMessage || directMessage;
   if (responseMessage) return responseMessage;
 
   const errorMessage = error instanceof Error ? error.message.trim() : '';

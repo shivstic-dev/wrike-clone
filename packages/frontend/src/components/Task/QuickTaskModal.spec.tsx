@@ -402,6 +402,22 @@ describe('QuickTaskModal', () => {
 });
 
 describe('getQuickTaskErrorMessage', () => {
+  it('uses the backend error envelope message', () => {
+    expect(
+      getQuickTaskErrorMessage({
+        response: {
+          data: {
+            success: false,
+            error: {
+              code: 'FORBIDDEN',
+              message: 'Department access denied',
+            },
+          },
+        },
+      }),
+    ).toBe('Department access denied');
+  });
+
   it('uses a meaningful API response message', () => {
     expect(
       getQuickTaskErrorMessage({
