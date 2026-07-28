@@ -8,9 +8,11 @@ import {
   useWorkspace,
 } from '../api/workspaces';
 import { FolderTree } from '../components/Folder/FolderTree';
+import { TaskTable } from '../components/Table/TaskTable';
 import { ErrorDisplay } from '../components/common/ErrorDisplay';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { EmptyState } from '../components/common/EmptyState';
+import { useTasks } from '../api/tasks';
 import { useAuth } from '../contexts/AuthContext';
 import { TASK_PRIORITY } from '../api/enums';
 import type {
@@ -285,6 +287,7 @@ export default function WorkspacePage() {
   const { membership } = useAuth();
   const [modal, setModal] = useState<SetupModal>(null);
   const [continueToProject, setContinueToProject] = useState(false);
+  const [selectedFolderId, setSelectedFolderId] = useState('');
   const { data: workspace, isLoading: wsLoading, error: wsError } = useWorkspace(workspaceId!);
   const { data: folders, isLoading: foldersLoading } = useFolderTree(workspaceId!);
   const {
@@ -293,9 +296,18 @@ export default function WorkspacePage() {
     error: projectsError,
     refetch,
   } = useWorkspaceProjects(workspaceId!);
+  const folderTasks = useTasks(
+    { folderId: selectedFolderId, perPage: 100 },
+    !!selectedFolderId,
+  );
   const createFolder = useCreateFolder();
   const createProject = useCreateProject();
   const canManageStructure = membership?.role === 'admin';
+  const selectedFolder = folders?.find((folder) => folder.id === selectedFolderId);
+  const visibleProjects = (projects || []).filter(
+    (project) =>
+      !project.isSystem && (!selectedFolderId || project.folderId === selectedFolderId),
+  );
 
   function openFolderModal(andThenCreateProject = false) {
     setContinueToProject(andThenCreateProject);
@@ -355,7 +367,7 @@ export default function WorkspacePage() {
     <div className="mx-auto max-w-7xl p-6">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 text-lg font-bold text-primary-700">
               {workspace.name.charAt(0).toUpperCase()}
@@ -405,7 +417,11 @@ export default function WorkspacePage() {
               )}
             </div>
             {folders && folders.length > 0 ? (
-              <FolderTree folders={folders} />
+              <FolderTree
+                folders={folders}
+                selectedFolderId={selectedFolderId}
+                onSelect={(folder) => setSelectedFolderId(folder.id)}
+              />
             ) : (
               <p className="text-sm text-slate-400">No folders yet</p>
             )}
@@ -414,8 +430,53 @@ export default function WorkspacePage() {
 
         {/* Project list */}
         <div className="lg:col-span-9">
+          {selectedFolderId && (
+            <section
+              className="mb-8"
+              aria-labelledby="folder-tasks-heading"
+              aria-live="polite"
+            >
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
+                    Selected folder
+                  </p>
+                  <h2
+                    id="folder-tasks-heading"
+                    className="mt-1 text-lg font-semibold text-slate-900"
+                  >
+                    Tasks in {selectedFolder?.name || 'this folder'}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm"
+                  onClick={() => setSelectedFolderId('')}
+                >
+                  Show all projects
+                </button>
+              </div>
+              {folderTasks.error ? (
+                <ErrorDisplay
+                  title="Tasks could not be loaded"
+                  message="Try loading this folder again."
+                  onRetry={() => folderTasks.refetch()}
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <TaskTable
+                    tasks={folderTasks.data?.data || []}
+                    isLoading={folderTasks.isLoading}
+                  />
+                </div>
+              )}
+            </section>
+          )}
+
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">Projects</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {selectedFolder ? `Projects in ${selectedFolder.name}` : 'Projects'}
+            </h2>
             {canManageStructure && folders && folders.length > 0 && (
               <button className="btn-primary" onClick={() => setModal('project')}>
                 New project
@@ -423,9 +484,9 @@ export default function WorkspacePage() {
             )}
           </div>
 
-          {projects && projects.length > 0 ? (
+          {visibleProjects.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              {projects.map((project: Project) => (
+              {visibleProjects.map((project: Project) => (
                 <Link
                   key={project.id}
                   to={`/projects/${project.id}`}
@@ -458,9 +519,13 @@ export default function WorkspacePage() {
               description={
                 canManageStructure
                   ? folders && folders.length > 0
-                    ? 'Create a project, then open it to add tasks.'
+                    ? selectedFolder
+                      ? `Create a project in ${selectedFolder.name}, or keep tasks in General Tasks.`
+                      : 'Create a project, then open it to add tasks.'
                     : 'Create a folder first. Your projects and tasks will live inside it.'
-                  : 'An administrator needs to create a project before tasks can be added.'
+                  : selectedFolder
+                    ? 'This folder has no regular projects. Its direct tasks are shown above.'
+                    : 'An administrator needs to create a project before tasks can be added.'
               }
               action={
                 canManageStructure ? (

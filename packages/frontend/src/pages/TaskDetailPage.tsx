@@ -13,6 +13,7 @@ import toast from 'react-hot-toast';
 import { useState } from 'react';
 import { useWorkspaceMembers, useWorkspaces } from '../api/workspaces';
 import { useAuth } from '../contexts/AuthContext';
+import { useMoveTaskLocation, useTaskLocations } from '../api/task-locations';
 
 const statusOptions: { value: string; label: string }[] = [
   { value: TASK_STATUS.TODO, label: 'To Do' },
@@ -20,6 +21,123 @@ const statusOptions: { value: string; label: string }[] = [
   { value: TASK_STATUS.COMPLETED, label: 'Completed' },
   { value: TASK_STATUS.BLOCKED, label: 'Blocked' },
 ];
+
+function TaskLocationEditor({ task }: { task: Task }) {
+  const { data: locations = [], isLoading, isError } = useTaskLocations(task.departmentId);
+  const moveLocation = useMoveTaskLocation();
+  const [selectedFolderId, setSelectedFolderId] = useState(task.folderId || '');
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    task.isSystemProject ? '' : task.projectId,
+  );
+  const selectedLocation = locations.find(
+    (location) => location.folderId === selectedFolderId,
+  );
+
+  async function handleFolderChange(folderId: string) {
+    if (!folderId || folderId === selectedFolderId) return;
+    try {
+      await moveLocation.mutateAsync({ taskId: task.id, folderId });
+      setSelectedFolderId(folderId);
+      setSelectedProjectId('');
+      toast.success('Task moved');
+    } catch {
+      toast.error('Task could not be moved. Try again.');
+    }
+  }
+
+  async function handleProjectChange(projectId: string) {
+    if (!selectedFolderId || projectId === selectedProjectId) return;
+    try {
+      await moveLocation.mutateAsync({
+        taskId: task.id,
+        folderId: selectedFolderId,
+        projectId: projectId || undefined,
+      });
+      setSelectedProjectId(projectId);
+      toast.success('Task moved');
+    } catch {
+      toast.error('Task could not be moved. Try again.');
+    }
+  }
+
+  return (
+    <section
+      className="card mb-6 overflow-hidden"
+      aria-labelledby="task-location-heading"
+    >
+      <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
+          Task home
+        </p>
+        <h2 id="task-location-heading" className="mt-0.5 text-sm font-semibold text-slate-800">
+          Location
+        </h2>
+      </div>
+      <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-3">
+        <div>
+          <label className="label" htmlFor="task-location-department">
+            Department
+          </label>
+          <input
+            id="task-location-department"
+            className="input text-sm"
+            value={task.departmentName || task.departmentId}
+            readOnly
+          />
+        </div>
+        <div>
+          <label className="label" htmlFor="task-location-folder">
+            Folder
+          </label>
+          <select
+            id="task-location-folder"
+            className="input text-sm"
+            value={selectedFolderId}
+            onChange={(event) => void handleFolderChange(event.target.value)}
+            disabled={isLoading || moveLocation.isPending}
+          >
+            {!locations.some((location) => location.folderId === selectedFolderId) &&
+              selectedFolderId && (
+                <option value={selectedFolderId}>{task.folderName || 'Current folder'}</option>
+              )}
+            {locations.map((location) => (
+              <option key={location.folderId} value={location.folderId}>
+                {location.folderName}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label" htmlFor="task-location-project">
+            Project
+          </label>
+          <select
+            id="task-location-project"
+            className="input text-sm"
+            value={selectedProjectId}
+            onChange={(event) => void handleProjectChange(event.target.value)}
+            disabled={!selectedLocation || isLoading || moveLocation.isPending}
+          >
+            <option value="">General Tasks</option>
+            {(selectedLocation?.projects || []).map((project) => (
+              <option key={project.projectId} value={project.projectId}>
+                {project.projectName}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {isError && (
+        <p className="border-t border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700" role="alert">
+          Available folders could not be loaded. Try refreshing the page.
+        </p>
+      )}
+      <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
+        Changing folders first places the task in that folder&apos;s General Tasks list.
+      </p>
+    </section>
+  );
+}
 
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
@@ -222,6 +340,8 @@ export default function TaskDetailPage() {
               </div>
             </div>
           </div>
+
+          {canManage && <TaskLocationEditor key={task.id} task={task} />}
 
           {/* Comments section */}
           <CommentSection taskId={task.id} />

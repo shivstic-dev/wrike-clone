@@ -59,7 +59,7 @@ export function buildTaskSearchParams(filters: TaskFilterParams): URLSearchParam
 
 // ---- Hooks ----
 
-export function useTasks(filters: TaskFilterParams = {}) {
+export function useTasks(filters: TaskFilterParams = {}, enabled = true) {
   return useQuery({
     queryKey: taskKeys.list(filters),
     queryFn: async () => {
@@ -67,6 +67,7 @@ export function useTasks(filters: TaskFilterParams = {}) {
       const { data } = await apiClient.get<PaginatedResponse<Task>>(`/tasks?${params.toString()}`);
       return data;
     },
+    enabled,
   });
 }
 

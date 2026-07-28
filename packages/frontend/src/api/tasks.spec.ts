@@ -3,6 +3,13 @@ import { TaskPriority, TaskStatus } from '@wrike-clone/shared';
 import { buildTaskSearchParams, taskKeys } from './tasks';
 
 describe('task API contract helpers', () => {
+  it('uses the canonical home folder when requesting folder tasks', () => {
+    const params = buildTaskSearchParams({ folderId: 'folder-1', perPage: 100 });
+
+    expect(params.get('folderId')).toBe('folder-1');
+    expect(params.get('perPage')).toBe('100');
+  });
+
   it('serializes task filters using the backend query contract', () => {
     const params = buildTaskSearchParams({
       page: 2,
