@@ -90,7 +90,7 @@ export default function AuthLayout() {
         className="flex h-screen items-center justify-center bg-atlas-paper"
         role="status"
       >
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-atlas-mist border-t-atlas-current" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-atlas-mist border-t-atlas-current motion-reduce:animate-none" />
       </div>
     );
   }

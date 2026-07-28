@@ -167,7 +167,7 @@ export default function LoginPage() {
               <span className="flex items-center gap-2" role="status">
                 <span
                   aria-hidden="true"
-                  className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+                  className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent motion-reduce:animate-none"
                 />
                 Signing in...
               </span>

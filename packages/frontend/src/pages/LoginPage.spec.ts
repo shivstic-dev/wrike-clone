@@ -2,17 +2,24 @@
 
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import AuthLayout from '../layouts/AuthLayout';
 import LoginPage, { resolveLoginTenantSlug } from './LoginPage';
 
 const mocks = vi.hoisted(() => ({
+  authLoading: false,
   login: vi.fn(),
   setTenantSlug: vi.fn(),
   tenantSlug: 'cankids-india',
 }));
 
 vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ login: mocks.login }),
+  useAuth: () => ({
+    isAuthenticated: false,
+    isLoading: mocks.authLoading,
+    login: mocks.login,
+  }),
 }));
 
 vi.mock('../contexts/TenantContext', () => ({
@@ -35,6 +42,30 @@ function renderLogin(): void {
   act(() => {
     root = createRoot(container);
     root.render(createElement(LoginPage));
+  });
+}
+
+function renderAuthLayout(): void {
+  act(() => {
+    root = createRoot(container);
+    root.render(
+      createElement(
+        MemoryRouter,
+        { initialEntries: ['/'] },
+        createElement(
+          Routes,
+          {},
+          createElement(
+            Route,
+            { element: createElement(AuthLayout) },
+            createElement(Route, {
+              element: createElement('p', {}, 'Authentication content'),
+              path: '/',
+            }),
+          ),
+        ),
+      ),
+    );
   });
 }
 
@@ -70,6 +101,7 @@ beforeEach(() => {
   ).IS_REACT_ACT_ENVIRONMENT = true;
   mocks.login.mockReset();
   mocks.setTenantSlug.mockReset();
+  mocks.authLoading = false;
   mocks.tenantSlug = 'cankids-india';
   document.body.innerHTML = '';
   container = document.createElement('div');
@@ -125,5 +157,32 @@ describe('LoginPage', () => {
       tenantSlug: 'cankids-india',
     });
     expect(mocks.setTenantSlug).toHaveBeenCalledWith('cankids-india');
+  });
+
+  it('stops the submit spinner when reduced motion is requested', async () => {
+    mocks.login.mockImplementation(
+      () =>
+        new Promise<void>(() => {
+          // Keep the request pending so the submitting state remains visible.
+        }),
+    );
+    renderLogin();
+
+    await submitLogin('user@example.org', 'private-password');
+
+    const spinner = container.querySelector('[role="status"] [aria-hidden="true"]');
+    expect(spinner?.classList.contains('animate-spin')).toBe(true);
+    expect(spinner?.classList.contains('motion-reduce:animate-none')).toBe(true);
+  });
+});
+
+describe('AuthLayout', () => {
+  it('stops the auth-loading spinner when reduced motion is requested', () => {
+    mocks.authLoading = true;
+    renderAuthLayout();
+
+    const status = container.querySelector('[role="status"]');
+    const spinner = status?.querySelector('.animate-spin');
+    expect(spinner?.classList.contains('motion-reduce:animate-none')).toBe(true);
   });
 });
