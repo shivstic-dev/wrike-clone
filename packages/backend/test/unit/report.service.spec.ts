@@ -1,4 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
+import { TaskPriority, TaskStatus } from '@wrike-clone/shared';
 import type { Knex } from 'knex';
 import { tenantContext } from '../../src/common/tenant-context';
 import type { DepartmentRole } from '../../src/rbac/department-access.service';
@@ -360,7 +361,7 @@ describe('ReportService report rows', () => {
         department_id: 'dept-1',
         title: 'Employee task',
         status: 'todo',
-        priority: 'normal',
+        priority: 'medium',
         visibility: 'department',
         assignee_id: null,
         start_date: null,
@@ -400,22 +401,86 @@ describe('ReportService report rows', () => {
         deleted_at: null,
       },
       {
+        id: 'task-department-head',
+        tenant_id: 'tenant-1',
+        department_id: 'dept-1',
+        title: 'Department head task',
+        status: 'todo',
+        priority: 'medium',
+        visibility: 'department',
+        assignee_id: 'head-1',
+        start_date: null,
+        due_date: new Date('2026-08-05T00:00:00.000Z'),
+        completed_at: null,
+        created_at: new Date('2026-07-05T00:00:00.000Z'),
+        deleted_at: null,
+      },
+      {
+        id: 'task-tenant-admin',
+        tenant_id: 'tenant-1',
+        department_id: 'dept-1',
+        title: 'Tenant admin task',
+        status: 'todo',
+        priority: 'medium',
+        visibility: 'department',
+        assignee_id: 'admin-1',
+        start_date: null,
+        due_date: new Date('2026-08-06T00:00:00.000Z'),
+        completed_at: null,
+        created_at: new Date('2026-07-06T00:00:00.000Z'),
+        deleted_at: null,
+      },
+      {
+        id: 'task-second-department',
+        tenant_id: 'tenant-1',
+        department_id: 'dept-2',
+        title: 'Second department task',
+        status: 'todo',
+        priority: 'medium',
+        visibility: 'department',
+        assignee_id: null,
+        start_date: null,
+        due_date: new Date('2026-08-07T00:00:00.000Z'),
+        completed_at: null,
+        created_at: new Date('2026-07-07T00:00:00.000Z'),
+        deleted_at: null,
+      },
+      {
+        id: 'task-other-tenant',
+        tenant_id: 'tenant-2',
+        department_id: 'dept-other-tenant',
+        title: 'Other tenant task',
+        status: 'todo',
+        priority: 'medium',
+        visibility: 'department',
+        assignee_id: 'employee-1',
+        start_date: null,
+        due_date: new Date('2026-08-08T00:00:00.000Z'),
+        completed_at: null,
+        created_at: new Date('2026-07-08T00:00:00.000Z'),
+        deleted_at: null,
+      },
+      {
         id: 'task-deleted',
         tenant_id: 'tenant-1',
         department_id: 'dept-1',
         title: 'Deleted task',
         status: 'todo',
-        priority: 'normal',
+        priority: 'medium',
         visibility: 'department',
         assignee_id: 'manager-1',
         start_date: null,
-        due_date: new Date('2026-08-05T00:00:00.000Z'),
+        due_date: new Date('2026-08-09T00:00:00.000Z'),
         completed_at: null,
-        created_at: new Date('2026-07-05T00:00:00.000Z'),
-        deleted_at: new Date('2026-07-06T00:00:00.000Z'),
+        created_at: new Date('2026-07-09T00:00:00.000Z'),
+        deleted_at: new Date('2026-07-10T00:00:00.000Z'),
       },
     ],
-    workspaces: [{ id: 'dept-1', name: 'CEPA' }],
+    workspaces: [
+      { id: 'dept-1', name: 'CEPA' },
+      { id: 'dept-2', name: 'Finance' },
+      { id: 'dept-other-tenant', name: 'Other tenant department' },
+    ],
     users: [
       { id: 'manager-1', display_name: 'Current Manager' },
       { id: 'manager-2', display_name: 'Other Manager' },
@@ -496,25 +561,105 @@ describe('ReportService report rows', () => {
     expect(report.filters.scope).toBe('combined');
   });
 
-  it.each([
-    ['department_head', { departmentId: 'dept-1' }],
-    ['admin', {}],
-  ] satisfies Array<[DepartmentRole, ReportBuildFilter]>)(
-    '%s omitted scope includes all current permitted tasks',
-    async (role, filter) => {
-      const report = await runReport(role, filter);
+  it('department head includes every current task in the selected department only', async () => {
+    const report = await runReport('department_head', { departmentId: 'dept-1' });
 
-      expect(report.tasks.map((task) => task.title)).toEqual([
-        'Manager task',
-        'Employee task',
-        'Unassigned task',
-        'Other manager task',
-      ]);
-      expect(report.totals.tasks).toBe(4);
-      expect(report.scope.mode).toBe('combined');
-      expect(report.filters.scope).toBe('combined');
-    },
-  );
+    expect(report.tasks.map((task) => task.title)).toEqual([
+      'Manager task',
+      'Employee task',
+      'Unassigned task',
+      'Other manager task',
+      'Department head task',
+      'Tenant admin task',
+    ]);
+    expect(report.totals.tasks).toBe(6);
+    expect(report.scope.mode).toBe('combined');
+    expect(report.filters.scope).toBe('combined');
+  });
+
+  it('admin selected department includes every current task in that department only', async () => {
+    const report = await runReport('admin', { departmentId: 'dept-1' });
+
+    expect(report.tasks.map((task) => task.title)).toEqual([
+      'Manager task',
+      'Employee task',
+      'Unassigned task',
+      'Other manager task',
+      'Department head task',
+      'Tenant admin task',
+    ]);
+    expect(report.totals.tasks).toBe(6);
+    expect(report.scope.departmentId).toBe('dept-1');
+  });
+
+  it('organization admin includes both tenant departments without crossing tenants', async () => {
+    const report = await runReport('admin', {});
+
+    expect(report.tasks.map((task) => task.title)).toEqual([
+      'Manager task',
+      'Employee task',
+      'Unassigned task',
+      'Other manager task',
+      'Department head task',
+      'Tenant admin task',
+      'Second department task',
+    ]);
+    expect(report.totals.tasks).toBe(7);
+    expect(report.scope).toEqual({
+      departmentId: undefined,
+      role: 'admin',
+      mode: 'combined',
+      ownTasksOnly: false,
+    });
+  });
+
+  it('serializes the resolved individual scope and all active filters', async () => {
+    const dateFrom = new Date('2026-07-01T00:00:00.000Z');
+    const dateTo = new Date('2026-07-31T00:00:00.000Z');
+    const report = await runReport('manager', {
+      departmentId: 'dept-1',
+      scope: 'individual',
+      targetUserId: 'employee-1',
+      dateFrom,
+      dateTo,
+      status: TaskStatus.TODO,
+      priority: TaskPriority.MEDIUM,
+    });
+
+    expect(report.tasks.map((task) => task.title)).toEqual(['Employee task']);
+    expect(report.filters).toEqual({
+      dateFrom: dateFrom.toISOString(),
+      dateTo: dateTo.toISOString(),
+      status: 'todo',
+      priority: 'medium',
+      assigneeId: undefined,
+      scope: 'individual',
+      targetUserId: 'employee-1',
+    });
+  });
+
+  it('serializes combined scope with active date, status, and priority filters', async () => {
+    const dateFrom = new Date('2026-07-01T00:00:00.000Z');
+    const dateTo = new Date('2026-07-31T00:00:00.000Z');
+    const report = await runReport('manager', {
+      departmentId: 'dept-1',
+      dateFrom,
+      dateTo,
+      status: TaskStatus.TODO,
+      priority: TaskPriority.MEDIUM,
+    });
+
+    expect(report.tasks.map((task) => task.title)).toEqual(['Employee task']);
+    expect(report.filters).toEqual({
+      dateFrom: dateFrom.toISOString(),
+      dateTo: dateTo.toISOString(),
+      status: 'todo',
+      priority: 'medium',
+      assigneeId: undefined,
+      scope: 'combined',
+      targetUserId: undefined,
+    });
+  });
 
   it('keeps an explicit assignee filter exact and excludes unassigned tasks', async () => {
     const report = await runReport('manager', {
