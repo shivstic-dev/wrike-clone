@@ -7,6 +7,7 @@ describe('task API contract helpers', () => {
     const params = buildTaskSearchParams({
       page: 2,
       perPage: 50,
+      folderId: 'folder-1',
       projectId: 'project-1',
       assigneeId: 'user-1',
       status: [TaskStatus.TODO, TaskStatus.IN_PROGRESS],
@@ -19,6 +20,7 @@ describe('task API contract helpers', () => {
     expect(Object.fromEntries(params)).toEqual({
       page: '2',
       perPage: '50',
+      folderId: 'folder-1',
       projectId: 'project-1',
       assigneeId: 'user-1',
       status: 'todo,in_progress',

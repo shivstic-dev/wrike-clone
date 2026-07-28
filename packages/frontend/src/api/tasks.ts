@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from './client';
+import { folderKeys, workspaceKeys } from './workspaces';
 import type {
   Task,
   TaskFilterParams,
@@ -45,6 +46,7 @@ export function buildTaskSearchParams(filters: TaskFilterParams): URLSearchParam
   if (filters.sortBy) params.set('sortBy', filters.sortBy);
   if (filters.sortDirection) params.set('sortDirection', filters.sortDirection);
   if (filters.projectId) params.set('projectId', filters.projectId);
+  if (filters.folderId) params.set('folderId', filters.folderId);
   if (filters.departmentId) params.set('departmentId', filters.departmentId);
   if (filters.assigneeId) params.set('assigneeId', filters.assigneeId);
   if (filters.status?.length) params.set('status', filters.status.join(','));
@@ -145,7 +147,10 @@ export function useCreateTask() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: folderKeys.all });
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
     },
   });
 }
