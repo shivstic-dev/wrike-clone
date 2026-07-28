@@ -19,13 +19,13 @@ export function ErrorDisplay({
       padding="none"
       role="alert"
       className={clsx(
-        'flex flex-col items-center justify-center border-rose-200 bg-rose-50 px-6 py-12 text-center',
+        'flex flex-col items-center justify-center border-atlas-blush bg-[#fff7f8] px-6 py-12 text-center',
         className,
       )}
     >
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rose-100">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[1.1rem] bg-atlas-blush">
         <svg
-          className="h-6 w-6 text-rose-700"
+          className="h-6 w-6 text-[#a24763]"
           fill="none"
           viewBox="0 0 24 24"
           strokeWidth={1.5}
@@ -39,7 +39,7 @@ export function ErrorDisplay({
         </svg>
       </div>
       <h3 className="font-atlasDisplay text-base font-semibold text-atlas-ink">{title}</h3>
-      <p className="mt-1 text-sm text-rose-800">{message}</p>
+      <p className="mt-1 text-sm text-[#805262]">{message}</p>
       {onRetry && (
         <Button className="mt-4" onClick={onRetry}>
           Try again

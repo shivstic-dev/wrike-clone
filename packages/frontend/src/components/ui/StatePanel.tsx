@@ -10,9 +10,9 @@ export interface StatePanelProps {
 }
 
 const toneClasses = {
-  empty: 'border-dashed border-atlas-mist bg-atlas-paper',
-  error: 'border-rose-200 bg-rose-50',
-  forbidden: 'border-amber-200 bg-amber-50',
+  empty: 'border-dashed border-atlas-mist bg-white/75',
+  error: 'border-atlas-blush bg-[#fff7f8]',
+  forbidden: 'border-atlas-fieldNote bg-[#fffaf0]',
 } as const;
 
 export function StatePanel({ action, description, title, tone = 'empty' }: StatePanelProps) {

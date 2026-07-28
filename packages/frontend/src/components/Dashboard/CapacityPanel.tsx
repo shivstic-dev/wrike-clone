@@ -18,7 +18,7 @@ export function CapacityPanel({ capacity }: CapacityPanelProps) {
   const maxOpenTasks = Math.max(1, ...capacity.map((item) => item.openTasks));
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-atlas-mist bg-white shadow-sm">
+    <section className="sunny-card overflow-hidden rounded-3xl border border-atlas-mist bg-white">
       <header className="flex items-start justify-between gap-4 border-b border-atlas-mist px-5 py-4">
         <div>
           <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
@@ -50,7 +50,7 @@ export function CapacityPanel({ capacity }: CapacityPanelProps) {
               >
                 <span
                   aria-hidden="true"
-                  className="grid h-8 w-8 place-items-center rounded-full bg-atlas-mist font-atlasMono text-[0.625rem] font-medium text-atlas-canopy"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-atlas-sprout/65 font-atlasMono text-[0.6875rem] font-bold text-atlas-ink"
                 >
                   {initials(person.name)}
                 </span>

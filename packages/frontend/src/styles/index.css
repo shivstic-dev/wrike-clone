@@ -1,25 +1,27 @@
-@import '@fontsource/archivo/600.css';
-@import '@fontsource/archivo/700.css';
-@import '@fontsource/source-sans-3/400.css';
-@import '@fontsource/source-sans-3/600.css';
-@import '@fontsource/ibm-plex-mono/400.css';
-@import '@fontsource/ibm-plex-mono/500.css';
+@import '@fontsource/fredoka/latin-600.css';
+@import '@fontsource/fredoka/latin-700.css';
+@import '@fontsource/nunito-sans/latin-400.css';
+@import '@fontsource/nunito-sans/latin-600.css';
+@import '@fontsource/nunito-sans/latin-700.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --atlas-canopy: #123c3a;
-  --atlas-current: #25766f;
-  --atlas-field-note: #f2cb67;
-  --atlas-signal-coral: #f27b55;
-  --atlas-mist: #dce9e6;
-  --atlas-paper: #f8faf8;
-  --atlas-ink: #183432;
-  --atlas-font-display: 'Archivo', sans-serif;
-  --atlas-font-body: 'Source Sans 3', sans-serif;
-  --atlas-font-mono: 'IBM Plex Mono', monospace;
+  --atlas-canopy: #6656a8;
+  --atlas-current: #7b6bc2;
+  --atlas-field-note: #ffd975;
+  --atlas-signal-coral: #f47f8f;
+  --atlas-mist: #e9e4f6;
+  --atlas-paper: #fffaf6;
+  --atlas-ink: #352f52;
+  --atlas-sprout: #a9dcc8;
+  --atlas-sky: #dceeff;
+  --atlas-blush: #ffe5ea;
+  --atlas-font-display: 'Fredoka', sans-serif;
+  --atlas-font-body: 'Nunito Sans', sans-serif;
+  --atlas-font-mono: 'Nunito Sans', sans-serif;
 }
 
 @layer base {
@@ -29,7 +31,7 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900;
+    @apply bg-atlas-paper text-atlas-ink;
     font-family: var(--atlas-font-body);
   }
 
@@ -43,23 +45,28 @@
   }
 
   * {
-    @apply border-slate-200;
+    @apply border-atlas-mist;
+  }
+
+  ::selection {
+    background: var(--atlas-field-note);
+    color: var(--atlas-ink);
   }
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium
-           transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold
+           transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    @apply btn bg-primary-600 text-white shadow-[0_5px_0_#4f4388] hover:-translate-y-0.5 hover:bg-primary-500 hover:shadow-[0_7px_0_#4f4388] focus:ring-primary-400 active:translate-y-0.5 active:shadow-[0_2px_0_#4f4388] motion-reduce:transform-none;
   }
 
   .btn-secondary {
-    @apply btn bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 focus:ring-primary-500;
+    @apply btn border border-atlas-mist bg-white text-atlas-ink shadow-sm hover:bg-atlas-paper focus:ring-primary-400;
   }
 
   .btn-danger {
@@ -67,7 +74,7 @@
   }
 
   .btn-ghost {
-    @apply btn text-slate-600 hover:bg-slate-100 hover:text-slate-900;
+    @apply btn text-atlas-current hover:bg-atlas-mist hover:text-atlas-ink;
   }
 
   .btn-sm {
@@ -79,8 +86,8 @@
   }
 
   .input {
-    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm
-           placeholder-slate-400 shadow-sm
+    @apply block w-full rounded-xl border border-atlas-mist bg-white px-3 py-2 text-sm
+           placeholder-slate-400 shadow-[0_3px_12px_rgba(102,86,168,0.06)]
            focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500
            disabled:bg-slate-50 disabled:text-slate-500;
   }
@@ -90,7 +97,7 @@
   }
 
   .card {
-    @apply bg-white rounded-xl border border-slate-200 shadow-sm;
+    @apply rounded-2xl border border-atlas-mist bg-white shadow-[0_8px_24px_rgba(102,86,168,0.08)];
   }
 
   .badge {
@@ -139,6 +146,41 @@
 
   .priority-urgent {
     @apply text-red-600;
+  }
+}
+
+@layer utilities {
+  .sunny-canvas {
+    background-color: var(--atlas-paper);
+    background-image:
+      radial-gradient(circle at 8% 12%, rgb(255 217 117 / 22%) 0 5rem, transparent 5.1rem),
+      radial-gradient(circle at 93% 8%, rgb(220 238 255 / 60%) 0 7rem, transparent 7.1rem),
+      radial-gradient(circle at 82% 92%, rgb(169 220 200 / 24%) 0 6rem, transparent 6.1rem);
+  }
+
+  .sunny-card {
+    border-color: rgb(233 228 246 / 90%);
+    box-shadow: 0 10px 26px rgb(102 86 168 / 8%);
+  }
+
+  .sunny-bob {
+    animation: sunny-bob 5s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sunny-bob {
+      animation: none;
+    }
+  }
+}
+
+@keyframes sunny-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(3deg);
   }
 }
 

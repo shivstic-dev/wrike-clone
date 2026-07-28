@@ -50,7 +50,7 @@ function AddMemberModal({ workspaceId, onClose }: { workspaceId: string; onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+      <div className="sunny-card w-full max-w-md rounded-3xl bg-white p-6">
         <h3 className="mb-4 text-lg font-semibold text-slate-900">Add Department Member</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

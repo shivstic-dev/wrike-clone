@@ -32,43 +32,43 @@ export function DepartmentPulse({ overview }: DepartmentPulseProps) {
       label: 'Department pulse',
       value: comparison.value,
       detail: comparison.detail,
-      className: 'bg-atlas-canopy text-white',
-      mutedClassName: 'text-atlas-mist',
+      className: 'bg-[#eee9ff] text-atlas-ink',
+      mutedClassName: 'text-atlas-current',
     },
     {
       label: 'Active work',
       value: String(overview.totals.active),
       detail: 'Open tasks in this scope',
-      className: 'bg-white text-atlas-ink',
-      mutedClassName: 'text-atlas-current',
+      className: 'bg-atlas-sky text-atlas-ink',
+      mutedClassName: 'text-[#526b91]',
     },
     {
       label: 'Completed',
       value: String(overview.totals.completed),
       detail: `Last ${overview.windowDays} days`,
-      className: 'bg-white text-atlas-ink',
-      mutedClassName: 'text-atlas-current',
+      className: 'bg-[#fff3c9] text-atlas-ink',
+      mutedClassName: 'text-[#7b6424]',
     },
     {
       label: 'Needs attention',
       value: String(overview.attention.length),
       detail: attentionDetail || 'No flagged open work',
-      className: 'bg-[#fff8f4] text-atlas-signalCoral',
-      mutedClassName: 'text-[#a74429]',
+      className: 'bg-atlas-blush text-[#a24763]',
+      mutedClassName: 'text-[#8b5365]',
     },
   ];
 
   return (
-    <section aria-label="Department pulse" className="overflow-hidden rounded-2xl border border-atlas-mist bg-atlas-mist">
+    <section aria-label="Department pulse" className="sunny-card overflow-hidden rounded-3xl border-4 border-white bg-white">
       <dl className="grid gap-px sm:grid-cols-2 xl:grid-cols-4">
         {cells.map((cell) => (
           <div key={cell.label} className={`min-w-0 px-5 py-4 ${cell.className}`}>
             <dt
-              className={`font-atlasMono text-[0.6875rem] font-medium uppercase tracking-[0.12em] ${cell.mutedClassName}`}
+              className={`font-atlasMono text-xs font-bold tracking-[0.02em] ${cell.mutedClassName}`}
             >
               {cell.label}
             </dt>
-            <dd className="mt-2 font-atlasDisplay text-2xl font-bold tracking-[-0.04em]">
+            <dd className="mt-2 font-atlasDisplay text-3xl font-bold tracking-[-0.02em]">
               {cell.value}
             </dd>
             <dd className={`mt-1 text-xs leading-5 ${cell.mutedClassName}`}>{cell.detail}</dd>

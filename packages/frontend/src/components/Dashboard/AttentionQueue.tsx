@@ -20,7 +20,7 @@ function dueLabel(dueDate: string | null): string {
 
 export function AttentionQueue({ attention }: AttentionQueueProps) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-atlas-mist bg-white shadow-sm">
+    <section className="sunny-card overflow-hidden rounded-3xl border border-atlas-mist bg-white">
       <header className="flex items-start justify-between gap-4 border-b border-atlas-mist px-5 py-4">
         <div>
           <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
@@ -30,7 +30,7 @@ export function AttentionQueue({ attention }: AttentionQueueProps) {
             Attention queue
           </h2>
         </div>
-        <span className="rounded-full bg-[#fff2ec] px-2.5 py-1 font-atlasMono text-xs text-[#a74429]">
+        <span className="rounded-full bg-atlas-blush px-3 py-1 font-atlasMono text-xs font-bold text-[#a24763]">
           {attention.length} flagged
         </span>
       </header>

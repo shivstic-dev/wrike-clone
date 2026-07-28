@@ -16,7 +16,7 @@ export interface RoleCompositionProps {
 
 function ChartLoading() {
   return (
-    <div className="grid min-h-72 place-items-center rounded-2xl border border-atlas-mist bg-white text-sm text-slate-500 shadow-sm">
+    <div className="sunny-card grid min-h-72 place-items-center rounded-3xl border border-atlas-mist bg-white text-sm text-slate-500">
       Loading live chart…
     </div>
   );
@@ -32,7 +32,7 @@ export function AtlasPanel({
   title: string;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-atlas-mist bg-white shadow-sm">
+    <section className="sunny-card overflow-hidden rounded-3xl border border-atlas-mist bg-white">
       <header className="border-b border-atlas-mist px-5 py-4">
         <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
           {eyebrow}

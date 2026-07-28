@@ -141,7 +141,7 @@ function PrimaryNavigation({
 
           return (
             <div className="mb-6" key={section}>
-              <p className="px-3 font-atlasMono text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-atlas-current">
+              <p className="px-3 font-atlasMono text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-atlas-current">
                 {sectionLabels[section]}
               </p>
               <div className="mt-2 space-y-1">
@@ -149,10 +149,10 @@ function PrimaryNavigation({
                   <Link
                     aria-current={itemIsActive(item) ? 'page' : undefined}
                     className={clsx(
-                      'flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current',
+                      'flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current',
                       itemIsActive(item)
-                        ? 'bg-atlas-mist text-atlas-canopy'
-                        : 'text-atlas-ink hover:bg-atlas-paper',
+                        ? 'bg-atlas-canopy text-white shadow-[0_5px_14px_rgba(102,86,168,0.22)]'
+                        : 'text-atlas-ink hover:translate-x-0.5 hover:bg-atlas-mist/70 motion-reduce:transform-none',
                     )}
                     key={item.path}
                     onClick={onNavigate}
@@ -174,10 +174,10 @@ function PrimaryNavigation({
                       <Link
                         aria-current={workspace.id === activeDepartmentId ? 'page' : undefined}
                         className={clsx(
-                          'flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current',
+                          'flex min-h-9 items-center gap-2 rounded-xl px-3 py-1.5 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current',
                           workspace.id === activeDepartmentId
-                            ? 'bg-atlas-paper font-semibold text-atlas-canopy'
-                            : 'text-atlas-ink hover:bg-atlas-paper',
+                            ? 'bg-atlas-fieldNote/45 font-bold text-atlas-ink'
+                            : 'text-atlas-ink hover:bg-atlas-mist/60',
                         )}
                         key={workspace.id}
                         onClick={onNavigate}
@@ -185,7 +185,7 @@ function PrimaryNavigation({
                       >
                         <span
                           aria-hidden="true"
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-atlas-mist font-atlasDisplay text-xs font-bold text-atlas-canopy"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-atlas-sprout/65 font-atlasDisplay text-xs font-bold text-atlas-ink"
                         >
                           {workspace.name.charAt(0).toUpperCase()}
                         </span>
@@ -199,7 +199,7 @@ function PrimaryNavigation({
           );
         })}
       </nav>
-      <footer className="border-t border-atlas-mist bg-atlas-paper px-5 py-4">
+      <footer className="m-3 rounded-2xl border border-atlas-mist bg-white/75 px-4 py-3 shadow-sm">
         <p className="font-atlasMono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-atlas-current">
           Active department
         </p>
@@ -240,12 +240,12 @@ function AccountMenu({
         aria-controls="account-disclosure"
         aria-expanded={open}
         aria-label="Open account menu"
-        className="flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-atlas-ink transition-colors hover:bg-atlas-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
+        className="flex min-h-10 items-center gap-2 rounded-full px-2 text-sm font-bold text-atlas-ink transition-colors hover:bg-atlas-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
         onClick={() => setOpen((current) => !current)}
         ref={triggerRef}
         type="button"
       >
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-atlas-canopy font-atlasDisplay text-xs font-bold text-white">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-atlas-fieldNote font-atlasDisplay text-sm font-bold text-atlas-ink shadow-[0_3px_0_#e8b948]">
           {label.charAt(0).toUpperCase()}
         </span>
         <span className="hidden max-w-32 truncate sm:block">{label}</span>
@@ -261,7 +261,7 @@ function AccountMenu({
             type="button"
           />
           <div
-            className="absolute right-0 z-30 mt-2 w-64 overflow-hidden rounded-xl border border-atlas-mist bg-white shadow-xl"
+            className="sunny-card absolute right-0 z-30 mt-2 w-64 overflow-hidden rounded-2xl border border-atlas-mist bg-white"
             id="account-disclosure"
           >
             <div className="border-b border-atlas-mist px-4 py-3">
@@ -322,7 +322,7 @@ function TopBar({
   }, [helpOpen]);
 
   return (
-    <header className="relative z-20 flex min-h-16 items-center justify-between gap-3 border-b border-atlas-mist bg-white px-3 sm:px-6">
+    <header className="relative z-20 flex min-h-16 items-center justify-between gap-3 border-b border-atlas-mist bg-white/90 px-3 backdrop-blur-sm sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
         {mobile && (
           <button
@@ -364,7 +364,7 @@ function TopBar({
             {helpOpen && (
               <div
                 aria-label="Help"
-                className="absolute right-0 mt-2 w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-atlas-mist bg-white p-4 text-sm text-atlas-ink shadow-xl"
+                className="sunny-card absolute right-0 mt-2 w-[min(22rem,calc(100vw-1.5rem))] rounded-2xl border border-atlas-mist bg-white p-4 text-sm text-atlas-ink"
                 role="region"
               >
                 {helpContent}
@@ -430,7 +430,7 @@ function MobileNavigationSheet({
     <div className="fixed inset-0 z-40 md:hidden">
       <button
         aria-label="Close navigation"
-        className="absolute inset-0 bg-atlas-canopy/45 backdrop-blur-[1px]"
+        className="absolute inset-0 bg-atlas-ink/35 backdrop-blur-[2px]"
         onClick={onClose}
         tabIndex={-1}
         type="button"
@@ -438,7 +438,7 @@ function MobileNavigationSheet({
       <aside
         aria-label="Navigation"
         aria-modal="true"
-        className="relative flex h-full w-[min(20rem,88vw)] flex-col bg-white shadow-2xl"
+        className="relative flex h-full w-[min(20rem,88vw)] flex-col bg-[#fbf8ff] shadow-2xl"
         id="mobile-navigation"
         onKeyDown={containFocus}
         ref={sheetRef}
@@ -517,14 +517,20 @@ export default function AppShell({ helpContent }: AppShellProps) {
   }, [closeMobileNavigation, mobileNavigationOpen]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-atlas-paper text-atlas-ink">
+    <div className="sunny-canvas flex h-screen overflow-hidden text-atlas-ink">
       {!mobile && (
-        <aside className="flex w-64 shrink-0 flex-col border-r border-atlas-mist bg-white">
+        <aside className="flex w-64 shrink-0 flex-col border-r border-atlas-mist bg-[#fbf8ff]/95">
           <div className="flex min-h-16 items-center border-b border-atlas-mist px-5">
             <Link
-              className="font-atlasDisplay text-lg font-bold text-atlas-canopy focus-visible:outline focus-visible:outline-2 focus-visible:outline-atlas-current"
+              className="flex items-center gap-2.5 font-atlasDisplay text-lg font-bold text-atlas-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-atlas-current"
               to="/dashboard"
             >
+              <span
+                aria-hidden="true"
+                className="sunny-bob grid h-9 w-9 place-items-center rounded-[1rem] bg-atlas-fieldNote text-sm shadow-[0_4px_0_#e8b948]"
+              >
+                ✓
+              </span>
               OpenWork Hub
             </Link>
           </div>

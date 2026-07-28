@@ -40,7 +40,7 @@ function AssigneeChips({ task }: { task: Task }) {
 }
 function TaskSection({ title, tasks }: { title: string; tasks: Task[] }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-atlas-mist bg-white shadow-sm">
+    <section className="sunny-card overflow-hidden rounded-3xl border border-atlas-mist bg-white">
       <header className="flex items-center justify-between gap-4 border-b border-atlas-mist px-5 py-4">
         <h2 className="font-atlasDisplay text-lg font-bold text-atlas-ink">{title}</h2>
         <span className="rounded-full bg-atlas-paper px-2.5 py-1 font-atlasMono text-xs text-atlas-current">
@@ -184,25 +184,29 @@ export default function DashboardPage() {
   const showPersonalTasks = !managementView && !!departmentId;
 
   return (
-    <div className="min-h-full bg-atlas-paper p-3 sm:p-6">
-      <div className="mx-auto max-w-[96rem] overflow-hidden rounded-[1.75rem] border border-atlas-mist bg-atlas-paper shadow-[0_24px_70px_rgba(18,60,58,0.12)]">
-        <div className="h-2 bg-atlas-canopy" />
+    <div className="sunny-canvas min-h-full p-3 sm:p-6">
+      <div className="mx-auto max-w-[96rem] overflow-hidden rounded-[2rem] border border-white/80 bg-white/55 shadow-[0_24px_70px_rgba(102,86,168,0.12)] backdrop-blur-[2px]">
+        <div aria-hidden="true" className="grid h-2 grid-cols-3">
+          <span className="bg-atlas-fieldNote" />
+          <span className="bg-atlas-sprout" />
+          <span className="bg-atlas-blush" />
+        </div>
         <div className="space-y-5 p-4 sm:p-6 lg:p-8">
-          <header className="flex flex-col gap-5 border-b border-atlas-mist pb-6 lg:flex-row lg:items-end lg:justify-between">
+          <header className="flex flex-col gap-5 rounded-[1.75rem] border border-white bg-white/75 p-5 shadow-[0_8px_24px_rgba(102,86,168,0.06)] lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <p className="font-atlasMono text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-atlas-current">
+              <p className="font-atlasMono text-xs font-bold tracking-[0.04em] text-atlas-current">
                 {scopeName} · Department pulse
               </p>
-              <h1 className="mt-2 font-atlasDisplay text-3xl font-bold tracking-[-0.045em] text-atlas-ink sm:text-4xl">
+              <h1 className="mt-2 font-atlasDisplay text-3xl font-bold tracking-[-0.02em] text-atlas-ink sm:text-4xl">
                 {greeting(user?.displayName, user?.email)}
               </h1>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{scopeSummary}</p>
+              <p className="mt-2 text-sm leading-6 text-atlas-ink/70">{scopeSummary}</p>
             </div>
 
             <label className="text-xs font-semibold text-atlas-ink">
               Department
               <select
-                className="mt-1 block min-w-64 rounded-xl border-atlas-mist bg-white text-sm shadow-sm focus:border-atlas-current focus:ring-atlas-current"
+                className="mt-1 block min-w-64 rounded-2xl border-atlas-mist bg-white text-sm font-semibold shadow-sm focus:border-atlas-current focus:ring-atlas-current"
                 value={departmentId}
                 onChange={(event) => setDepartmentId(event.target.value)}
                 disabled={departments.isLoading || departmentList.length === 0}
@@ -292,7 +296,7 @@ export default function DashboardPage() {
           {showGroupedFallback && <GroupedTaskLedger grouped={grouped.data!} />}
 
           {tenantAdmin && !departmentId && (
-            <section className="rounded-2xl border border-atlas-mist bg-white px-5 py-5 shadow-sm">
+            <section className="sunny-card rounded-3xl border border-atlas-mist bg-white px-5 py-5">
               <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
                 Department stewardship
               </p>
@@ -306,7 +310,7 @@ export default function DashboardPage() {
           )}
 
           {canChangeRoles && (
-            <section className="overflow-hidden rounded-2xl border border-atlas-mist bg-white shadow-sm">
+            <section className="sunny-card overflow-hidden rounded-3xl border border-atlas-mist bg-white">
               <header className="border-b border-atlas-mist px-5 py-4">
                 <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
                   Department stewardship

@@ -47,7 +47,7 @@ function ModalShell({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl"
+        className="sunny-card max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby="workspace-modal-title"

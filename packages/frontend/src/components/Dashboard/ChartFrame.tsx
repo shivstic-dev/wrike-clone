@@ -39,7 +39,7 @@ export function ChartFrame({
 
   return (
     <figure
-      className="min-w-0 rounded-xl border border-atlas-mist bg-white p-4 shadow-sm sm:p-5"
+      className="sunny-card min-w-0 rounded-3xl border border-atlas-mist bg-white p-4 sm:p-5"
       aria-labelledby={titleId}
       aria-describedby={`${descriptionId} ${summaryId}`}
     >
