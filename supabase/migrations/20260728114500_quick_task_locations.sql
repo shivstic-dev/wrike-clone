@@ -19,6 +19,7 @@ WITH ranked_homes AS (
            ORDER BY is_home DESC, folder_id
          ) AS row_number
   FROM task_folder_links
+  WHERE is_home = true
 )
 UPDATE task_folder_links link
 SET is_home = (ranked.row_number = 1)

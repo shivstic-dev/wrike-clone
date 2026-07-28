@@ -20,4 +20,13 @@ describe('quick task locations migration', () => {
     expect(sql).toContain('JOIN projects p ON p.id = t.project_id');
     expect(sql).toContain('WHERE NOT EXISTS');
   });
+
+  it('only normalizes duplicate true homes and promotes the project-folder link', () => {
+    expect(sql).toMatch(
+      /WITH ranked_homes AS \([\s\S]*FROM task_folder_links\s+WHERE is_home = true/,
+    );
+    expect(sql).toMatch(
+      /ON CONFLICT \(task_id, folder_id\)\s+DO UPDATE SET is_home = true;/,
+    );
+  });
 });
