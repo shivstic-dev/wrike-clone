@@ -307,6 +307,26 @@ describe('Validation Schemas', () => {
       expect(createTaskSchema.safeParse({ title: 'Prepare banner' }).success).toBe(false);
     });
 
+    it('rejects a department and project without a folder', () => {
+      expect(
+        createTaskSchema.safeParse({
+          departmentId: '00000000-0000-4000-8000-000000000001',
+          projectId: '00000000-0000-4000-8000-000000000002',
+          title: 'Prepare banner',
+        }).success,
+      ).toBe(false);
+    });
+
+    it('rejects a folder and project without a department', () => {
+      expect(
+        createTaskSchema.safeParse({
+          folderId: '00000000-0000-4000-8000-000000000003',
+          projectId: '00000000-0000-4000-8000-000000000002',
+          title: 'Prepare banner',
+        }).success,
+      ).toBe(false);
+    });
+
     it('requires a folder or project when moving', () => {
       expect(moveTaskLocationSchema.safeParse({}).success).toBe(false);
     });

@@ -165,8 +165,19 @@ export const taskLocationInputSchema = z
     folderId: uuidField.optional(),
     projectId: uuidField.optional(),
   })
-  .refine((value) => !!value.departmentId || !!value.projectId, {
-    message: 'departmentId or projectId is required',
+  .refine((value) => {
+    const hasDepartment = !!value.departmentId;
+    const hasFolder = !!value.folderId;
+    const hasProject = !!value.projectId;
+
+    return (
+      (hasDepartment && !hasFolder && !hasProject) ||
+      (hasDepartment && hasFolder && !hasProject) ||
+      (!hasDepartment && !hasFolder && hasProject) ||
+      (hasDepartment && hasFolder && hasProject)
+    );
+  }, {
+    message: 'invalid task location combination',
     path: ['departmentId'],
   });
 
