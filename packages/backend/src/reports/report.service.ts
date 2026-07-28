@@ -6,6 +6,14 @@ import { DATABASE_PROVIDER } from '../database/database.module';
 import { requireTenantContext } from '../common/tenant-context';
 import { DepartmentAccessService } from '../rbac/department-access.service';
 import type { DepartmentReportFilterInput } from '@wrike-clone/shared';
+import {
+  buildExactAudience,
+  buildManagerAudience,
+  buildUnrestrictedAudience,
+  resolveReportMode,
+  type ReportDepartmentMember,
+  type ResolvedReportAudience,
+} from './report-audience';
 
 type ReportTask = {
   id: string;
@@ -96,7 +104,7 @@ export class ReportService {
     if (filter.status) query.where('tasks.status', filter.status);
     if (filter.priority) query.where('tasks.priority', filter.priority);
     if (filter.assigneeId) {
-      await this.assertReportTargetAllowed(filter.assigneeId, scope.userIds);
+      await this.assertReportTargetAllowed(filter.assigneeId, scope.allowedTargetUserIds);
       this.whereAssignedTo(query, [filter.assigneeId]);
     }
 
@@ -191,29 +199,26 @@ export class ReportService {
     if (!member) throw new ForbiddenException('That user is outside your organization');
   }
 
-  private async resolveAudience(filter: DepartmentReportFilterInput): Promise<{
-    departmentId?: string;
-    role: string;
-    mode: 'self' | 'individual' | 'combined';
-    userIds: string[] | null;
-  }> {
+  private async resolveAudience(
+    filter: DepartmentReportFilterInput,
+  ): Promise<ResolvedReportAudience> {
     const ctx = requireTenantContext();
     const base = await this.departmentAccess.getReportScope(filter.departmentId);
-    const mode = filter.scope || 'self';
+    const mode = resolveReportMode(base.role, filter.scope);
     const role = base.role;
 
-    if (role === 'employee') {
-      if (mode !== 'self') {
-        throw new ForbiddenException('Employees may only run reports for themselves');
-      }
-      return { departmentId: base.departmentId, role, mode, userIds: [ctx.userId] };
-    }
-    if (mode === 'self') {
-      return { departmentId: base.departmentId, role, mode, userIds: [ctx.userId] };
+    if (role === 'employee' || mode === 'self') {
+      return {
+        departmentId: base.departmentId,
+        role,
+        mode,
+        ...buildExactAudience(ctx.userId),
+        allowedTargetUserIds: [ctx.userId],
+      };
     }
 
     const departmentMembers = base.departmentId
-      ? await this.db('workspace_members')
+      ? ((await this.db('workspace_members')
           .leftJoin('department_heads', function () {
             this.on('department_heads.department_id', '=', 'workspace_members.workspace_id').andOn(
               'department_heads.user_id',
@@ -221,41 +226,59 @@ export class ReportService {
               'workspace_members.user_id',
             );
           })
+          .join('tenant_memberships', function () {
+            this.on('tenant_memberships.tenant_id', '=', 'workspace_members.tenant_id').andOn(
+              'tenant_memberships.user_id',
+              '=',
+              'workspace_members.user_id',
+            );
+          })
           .where({
             'workspace_members.tenant_id': ctx.tenantId,
             'workspace_members.workspace_id': base.departmentId,
+            'tenant_memberships.is_active': true,
           })
           .select(
-            'workspace_members.user_id',
-            'workspace_members.role',
-            'department_heads.id as head_id',
-          )
+            'workspace_members.user_id as userId',
+            this.db.raw(`
+              CASE
+                WHEN department_heads.id IS NOT NULL THEN 'department_head'
+                WHEN workspace_members.role = 'manager'
+                  OR tenant_memberships.role = 'manager' THEN 'manager'
+                ELSE 'employee'
+              END AS role
+            `),
+            this.db.raw('(department_heads.id IS NOT NULL) AS "isDepartmentHead"'),
+          )) as ReportDepartmentMember[])
       : [];
 
-    let allowedIds: string[] | null;
-    if (role === 'manager') {
-      allowedIds = [
-        ctx.userId,
-        ...departmentMembers
-          .filter((member) => member.role === 'employee' && !member.head_id)
-          .map((member) => member.user_id as string),
-      ];
-    } else if (base.departmentId) {
-      allowedIds = departmentMembers.map((member) => member.user_id as string);
-    } else {
-      allowedIds = null;
-    }
+    const managerAudience =
+      role === 'manager' ? buildManagerAudience(ctx.userId, departmentMembers) : null;
+    const allowedUserIds = managerAudience
+      ? managerAudience.userIds
+      : base.departmentId
+        ? departmentMembers.map((member) => member.userId)
+        : null;
 
     if (mode === 'individual') {
       const target = filter.targetUserId!;
-      await this.assertReportTargetAllowed(target, allowedIds);
-      return { departmentId: base.departmentId, role, mode, userIds: [target] };
+      await this.assertReportTargetAllowed(target, allowedUserIds);
+      return {
+        departmentId: base.departmentId,
+        role,
+        mode,
+        ...buildExactAudience(target),
+        allowedTargetUserIds: [target],
+      };
     }
+
+    const audience = managerAudience || buildUnrestrictedAudience();
     return {
       departmentId: base.departmentId,
       role,
       mode,
-      userIds: allowedIds ? [...new Set(allowedIds)] : null,
+      ...audience,
+      allowedTargetUserIds: allowedUserIds,
     };
   }
 
