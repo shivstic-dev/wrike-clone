@@ -115,7 +115,9 @@ export interface UpdateProjectRequest {
     visibility?: 'global' | 'department';
 }
 export interface CreateTaskRequest {
-    projectId: string;
+    departmentId?: string;
+    folderId?: string;
+    projectId?: string;
     parentTaskId?: string;
     assigneeId?: string;
     assigneeIds?: string[];
@@ -128,6 +130,19 @@ export interface CreateTaskRequest {
     dueDate?: string;
     visibility?: 'global' | 'department';
     customFields?: Record<string, unknown>;
+}
+export interface MoveTaskLocationRequest {
+    folderId?: string;
+    projectId?: string;
+}
+export interface TaskLocationOption {
+    folderId: string;
+    folderName: string;
+    isGeneral: boolean;
+    projects: Array<{
+        projectId: string;
+        projectName: string;
+    }>;
 }
 export interface UpdateTaskRequest {
     title?: string;

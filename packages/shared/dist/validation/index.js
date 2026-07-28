@@ -7,7 +7,7 @@
  * frontend (form validation), so rules never diverge.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.departmentReportFilterSchema = exports.paginationSchema = exports.addTaskAssigneeSchema = exports.changeDepartmentMemberRoleSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.createDependencySchema = exports.bulkTaskUpdateSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
+exports.departmentReportFilterSchema = exports.paginationSchema = exports.addTaskAssigneeSchema = exports.changeDepartmentMemberRoleSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.createDependencySchema = exports.bulkTaskUpdateSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.moveTaskLocationSchema = exports.taskLocationInputSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
 const zod_1 = require("zod");
 const enums_1 = require("../enums");
 // ── Helpers ────────────────────────────────────────────────────
@@ -131,8 +131,34 @@ exports.updateProjectSchema = zod_1.z
 })
     .refine((d) => Object.keys(d).length > 0, 'At least one field required');
 // ── Task ───────────────────────────────────────────────────────
-exports.createTaskSchema = zod_1.z.object({
-    projectId: exports.uuidField,
+exports.taskLocationInputSchema = zod_1.z
+    .object({
+    departmentId: exports.uuidField.optional(),
+    folderId: exports.uuidField.optional(),
+    projectId: exports.uuidField.optional(),
+})
+    .refine((value) => {
+    const hasDepartment = !!value.departmentId;
+    const hasFolder = !!value.folderId;
+    const hasProject = !!value.projectId;
+    return ((hasDepartment && !hasFolder && !hasProject) ||
+        (hasDepartment && hasFolder && !hasProject) ||
+        (!hasDepartment && !hasFolder && hasProject) ||
+        (hasDepartment && hasFolder && hasProject));
+}, {
+    message: 'invalid task location combination',
+    path: ['departmentId'],
+});
+exports.moveTaskLocationSchema = zod_1.z
+    .object({
+    folderId: exports.uuidField.optional(),
+    projectId: exports.uuidField.optional(),
+})
+    .refine((value) => !!value.folderId || !!value.projectId, {
+    message: 'folderId or projectId is required',
+    path: ['folderId'],
+});
+exports.createTaskSchema = exports.taskLocationInputSchema.and(zod_1.z.object({
     parentTaskId: exports.uuidField.optional(),
     assigneeId: exports.uuidField.optional(),
     assigneeIds: zod_1.z.array(exports.uuidField).max(50).optional(),
@@ -145,7 +171,7 @@ exports.createTaskSchema = zod_1.z.object({
     dueDate: exports.isoDate.optional(),
     visibility: zod_1.z.enum(['global', 'department']).optional().default('department'),
     customFields: zod_1.z.record(zod_1.z.unknown()).optional(),
-});
+}));
 exports.updateTaskSchema = zod_1.z
     .object({
     title: zod_1.z.string().min(1).max(500).optional(),
