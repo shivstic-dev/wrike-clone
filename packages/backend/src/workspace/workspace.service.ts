@@ -15,6 +15,46 @@ import { DepartmentAccessService } from '../rbac/department-access.service';
 
 const SALT_ROUNDS = 12;
 
+export function buildWorkspaceMembersQuery(db: Knex, workspaceId: string, tenantId: string) {
+  return db('workspace_members')
+    .join('users', 'workspace_members.user_id', 'users.id')
+    .leftJoin('department_heads', function () {
+      this.on('department_heads.department_id', '=', 'workspace_members.workspace_id').andOn(
+        'department_heads.user_id',
+        '=',
+        'workspace_members.user_id',
+      );
+    })
+    .leftJoin('tenant_memberships', function () {
+      this.on('tenant_memberships.tenant_id', '=', 'workspace_members.tenant_id')
+        .andOn('tenant_memberships.user_id', '=', 'workspace_members.user_id')
+        .andOnVal('tenant_memberships.is_active', '=', true);
+    })
+    .where('workspace_members.workspace_id', workspaceId)
+    .andWhere('workspace_members.tenant_id', tenantId)
+    .select(
+      'workspace_members.id',
+      'workspace_members.workspace_id',
+      'workspace_members.user_id',
+      db.raw(`
+        CASE
+          WHEN tenant_memberships.role = 'admin' THEN 'admin'
+          WHEN department_heads.id IS NOT NULL THEN 'department_head'
+          WHEN tenant_memberships.role = 'manager' OR workspace_members.role = 'manager'
+            THEN 'manager'
+          ELSE 'employee'
+        END as role
+      `),
+      'workspace_members.created_at',
+      'workspace_members.updated_at',
+      'users.id as user_id',
+      'users.email',
+      'users.display_name',
+      'users.avatar_url',
+    )
+    .orderBy('users.display_name', 'asc');
+}
+
 @Injectable()
 export class WorkspaceService {
   private readonly logger = new Logger(WorkspaceService.name);
@@ -259,32 +299,7 @@ export class WorkspaceService {
     // Verify workspace exists
     await this.findById(workspaceId);
 
-    return this.db('workspace_members')
-      .join('users', 'workspace_members.user_id', 'users.id')
-      .leftJoin('department_heads', function () {
-        this.on('department_heads.department_id', '=', 'workspace_members.workspace_id').andOn(
-          'department_heads.user_id',
-          '=',
-          'workspace_members.user_id',
-        );
-      })
-      .where('workspace_members.workspace_id', workspaceId)
-      .andWhere('workspace_members.tenant_id', ctx.tenantId)
-      .select(
-        'workspace_members.id',
-        'workspace_members.workspace_id',
-        'workspace_members.user_id',
-        this.db.raw(
-          `CASE WHEN department_heads.id IS NOT NULL THEN 'department_head' ELSE workspace_members.role END as role`,
-        ),
-        'workspace_members.created_at',
-        'workspace_members.updated_at',
-        'users.id as user_id',
-        'users.email',
-        'users.display_name',
-        'users.avatar_url',
-      )
-      .orderBy('users.display_name', 'asc');
+    return buildWorkspaceMembersQuery(this.db, workspaceId, ctx.tenantId);
   }
 
   /**

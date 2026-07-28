@@ -25,6 +25,29 @@ interface QuickTaskModalProps {
 }
 
 const inputClasses = 'input mt-1 focus:ring-2 focus:ring-primary-500/20';
+const quickTaskErrorFallback = 'Task could not be created. Review the details and try again.';
+
+export function getQuickTaskErrorMessage(error: unknown): string {
+  const responseMessage =
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof error.response === 'object' &&
+    error.response !== null &&
+    'data' in error.response &&
+    typeof error.response.data === 'object' &&
+    error.response.data !== null &&
+    'message' in error.response.data &&
+    typeof error.response.data.message === 'string'
+      ? error.response.data.message.trim()
+      : '';
+  if (responseMessage) return responseMessage;
+
+  const errorMessage = error instanceof Error ? error.message.trim() : '';
+  return errorMessage && !/^Request failed with status code \d+$/i.test(errorMessage)
+    ? errorMessage
+    : quickTaskErrorFallback;
+}
 
 export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTaskModalProps) {
   const {
@@ -72,7 +95,7 @@ export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTask
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        if (!submissionRef.current) onClose();
+        onClose();
         return;
       }
 
@@ -82,7 +105,15 @@ export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTask
         dialogRef.current.querySelectorAll<HTMLElement>(
           'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])',
         ),
-      ).filter((element) => !element.closest('details:not([open])'));
+      ).filter((element) => {
+        const closedDetails = element.closest('details:not([open])');
+        if (!closedDetails) return true;
+        return (
+          element.tagName === 'SUMMARY' &&
+          element.parentElement === closedDetails &&
+          !closedDetails.parentElement?.closest('details:not([open])')
+        );
+      });
       const firstFocusable = focusableElements[0];
       const lastFocusable = focusableElements.at(-1);
       if (!firstFocusable || !lastFocusable) return;
@@ -177,11 +208,7 @@ export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTask
       ));
       onClose();
     } catch (error) {
-      setSubmitError(
-        error instanceof Error
-          ? error.message || 'Task could not be created. Check the form and try again.'
-          : 'Task could not be created. Check the form and try again.',
-      );
+      setSubmitError(getQuickTaskErrorMessage(error));
       submissionRef.current = false;
     }
   };

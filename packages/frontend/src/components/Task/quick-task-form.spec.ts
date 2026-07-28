@@ -212,10 +212,28 @@ describe('quick task form helpers', () => {
       { userId: 'manager-2', role: 'manager' },
       { userId: 'employee-1', role: 'employee' },
       { userId: 'head-1', role: 'department_head' },
+      { userId: 'admin-1', role: 'admin' },
     ];
 
     expect(
       permittedQuickTaskAssignees(members, 'manager', 'manager-1').map((member) => member.userId),
     ).toEqual(['manager-1', 'employee-1']);
+  });
+
+  it('never offers tenant admins as quick task assignees', () => {
+    const members = [
+      { userId: 'head-1', role: 'department_head' },
+      { userId: 'employee-1', role: 'employee' },
+      { userId: 'admin-1', role: 'admin' },
+    ];
+
+    expect(
+      permittedQuickTaskAssignees(members, 'department_head', 'head-1').map(
+        (member) => member.userId,
+      ),
+    ).toEqual(['head-1', 'employee-1']);
+    expect(
+      permittedQuickTaskAssignees(members, 'admin', 'admin-viewer').map((member) => member.userId),
+    ).toEqual(['head-1', 'employee-1']);
   });
 });

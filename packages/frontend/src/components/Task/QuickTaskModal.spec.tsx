@@ -3,7 +3,7 @@
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { QuickTaskModal } from './QuickTaskModal';
+import { getQuickTaskErrorMessage, QuickTaskModal } from './QuickTaskModal';
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -226,6 +226,29 @@ describe('QuickTaskModal', () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it('closes on Escape while task creation is pending', () => {
+    mocks.mutateAsync.mockImplementation(
+      () =>
+        new Promise(() => {
+          // Deliberately unresolved so submissionRef remains active.
+        }),
+    );
+    const onClose = renderModal();
+    enterTitle('Prepare volunteer briefing');
+    const form = document.querySelector('form');
+    if (!form) throw new Error('Quick task form was not rendered');
+
+    act(() => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(mocks.mutateAsync).toHaveBeenCalledOnce();
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it('keeps Tab focus inside the dialog', () => {
     renderModal();
     const closeButton = document.querySelector<HTMLButtonElement>(
@@ -261,6 +284,33 @@ describe('QuickTaskModal', () => {
       );
     });
     expect(document.activeElement).toBe(closeButton);
+  });
+
+  it('keeps the More details summary tabbable while its descendants are hidden', () => {
+    renderModal();
+    const summary = document.querySelector<HTMLElement>('details:not([open]) > summary');
+    if (!summary) throw new Error('Closed More details summary was not rendered');
+
+    document
+      .querySelectorAll<
+        HTMLButtonElement | HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+      >('button, input, select, textarea')
+      .forEach((element) => {
+        element.disabled = true;
+      });
+    summary.focus();
+    const tabEvent = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    });
+
+    act(() => {
+      document.dispatchEvent(tabEvent);
+    });
+
+    expect(tabEvent.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(summary);
   });
 
   it('closes when the backdrop area is pressed', () => {
@@ -315,7 +365,13 @@ describe('QuickTaskModal', () => {
 
   it('shows a submission error and permits retry after a failed mutation', async () => {
     mocks.mutateAsync
-      .mockRejectedValueOnce(new Error('You cannot assign this task.'))
+      .mockRejectedValueOnce({
+        response: {
+          data: {
+            message: 'You cannot assign this task.',
+          },
+        },
+      })
       .mockResolvedValueOnce(createdTask);
     const onClose = renderModal();
     enterTitle('Prepare volunteer briefing');
@@ -336,5 +392,31 @@ describe('QuickTaskModal', () => {
     });
     expect(mocks.mutateAsync).toHaveBeenCalledTimes(2);
     expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+describe('getQuickTaskErrorMessage', () => {
+  it('uses a meaningful API response message', () => {
+    expect(
+      getQuickTaskErrorMessage({
+        response: {
+          data: {
+            message: '  Managers may only assign employees or themselves.  ',
+          },
+        },
+      }),
+    ).toBe('Managers may only assign employees or themselves.');
+  });
+
+  it('uses a retry-oriented fallback instead of a generic Axios status message', () => {
+    expect(getQuickTaskErrorMessage(new Error('Request failed with status code 403'))).toBe(
+      'Task could not be created. Review the details and try again.',
+    );
+  });
+
+  it('keeps a meaningful non-Axios error message', () => {
+    expect(getQuickTaskErrorMessage(new Error('You cannot assign this task.'))).toBe(
+      'You cannot assign this task.',
+    );
   });
 });

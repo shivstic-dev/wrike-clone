@@ -13,7 +13,7 @@ interface TaskFormProps {
     userId: string;
     displayName: string;
     email: string;
-    role?: 'employee' | 'manager' | 'department_head';
+    role?: 'admin' | 'employee' | 'manager' | 'department_head';
   }>;
 }
 

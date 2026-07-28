@@ -134,7 +134,10 @@ export function permittedQuickTaskAssignees<T extends { userId: string; role: st
   viewerRole: string | undefined,
   currentUserId: string | undefined,
 ): T[] {
+  const assignableMembers = members.filter((member) => member.role !== 'admin');
   return viewerRole === 'manager'
-    ? members.filter((member) => member.userId === currentUserId || member.role === 'employee')
-    : members;
+    ? assignableMembers.filter(
+        (member) => member.userId === currentUserId || member.role === 'employee',
+      )
+    : assignableMembers;
 }
