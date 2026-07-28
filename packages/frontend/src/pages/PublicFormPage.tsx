@@ -117,11 +117,11 @@ export default function PublicFormPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-indigo-50 py-12 px-4">
+    <div className="workboard-canvas min-h-screen px-4 py-12">
       <div className="mx-auto max-w-lg">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-primary-600 shadow-lg">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-atlas-canopy shadow-sm">
             <svg
               className="h-7 w-7 text-white"
               fill="none"
@@ -143,7 +143,7 @@ export default function PublicFormPage() {
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="rounded-2xl bg-white p-8 shadow-lg border border-slate-100"
+          className="workboard-card rounded-2xl border border-atlas-mist bg-white p-8"
         >
           <div className="space-y-5">
             {form?.fields?.map((field) => (

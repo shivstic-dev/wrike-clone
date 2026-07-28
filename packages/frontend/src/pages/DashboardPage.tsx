@@ -40,9 +40,9 @@ function AssigneeChips({ task }: { task: Task }) {
 }
 function TaskSection({ title, tasks }: { title: string; tasks: Task[] }) {
   return (
-    <section className="sunny-card overflow-hidden rounded-3xl border border-atlas-mist bg-white">
+    <section className="workboard-card overflow-hidden rounded-2xl border border-atlas-mist bg-white">
       <header className="flex items-center justify-between gap-4 border-b border-atlas-mist px-5 py-4">
-        <h2 className="font-atlasDisplay text-lg font-bold text-atlas-ink">{title}</h2>
+        <h2 className="font-atlasDisplay text-lg font-semibold text-atlas-ink">{title}</h2>
         <span className="rounded-full bg-atlas-paper px-2.5 py-1 font-atlasMono text-xs text-atlas-current">
           {tasks.length}
         </span>
@@ -79,7 +79,7 @@ function PeopleSections({ label, groups }: { label: string; groups: DepartmentTa
   if (groups.length === 0) return null;
   return (
     <div className="space-y-3">
-      <h2 className="font-atlasMono text-xs font-medium uppercase tracking-[0.1em] text-atlas-current">
+      <h2 className="font-atlasMono text-xs font-medium uppercase tracking-[0.1em] text-slate-500">
         {label}
       </h2>
       <div className="grid gap-4 xl:grid-cols-2">
@@ -120,9 +120,7 @@ export default function DashboardPage() {
   const departments = useWorkspaces();
   const departmentList = departments.data ?? [];
   const tenantAdmin = membership?.role === 'admin';
-  const selectedDepartment = departmentList.find(
-    (department) => department.id === departmentId,
-  );
+  const selectedDepartment = departmentList.find((department) => department.id === departmentId);
   const departmentRole = selectedDepartment?.departmentRole || (tenantAdmin ? 'admin' : 'none');
   const managementView =
     tenantAdmin ||
@@ -142,8 +140,7 @@ export default function DashboardPage() {
   );
 
   const members = useWorkspaceMembers(departmentId);
-  const canChangeRoles =
-    !!departmentId && (tenantAdmin || departmentRole === 'department_head');
+  const canChangeRoles = !!departmentId && (tenantAdmin || departmentRole === 'department_head');
   const changes = useDepartmentRoleChanges(departmentId, canChangeRoles);
   const changeRole = useChangeDepartmentRole();
 
@@ -174,39 +171,33 @@ export default function DashboardPage() {
   const attentionCount = overview.data?.attention.length;
   const scopeSummary =
     attentionCount === undefined
-      ? 'Live operations, workload, and access signals in one field note.'
+      ? 'Live operations, workload, and access signals in one view.'
       : attentionCount === 0
         ? 'No open work is currently flagged for attention.'
         : `${attentionCount} ${attentionCount === 1 ? 'item needs' : 'items need'} attention in this scope.`;
 
-  const showGroupedFallback =
-    managementView && !!departmentId && !overview.data && !!grouped.data;
+  const showGroupedFallback = managementView && !!departmentId && !overview.data && !!grouped.data;
   const showPersonalTasks = !managementView && !!departmentId;
 
   return (
-    <div className="sunny-canvas min-h-full p-3 sm:p-6">
-      <div className="mx-auto max-w-[96rem] overflow-hidden rounded-[2rem] border border-white/80 bg-white/55 shadow-[0_24px_70px_rgba(102,86,168,0.12)] backdrop-blur-[2px]">
-        <div aria-hidden="true" className="grid h-2 grid-cols-3">
-          <span className="bg-atlas-fieldNote" />
-          <span className="bg-atlas-sprout" />
-          <span className="bg-atlas-blush" />
-        </div>
-        <div className="space-y-5 p-4 sm:p-6 lg:p-8">
-          <header className="flex flex-col gap-5 rounded-[1.75rem] border border-white bg-white/75 p-5 shadow-[0_8px_24px_rgba(102,86,168,0.06)] lg:flex-row lg:items-end lg:justify-between">
+    <div className="workboard-canvas min-h-full p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-[96rem]">
+        <div className="space-y-5">
+          <header className="flex flex-col gap-5 border-b border-atlas-mist pb-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <p className="font-atlasMono text-xs font-bold tracking-[0.04em] text-atlas-current">
-                {scopeName} · Department pulse
+              <p className="font-atlasMono text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-atlas-current">
+                {scopeName} · Live operations
               </p>
-              <h1 className="mt-2 font-atlasDisplay text-3xl font-bold tracking-[-0.02em] text-atlas-ink sm:text-4xl">
+              <h1 className="mt-2 font-atlasDisplay text-3xl font-semibold tracking-[-0.045em] text-atlas-ink sm:text-4xl">
                 {greeting(user?.displayName, user?.email)}
               </h1>
-              <p className="mt-2 text-sm leading-6 text-atlas-ink/70">{scopeSummary}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500">{scopeSummary}</p>
             </div>
 
-            <label className="text-xs font-semibold text-atlas-ink">
+            <label className="text-xs font-medium text-slate-500">
               Department
               <select
-                className="mt-1 block min-w-64 rounded-2xl border-atlas-mist bg-white text-sm font-semibold shadow-sm focus:border-atlas-current focus:ring-atlas-current"
+                className="mt-1 block min-w-64 rounded-xl border-atlas-mist bg-white text-sm font-medium shadow-sm focus:border-atlas-current focus:ring-atlas-current"
                 value={departmentId}
                 onChange={(event) => setDepartmentId(event.target.value)}
                 disabled={departments.isLoading || departmentList.length === 0}
@@ -238,7 +229,7 @@ export default function DashboardPage() {
             departmentList.length === 0 &&
             !tenantAdmin && (
               <section className="rounded-2xl border border-dashed border-atlas-mist bg-white px-6 py-12 text-center">
-                <h2 className="font-atlasDisplay text-lg font-bold text-atlas-ink">
+                <h2 className="font-atlasDisplay text-lg font-semibold text-atlas-ink">
                   No department is available
                 </h2>
                 <p className="mt-2 text-sm text-slate-600">
@@ -283,9 +274,7 @@ export default function DashboardPage() {
             />
           )}
 
-          {showPersonalTasks && mine.isLoading && (
-            <LoadingSpinner className="py-10" size="md" />
-          )}
+          {showPersonalTasks && mine.isLoading && <LoadingSpinner className="py-10" size="md" />}
           {showPersonalTasks && mine.data && (
             <TaskSection title="My tasks" tasks={mine.data.data} />
           )}
@@ -296,11 +285,11 @@ export default function DashboardPage() {
           {showGroupedFallback && <GroupedTaskLedger grouped={grouped.data!} />}
 
           {tenantAdmin && !departmentId && (
-            <section className="sunny-card rounded-3xl border border-atlas-mist bg-white px-5 py-5">
+            <section className="workboard-card rounded-2xl border border-atlas-mist bg-white px-5 py-5">
               <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
                 Department stewardship
               </p>
-              <h2 className="mt-1 font-atlasDisplay text-lg font-bold text-atlas-ink">
+              <h2 className="mt-1 font-atlasDisplay text-lg font-semibold text-atlas-ink">
                 Access activity
               </h2>
               <p className="mt-2 text-sm text-slate-600">
@@ -310,12 +299,12 @@ export default function DashboardPage() {
           )}
 
           {canChangeRoles && (
-            <section className="sunny-card overflow-hidden rounded-3xl border border-atlas-mist bg-white">
+            <section className="workboard-card overflow-hidden rounded-2xl border border-atlas-mist bg-white">
               <header className="border-b border-atlas-mist px-5 py-4">
                 <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
                   Department stewardship
                 </p>
-                <h2 className="mt-1 font-atlasDisplay text-lg font-bold text-atlas-ink">
+                <h2 className="mt-1 font-atlasDisplay text-lg font-semibold text-atlas-ink">
                   Access activity
                 </h2>
                 <p className="mt-1 text-sm text-slate-600">
@@ -376,16 +365,14 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              <div className="border-t border-atlas-mist bg-atlas-paper px-5 py-4">
+              <div className="border-t border-atlas-mist bg-slate-50 px-5 py-4">
                 <h3 className="font-atlasMono text-xs font-medium uppercase tracking-[0.1em] text-atlas-current">
                   Recent role changes
                 </h3>
                 {changes.isLoading ? (
                   <div className="py-4 text-center">
                     <LoadingSpinner className="py-1" size="sm" />
-                    <p className="mt-2 text-xs text-slate-600">
-                      Loading role-change history…
-                    </p>
+                    <p className="mt-2 text-xs text-slate-600">Loading role-change history…</p>
                   </div>
                 ) : changes.error ? (
                   <ErrorDisplay

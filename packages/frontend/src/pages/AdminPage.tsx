@@ -50,7 +50,7 @@ function AddMemberModal({ workspaceId, onClose }: { workspaceId: string; onClose
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="sunny-card w-full max-w-md rounded-3xl bg-white p-6">
+      <div className="workboard-card w-full max-w-md rounded-2xl border border-atlas-mist bg-white p-6">
         <h3 className="mb-4 text-lg font-semibold text-slate-900">Add Department Member</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -123,7 +123,7 @@ export function WorkspaceMemberRoleControl({
 }) {
   if (role === 'admin') {
     return (
-      <span className="rounded-lg border border-purple-200 bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700">
+      <span className="rounded-lg border border-primary-200 bg-primary-50 px-2 py-1 text-xs font-medium text-primary-800">
         Admin
       </span>
     );

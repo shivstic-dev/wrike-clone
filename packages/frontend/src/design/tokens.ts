@@ -1,13 +1,13 @@
 import type { TaskPriority, TaskStatus } from '@wrike-clone/shared';
 
 export const operationsAtlasColors = {
-  canopy: '#123C3A',
-  current: '#25766F',
-  fieldNote: '#F2CB67',
-  signalCoral: '#F27B55',
-  mist: '#DCE9E6',
-  paper: '#F8FAF8',
-  ink: '#183432',
+  canopy: '#0D3B2A',
+  current: '#147A50',
+  fieldNote: '#B7D96B',
+  signalCoral: '#D85F5F',
+  mist: '#DDE5E0',
+  paper: '#F3F5F3',
+  ink: '#181C1A',
 } as const;
 
 type StatusTone = 'neutral' | 'info' | 'positive' | 'danger';

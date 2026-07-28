@@ -198,7 +198,7 @@ export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTask
       toast.custom((toastInstance) => (
         <div
           role="status"
-          className="sunny-card flex w-[min(24rem,calc(100vw-2rem))] items-center gap-3 rounded-2xl border border-atlas-mist border-l-4 border-l-atlas-sprout bg-white p-4 text-sm text-atlas-ink"
+          className="workboard-card flex w-[min(24rem,calc(100vw-2rem))] items-center gap-3 rounded-2xl border border-atlas-mist border-l-4 border-l-atlas-current bg-white p-4 text-sm text-atlas-ink"
         >
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-slate-900">Task created</p>
@@ -226,7 +226,7 @@ export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTask
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-atlas-ink/35 p-0 backdrop-blur-[2px] sm:p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-atlas-ink/40 p-0 backdrop-blur-[2px] sm:p-4">
       <div
         className="grid min-h-full place-items-center"
         onMouseDown={(event) => {
@@ -240,13 +240,13 @@ export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTask
           aria-labelledby="quick-task-title"
           aria-describedby="quick-task-hint"
           tabIndex={-1}
-          className="flex min-h-screen w-full flex-col bg-white shadow-2xl outline-none sm:min-h-0 sm:max-w-3xl sm:rounded-[2rem] sm:border sm:border-atlas-mist"
+          className="flex min-h-screen w-full flex-col bg-white shadow-2xl outline-none sm:min-h-0 sm:max-w-3xl sm:rounded-2xl sm:border sm:border-atlas-mist"
         >
-          <div className="flex items-start justify-between border-b border-atlas-mist bg-atlas-paper/65 px-5 py-4 sm:rounded-t-[2rem] sm:px-6 sm:py-5">
+          <div className="flex items-start justify-between border-b border-atlas-mist bg-slate-50 px-5 py-4 sm:rounded-t-2xl sm:px-6 sm:py-5">
             <div>
               <h2
                 id="quick-task-title"
-                className="font-atlasDisplay text-xl font-bold tracking-[-0.02em] text-atlas-ink sm:text-2xl"
+                className="font-atlasDisplay text-xl font-semibold tracking-[-0.035em] text-atlas-ink sm:text-2xl"
               >
                 Create task
               </h2>
@@ -258,7 +258,7 @@ export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTask
               type="button"
               aria-label="Close create task"
               disabled={createTask.isPending}
-              className="ml-4 rounded-xl p-2 text-atlas-current hover:bg-atlas-mist hover:text-atlas-ink focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="ml-4 rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-atlas-ink focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={closeIfIdle}
             >
               <svg
@@ -288,7 +288,7 @@ export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTask
                   id="quick-task-name"
                   required
                   value={state.title}
-                  className="mt-1.5 block w-full rounded-2xl border border-atlas-mist bg-white px-4 py-3 text-base font-semibold text-atlas-ink shadow-sm placeholder:font-normal placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                  className="mt-1.5 block w-full rounded-xl border border-atlas-mist bg-white px-4 py-3 text-base font-semibold text-atlas-ink shadow-sm placeholder:font-normal placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
                   placeholder="What needs to get done?"
                   onChange={(event) => {
                     setSubmitError('');
@@ -396,7 +396,7 @@ export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTask
                 </div>
               </div>
 
-              <details className="group rounded-2xl border border-atlas-mist bg-atlas-paper/70">
+              <details className="group rounded-xl border border-atlas-mist bg-slate-50">
                 <summary className="cursor-pointer list-none rounded-xl px-4 py-3 text-sm font-medium text-slate-600 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 [&::-webkit-details-marker]:hidden">
                   <span className="flex items-center justify-between">
                     More details
@@ -545,7 +545,7 @@ export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTask
               )}
             </div>
 
-            <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-atlas-mist bg-white px-5 py-4 sm:rounded-b-[2rem] sm:px-6">
+            <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-atlas-mist bg-white px-5 py-4 sm:rounded-b-2xl sm:px-6">
               <button
                 type="button"
                 className="btn-secondary"

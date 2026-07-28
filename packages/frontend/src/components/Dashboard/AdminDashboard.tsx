@@ -48,7 +48,7 @@ function DepartmentComparison({
                   <td className="px-4 py-3 text-right font-atlasMono text-atlas-ink">
                     {department.active}
                   </td>
-                  <td className="px-4 py-3 text-right font-atlasMono text-[#a74429]">
+                  <td className="px-4 py-3 text-right font-atlasMono text-red-700">
                     {department.overdue}
                   </td>
                   <td className="py-3 pl-4 text-right font-atlasMono text-atlas-ink">
@@ -90,11 +90,7 @@ function SetupHealth({ overview }: Pick<RoleCompositionProps, 'overview'>) {
   );
 }
 
-export function AdminDashboard({
-  grouped,
-  overview,
-  onRetryOverview,
-}: RoleCompositionProps) {
+export function AdminDashboard({ grouped, overview, onRetryOverview }: RoleCompositionProps) {
   return (
     <div className="space-y-4" data-dashboard-role="admin">
       <OverviewCore overview={overview} onRetryOverview={onRetryOverview} />

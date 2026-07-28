@@ -124,13 +124,13 @@ export default function CopilotWidget() {
       {/* Chat panel */}
       <div
         className={clsx(
-          'fixed bottom-24 right-6 z-50 w-80 sm:w-96 rounded-2xl bg-white shadow-2xl border border-slate-200 transition-all duration-300 origin-bottom-right',
+          'workboard-card fixed bottom-24 right-6 z-50 w-80 rounded-2xl border border-atlas-mist bg-white shadow-2xl transition-all duration-300 origin-bottom-right sm:w-96',
           open ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none',
         )}
       >
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-indigo-600">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-atlas-canopy">
             <svg
               className="h-4 w-4 text-white"
               fill="none"

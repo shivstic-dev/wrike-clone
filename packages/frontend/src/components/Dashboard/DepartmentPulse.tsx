@@ -29,46 +29,51 @@ export function DepartmentPulse({ overview }: DepartmentPulseProps) {
 
   const cells = [
     {
-      label: 'Department pulse',
+      label: 'Completion trend',
       value: comparison.value,
       detail: comparison.detail,
-      className: 'bg-[#eee9ff] text-atlas-ink',
-      mutedClassName: 'text-atlas-current',
+      className: 'workboard-feature border-primary-900 text-white',
+      mutedClassName: 'text-emerald-100/75',
     },
     {
       label: 'Active work',
       value: String(overview.totals.active),
       detail: 'Open tasks in this scope',
-      className: 'bg-atlas-sky text-atlas-ink',
-      mutedClassName: 'text-[#526b91]',
+      className: 'workboard-card border-atlas-mist bg-white text-atlas-ink',
+      mutedClassName: 'text-slate-500',
     },
     {
       label: 'Completed',
       value: String(overview.totals.completed),
       detail: `Last ${overview.windowDays} days`,
-      className: 'bg-[#fff3c9] text-atlas-ink',
-      mutedClassName: 'text-[#7b6424]',
+      className: 'workboard-card border-atlas-mist bg-white text-atlas-ink',
+      mutedClassName: 'text-slate-500',
     },
     {
       label: 'Needs attention',
       value: String(overview.attention.length),
       detail: attentionDetail || 'No flagged open work',
-      className: 'bg-atlas-blush text-[#a24763]',
-      mutedClassName: 'text-[#8b5365]',
+      className: 'workboard-card border-atlas-mist bg-white text-atlas-ink',
+      mutedClassName: 'text-slate-500',
     },
   ];
 
   return (
-    <section aria-label="Department pulse" className="sunny-card overflow-hidden rounded-3xl border-4 border-white bg-white">
-      <dl className="grid gap-px sm:grid-cols-2 xl:grid-cols-4">
-        {cells.map((cell) => (
-          <div key={cell.label} className={`min-w-0 px-5 py-4 ${cell.className}`}>
-            <dt
-              className={`font-atlasMono text-xs font-bold tracking-[0.02em] ${cell.mutedClassName}`}
-            >
+    <section aria-label="Department pulse">
+      <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {cells.map((cell, index) => (
+          <div
+            key={cell.label}
+            className={`min-w-0 rounded-2xl border px-5 py-4 ${cell.className}`}
+          >
+            <dt className={`font-atlasMono text-[0.6875rem] font-medium ${cell.mutedClassName}`}>
               {cell.label}
             </dt>
-            <dd className="mt-2 font-atlasDisplay text-3xl font-bold tracking-[-0.02em]">
+            <dd
+              className={`mt-4 font-atlasDisplay text-3xl font-semibold tracking-[-0.045em] ${
+                index === 3 ? 'text-red-700' : ''
+              }`}
+            >
               {cell.value}
             </dd>
             <dd className={`mt-1 text-xs leading-5 ${cell.mutedClassName}`}>{cell.detail}</dd>

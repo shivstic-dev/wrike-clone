@@ -16,7 +16,7 @@ export interface RoleCompositionProps {
 
 function ChartLoading() {
   return (
-    <div className="sunny-card grid min-h-72 place-items-center rounded-3xl border border-atlas-mist bg-white text-sm text-slate-500">
+    <div className="workboard-card grid min-h-72 place-items-center rounded-2xl border border-atlas-mist bg-white text-sm text-slate-500">
       Loading live chart…
     </div>
   );
@@ -32,12 +32,12 @@ export function AtlasPanel({
   title: string;
 }) {
   return (
-    <section className="sunny-card overflow-hidden rounded-3xl border border-atlas-mist bg-white">
+    <section className="workboard-card overflow-hidden rounded-2xl border border-atlas-mist bg-white">
       <header className="border-b border-atlas-mist px-5 py-4">
         <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
           {eyebrow}
         </p>
-        <h2 className="mt-1 font-atlasDisplay text-lg font-bold text-atlas-ink">{title}</h2>
+        <h2 className="mt-1 font-atlasDisplay text-lg font-semibold text-atlas-ink">{title}</h2>
       </header>
       {children}
     </section>
@@ -65,7 +65,7 @@ export function OverviewCore({
         <button
           type="button"
           onClick={onRetryOverview}
-          className="rounded-full border border-atlas-mist bg-white px-3 py-1.5 font-atlasMono text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-atlas-canopy shadow-sm hover:border-atlas-current focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
+          className="rounded-xl border border-atlas-mist bg-white px-3 py-1.5 font-atlasMono text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-atlas-canopy shadow-sm hover:border-atlas-current focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
         >
           Refresh overview
         </button>
@@ -138,17 +138,11 @@ export function TaskList({ tasks, title }: { tasks: Task[]; title: string }) {
   );
 }
 
-export function PeopleWork({
-  groups,
-  title,
-}: {
-  groups: DepartmentTaskGroup[];
-  title: string;
-}) {
+export function PeopleWork({ groups, title }: { groups: DepartmentTaskGroup[]; title: string }) {
   return (
     <section className="space-y-3" aria-label={title}>
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-atlasDisplay text-lg font-bold text-atlas-ink">{title}</h2>
+        <h2 className="font-atlasDisplay text-lg font-semibold text-atlas-ink">{title}</h2>
         <span className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.08em] text-atlas-current">
           {groups.length} people
         </span>

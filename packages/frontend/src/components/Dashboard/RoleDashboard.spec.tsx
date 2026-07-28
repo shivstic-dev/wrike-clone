@@ -2,10 +2,7 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import type {
-  DashboardOverview,
-  DashboardViewerRole,
-} from '@wrike-clone/shared';
+import type { DashboardOverview, DashboardViewerRole } from '@wrike-clone/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GroupedDepartmentTasks } from '../../api/tasks';
 import { RoleDashboard } from './RoleDashboard';
@@ -152,7 +149,7 @@ describe('RoleDashboard', () => {
     async (role, hiddenLanes) => {
       await renderDashboard(overview({ role }), null);
 
-      expect(container.textContent).toContain('Department pulse');
+      expect(container.textContent).toContain('Completion trend');
       expect(container.textContent).toContain('Attention queue');
       expect(container.textContent).toContain('Team capacity');
       hiddenLanes.forEach((lane) => expect(container.textContent).not.toContain(lane));
@@ -162,9 +159,7 @@ describe('RoleDashboard', () => {
   it('links every attention item directly to its task', async () => {
     await renderDashboard(overview({ role: 'manager' }));
 
-    const taskLink = container.querySelector<HTMLAnchorElement>(
-      'a[href="/tasks/task-attention"]',
-    );
+    const taskLink = container.querySelector<HTMLAnchorElement>('a[href="/tasks/task-attention"]');
     expect(taskLink?.textContent).toContain('Finalize donor report');
     expect(taskLink?.textContent).toContain('Overdue');
   });
@@ -181,9 +176,7 @@ describe('RoleDashboard', () => {
   it('stacks each capacity bar below the name and count until the small breakpoint', async () => {
     await renderDashboard(overview({ role: 'manager' }));
 
-    const bar = container.querySelector<HTMLElement>(
-      '[aria-label="Maya Manager: 5 open tasks"]',
-    );
+    const bar = container.querySelector<HTMLElement>('[aria-label="Maya Manager: 5 open tasks"]');
     const row = bar?.closest('li');
     expect(row?.className).toContain('grid-cols-[2rem_minmax(0,1fr)_auto]');
     expect(row?.className).toContain(

@@ -77,7 +77,7 @@ export function TaskTable({ tasks, isLoading }: TaskTableProps) {
               {info.getValue()}
             </Link>
             {info.row.original.visibility === 'global' && (
-              <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+              <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-800">
                 Global
               </span>
             )}

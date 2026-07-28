@@ -44,7 +44,7 @@ export function TaskCard({ task }: TaskCardProps) {
         <div className="flex items-start gap-2">
           <p className="flex-1 text-sm font-medium text-slate-900 line-clamp-2">{task.title}</p>
           {task.visibility === 'global' && (
-            <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+            <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-800">
               Global
             </span>
           )}

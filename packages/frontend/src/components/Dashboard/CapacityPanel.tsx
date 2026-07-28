@@ -18,13 +18,13 @@ export function CapacityPanel({ capacity }: CapacityPanelProps) {
   const maxOpenTasks = Math.max(1, ...capacity.map((item) => item.openTasks));
 
   return (
-    <section className="sunny-card overflow-hidden rounded-3xl border border-atlas-mist bg-white">
+    <section className="workboard-card overflow-hidden rounded-2xl border border-atlas-mist bg-white">
       <header className="flex items-start justify-between gap-4 border-b border-atlas-mist px-5 py-4">
         <div>
           <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
             Open task load
           </p>
-          <h2 className="mt-1 font-atlasDisplay text-lg font-bold text-atlas-ink">
+          <h2 className="mt-1 font-atlasDisplay text-lg font-semibold text-atlas-ink">
             Team capacity
           </h2>
         </div>
@@ -50,7 +50,7 @@ export function CapacityPanel({ capacity }: CapacityPanelProps) {
               >
                 <span
                   aria-hidden="true"
-                  className="grid h-9 w-9 place-items-center rounded-full bg-atlas-sprout/65 font-atlasMono text-[0.6875rem] font-bold text-atlas-ink"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-primary-100 font-atlasMono text-[0.6875rem] font-semibold text-primary-900"
                 >
                   {initials(person.name)}
                 </span>

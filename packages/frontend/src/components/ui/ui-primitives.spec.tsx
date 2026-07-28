@@ -18,7 +18,7 @@ const statePanelPropsWithLayout: StatePanelProps = {
   className: 'legacy-layout',
 };
 
-describe('Operations Atlas UI primitives', () => {
+describe('Workboard UI primitives', () => {
   it('keeps native button semantics and exposes visible labels', () => {
     const html = renderToStaticMarkup(<Button variant="primary">Create task</Button>);
 
@@ -49,24 +49,23 @@ describe('Operations Atlas UI primitives', () => {
     act(() => root.unmount());
   });
 
-  it('uses AA-safe danger text and high-contrast Atlas focus outlines', () => {
+  it('uses high-contrast button text and visible focus outlines', () => {
     const primary = renderToStaticMarkup(<Button variant="primary">Create task</Button>);
     const danger = renderToStaticMarkup(<Button variant="danger">Delete task</Button>);
 
-    expect(primary).toContain('focus-visible:outline-atlas-canopy');
+    expect(primary).toContain('focus-visible:outline-primary-700');
     expect(primary).toContain('focus-visible:outline-offset-2');
-    expect(danger).toContain('text-atlas-ink');
-    expect(danger).toContain('focus-visible:outline-atlas-canopy');
+    expect(danger).toContain('text-white');
+    expect(danger).toContain('focus-visible:outline-red-700');
     expect(danger).toContain('focus-visible:outline-offset-2');
   });
 
-  it('keeps the danger hover state on the AA-safe coral and ink pair', () => {
+  it('keeps the danger hover state explicit', () => {
     const danger = renderToStaticMarkup(<Button variant="danger">Delete task</Button>);
 
-    expect(danger).toContain('bg-atlas-signalCoral');
-    expect(danger).toContain('text-atlas-ink');
-    expect(danger).not.toContain('hover:bg-');
-    expect(danger).toContain('hover:shadow-md');
+    expect(danger).toContain('bg-red-600');
+    expect(danger).toContain('text-white');
+    expect(danger).toContain('hover:bg-red-700');
   });
 
   it('suppresses skeleton animation when reduced motion is requested', () => {

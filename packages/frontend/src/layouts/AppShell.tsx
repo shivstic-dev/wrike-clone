@@ -21,11 +21,7 @@ import {
 } from '../components/Task/quick-task-form';
 import { Button } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  navigationForRole,
-  type NavigationItem,
-  type ShellRole,
-} from '../design/navigation';
+import { navigationForRole, type NavigationItem, type ShellRole } from '../design/navigation';
 
 export interface AppShellProps {
   helpContent?: ReactNode;
@@ -53,10 +49,8 @@ interface MobileNavigationSheetProps extends PrimaryNavigationProps {
 const iconPaths: Record<NavigationItem['icon'], string> = {
   admin:
     'M12 15.75A3.75 3.75 0 1 0 12 8.25a3.75 3.75 0 0 0 0 7.5Zm7.5-3.75a7.7 7.7 0 0 0-.12-1.35l1.62-1.26-1.8-3.12-1.95.78a7.56 7.56 0 0 0-2.34-1.35L14.61 3h-3.6l-.3 2.7a7.56 7.56 0 0 0-2.34 1.35l-1.95-.78-1.8 3.12 1.62 1.26A7.7 7.7 0 0 0 6.12 12c0 .46.04.91.12 1.35l-1.62 1.26 1.8 3.12 1.95-.78a7.56 7.56 0 0 0 2.34 1.35l.3 2.7h3.6l.3-2.7a7.56 7.56 0 0 0 2.34-1.35l1.95.78 1.8-3.12-1.62-1.26c.08-.44.12-.89.12-1.35Z',
-  dashboard:
-    'M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z',
-  department:
-    'M4 20V7l8-3 8 3v13M8 10h2m4 0h2m-8 4h2m4 0h2M9 20v-3h6v3',
+  dashboard: 'M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z',
+  department: 'M4 20V7l8-3 8 3v13M8 10h2m4 0h2m-8 4h2m4 0h2M9 20v-3h6v3',
   reports: 'M5 20V10h3v10H5Zm6 0V4h3v16h-3Zm6 0v-7h3v7h-3Z',
   tasks: 'm5 12 3 3L19 6M5 6h6M5 20h14',
 };
@@ -141,7 +135,7 @@ function PrimaryNavigation({
 
           return (
             <div className="mb-6" key={section}>
-              <p className="px-3 font-atlasMono text-[0.6875rem] font-bold uppercase tracking-[0.1em] text-atlas-current">
+              <p className="px-3 font-atlasMono text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-slate-400">
                 {sectionLabels[section]}
               </p>
               <div className="mt-2 space-y-1">
@@ -149,10 +143,10 @@ function PrimaryNavigation({
                   <Link
                     aria-current={itemIsActive(item) ? 'page' : undefined}
                     className={clsx(
-                      'flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm font-bold transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current',
+                      'relative flex min-h-10 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current',
                       itemIsActive(item)
-                        ? 'bg-atlas-canopy text-white shadow-[0_5px_14px_rgba(102,86,168,0.22)]'
-                        : 'text-atlas-ink hover:translate-x-0.5 hover:bg-atlas-mist/70 motion-reduce:transform-none',
+                        ? 'bg-white font-semibold text-atlas-canopy shadow-[0_1px_3px_rgba(13,59,42,0.08)] before:absolute before:-left-3 before:h-7 before:w-1 before:rounded-r-full before:bg-atlas-current'
+                        : 'text-slate-600 hover:bg-white hover:text-atlas-ink',
                     )}
                     key={item.path}
                     onClick={onNavigate}
@@ -166,7 +160,7 @@ function PrimaryNavigation({
 
               {section === 'workspace' && workspaces.length > 0 && (
                 <div className="mt-3 border-l border-atlas-mist pl-3">
-                  <p className="px-3 font-atlasMono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-atlas-current">
+                  <p className="px-3 font-atlasMono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-slate-400">
                     Departments
                   </p>
                   <div className="mt-1 space-y-1">
@@ -176,8 +170,8 @@ function PrimaryNavigation({
                         className={clsx(
                           'flex min-h-9 items-center gap-2 rounded-xl px-3 py-1.5 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current',
                           workspace.id === activeDepartmentId
-                            ? 'bg-atlas-fieldNote/45 font-bold text-atlas-ink'
-                            : 'text-atlas-ink hover:bg-atlas-mist/60',
+                            ? 'bg-primary-50 font-semibold text-atlas-canopy'
+                            : 'text-slate-600 hover:bg-white hover:text-atlas-ink',
                         )}
                         key={workspace.id}
                         onClick={onNavigate}
@@ -185,7 +179,7 @@ function PrimaryNavigation({
                       >
                         <span
                           aria-hidden="true"
-                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-atlas-sprout/65 font-atlasDisplay text-xs font-bold text-atlas-ink"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary-100 font-atlasDisplay text-xs font-semibold text-primary-800"
                         >
                           {workspace.name.charAt(0).toUpperCase()}
                         </span>
@@ -199,8 +193,8 @@ function PrimaryNavigation({
           );
         })}
       </nav>
-      <footer className="m-3 rounded-2xl border border-atlas-mist bg-white/75 px-4 py-3 shadow-sm">
-        <p className="font-atlasMono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-atlas-current">
+      <footer className="mx-4 mb-4 border-t border-atlas-mist px-1 pt-4">
+        <p className="font-atlasMono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-slate-400">
           Active department
         </p>
         <p className="mt-1 truncate font-atlasDisplay text-sm font-semibold text-atlas-ink">
@@ -211,13 +205,7 @@ function PrimaryNavigation({
   );
 }
 
-function AccountMenu({
-  onLogout,
-  user,
-}: {
-  onLogout: () => void;
-  user: AccountUser | null;
-}) {
+function AccountMenu({ onLogout, user }: { onLogout: () => void; user: AccountUser | null }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -240,12 +228,12 @@ function AccountMenu({
         aria-controls="account-disclosure"
         aria-expanded={open}
         aria-label="Open account menu"
-        className="flex min-h-10 items-center gap-2 rounded-full px-2 text-sm font-bold text-atlas-ink transition-colors hover:bg-atlas-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
+        className="flex min-h-10 items-center gap-2 rounded-xl px-2 text-sm font-medium text-atlas-ink transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
         onClick={() => setOpen((current) => !current)}
         ref={triggerRef}
         type="button"
       >
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-atlas-fieldNote font-atlasDisplay text-sm font-bold text-atlas-ink shadow-[0_3px_0_#e8b948]">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 font-atlasDisplay text-sm font-semibold text-primary-900">
           {label.charAt(0).toUpperCase()}
         </span>
         <span className="hidden max-w-32 truncate sm:block">{label}</span>
@@ -261,7 +249,7 @@ function AccountMenu({
             type="button"
           />
           <div
-            className="sunny-card absolute right-0 z-30 mt-2 w-64 overflow-hidden rounded-2xl border border-atlas-mist bg-white"
+            className="workboard-card absolute right-0 z-30 mt-2 w-64 overflow-hidden rounded-2xl border border-atlas-mist bg-white"
             id="account-disclosure"
           >
             <div className="border-b border-atlas-mist px-4 py-3">
@@ -322,7 +310,7 @@ function TopBar({
   }, [helpOpen]);
 
   return (
-    <header className="relative z-20 flex min-h-16 items-center justify-between gap-3 border-b border-atlas-mist bg-white/90 px-3 backdrop-blur-sm sm:px-6">
+    <header className="relative z-20 flex min-h-[4.5rem] items-center justify-between gap-3 border-b border-atlas-mist bg-[#f8f9f8] px-3 sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
         {mobile && (
           <button
@@ -339,15 +327,29 @@ function TopBar({
             </span>
           </button>
         )}
-        <p
-          className={clsx(
-            mobile
-              ? 'truncate font-atlasDisplay text-base font-bold text-atlas-canopy'
-              : 'font-atlasMono text-xs font-medium uppercase tracking-[0.14em] text-atlas-current',
-          )}
-        >
-          {mobile ? 'OpenWork Hub' : 'Department task management'}
-        </p>
+        {mobile ? (
+          <p className="truncate font-atlasDisplay text-base font-semibold text-atlas-canopy">
+            OpenWork Hub
+          </p>
+        ) : (
+          <Link
+            className="flex min-h-10 w-[min(26rem,34vw)] items-center gap-2.5 rounded-xl border border-atlas-mist bg-white px-3 text-sm text-slate-500 shadow-[0_1px_2px_rgba(13,59,42,0.04)] transition-colors hover:border-primary-300 hover:text-atlas-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
+            to="/search"
+          >
+            <svg
+              aria-hidden="true"
+              className="h-4 w-4 shrink-0"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              viewBox="0 0 24 24"
+            >
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m16 16 4 4" />
+            </svg>
+            <span className="min-w-0 flex-1">Search tasks</span>
+          </Link>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
         {helpContent && (
@@ -364,7 +366,7 @@ function TopBar({
             {helpOpen && (
               <div
                 aria-label="Help"
-                className="sunny-card absolute right-0 mt-2 w-[min(22rem,calc(100vw-1.5rem))] rounded-2xl border border-atlas-mist bg-white p-4 text-sm text-atlas-ink"
+                className="workboard-card absolute right-0 mt-2 w-[min(22rem,calc(100vw-1.5rem))] rounded-2xl border border-atlas-mist bg-white p-4 text-sm text-atlas-ink"
                 role="region"
               >
                 {helpContent}
@@ -438,14 +440,14 @@ function MobileNavigationSheet({
       <aside
         aria-label="Navigation"
         aria-modal="true"
-        className="relative flex h-full w-[min(20rem,88vw)] flex-col bg-[#fbf8ff] shadow-2xl"
+        className="relative flex h-full w-[min(20rem,88vw)] flex-col bg-[#f7f8f7] shadow-2xl"
         id="mobile-navigation"
         onKeyDown={containFocus}
         ref={sheetRef}
         role="dialog"
       >
         <div className="flex min-h-16 items-center justify-between border-b border-atlas-mist px-5">
-          <p className="font-atlasDisplay text-lg font-bold text-atlas-canopy">OpenWork Hub</p>
+          <p className="font-atlasDisplay text-lg font-semibold text-atlas-canopy">OpenWork Hub</p>
           <button
             aria-label="Close navigation"
             className="flex h-10 w-10 items-center justify-center rounded-lg text-atlas-canopy hover:bg-atlas-mist focus-visible:outline focus-visible:outline-2 focus-visible:outline-atlas-current"
@@ -484,8 +486,7 @@ export default function AppShell({ helpContent }: AppShellProps) {
   const shellRole = shellRoleFor(membership?.role, workspaces);
   const navigationItems = useMemo(() => navigationForRole(shellRole), [shellRole]);
   const creatableDepartments = creatableQuickTaskDepartments(workspaces, membership?.role);
-  const canQuickCreate =
-    !workspacesPending && canCreateQuickTask(workspaces, membership?.role);
+  const canQuickCreate = !workspacesPending && canCreateQuickTask(workspaces, membership?.role);
   const initialQuickTaskDepartmentId = resolveQuickTaskInitialDepartmentId(
     workspaceId,
     creatableDepartments,
@@ -517,17 +518,17 @@ export default function AppShell({ helpContent }: AppShellProps) {
   }, [closeMobileNavigation, mobileNavigationOpen]);
 
   return (
-    <div className="sunny-canvas flex h-screen overflow-hidden text-atlas-ink">
+    <div className="workboard-canvas flex h-screen overflow-hidden text-atlas-ink">
       {!mobile && (
-        <aside className="flex w-64 shrink-0 flex-col border-r border-atlas-mist bg-[#fbf8ff]/95">
-          <div className="flex min-h-16 items-center border-b border-atlas-mist px-5">
+        <aside className="flex w-64 shrink-0 flex-col border-r border-atlas-mist bg-[#f7f8f7]">
+          <div className="flex min-h-[4.5rem] items-center border-b border-atlas-mist px-5">
             <Link
-              className="flex items-center gap-2.5 font-atlasDisplay text-lg font-bold text-atlas-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-atlas-current"
+              className="flex items-center gap-2.5 font-atlasDisplay text-lg font-semibold text-atlas-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-atlas-current"
               to="/dashboard"
             >
               <span
                 aria-hidden="true"
-                className="sunny-bob grid h-9 w-9 place-items-center rounded-[1rem] bg-atlas-fieldNote text-sm shadow-[0_4px_0_#e8b948]"
+                className="grid h-9 w-9 place-items-center rounded-xl bg-atlas-canopy text-sm font-bold text-white"
               >
                 ✓
               </span>

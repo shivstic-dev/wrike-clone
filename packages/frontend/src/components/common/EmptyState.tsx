@@ -14,14 +14,14 @@ export function EmptyState({ icon, title, description, action, className }: Empt
     <Panel
       padding="none"
       className={clsx(
-        'flex flex-col items-center justify-center border-2 border-dashed border-atlas-mist bg-white/75 px-6 py-12 text-center',
+        'flex flex-col items-center justify-center border border-dashed border-atlas-mist bg-white px-6 py-12 text-center',
         className,
       )}
     >
       {icon || (
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[1.1rem] bg-atlas-sprout/60">
+        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50">
           <svg
-            className="h-6 w-6 text-atlas-current"
+            className="h-5 w-5 text-atlas-current"
             fill="none"
             viewBox="0 0 24 24"
             strokeWidth={1.5}
@@ -36,7 +36,9 @@ export function EmptyState({ icon, title, description, action, className }: Empt
         </div>
       )}
       <h3 className="font-atlasDisplay text-base font-semibold text-atlas-ink">{title}</h3>
-      {description && <p className="mt-1 text-sm text-atlas-ink/65">{description}</p>}
+      {description && (
+        <p className="mt-1 max-w-lg text-sm leading-6 text-slate-500">{description}</p>
+      )}
       {action && <div className="mt-4">{action}</div>}
     </Panel>
   );

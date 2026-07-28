@@ -16,7 +16,7 @@ export function Panel({ className, padding = 'md', ...props }: PanelProps) {
   return (
     <div
       className={clsx(
-        'sunny-card rounded-3xl border border-atlas-mist bg-white',
+        'workboard-card rounded-2xl border border-atlas-mist bg-white',
         paddingClasses[padding],
         className,
       )}

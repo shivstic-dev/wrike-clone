@@ -39,7 +39,7 @@ export function ChartFrame({
 
   return (
     <figure
-      className="sunny-card min-w-0 rounded-3xl border border-atlas-mist bg-white p-4 sm:p-5"
+      className="workboard-card min-w-0 rounded-2xl border border-atlas-mist bg-white p-4 sm:p-5"
       aria-labelledby={titleId}
       aria-describedby={`${descriptionId} ${summaryId}`}
     >
@@ -47,7 +47,7 @@ export function ChartFrame({
         <span>
           <span
             id={titleId}
-            className="block font-atlasDisplay text-lg font-bold text-atlas-ink"
+            className="block font-atlasDisplay text-lg font-semibold text-atlas-ink"
           >
             {title}
           </span>
@@ -68,7 +68,7 @@ export function ChartFrame({
       </p>
 
       {emptyMessage ? (
-        <p className="mt-4 rounded-lg border border-dashed border-atlas-mist bg-atlas-paper px-4 py-10 text-center text-sm text-slate-600">
+        <p className="mt-4 rounded-xl border border-dashed border-atlas-mist bg-slate-50 px-4 py-10 text-center text-sm text-slate-600">
           {emptyMessage}
         </p>
       ) : (
@@ -77,7 +77,7 @@ export function ChartFrame({
         </div>
       )}
 
-      <details className="mt-4 rounded-lg border border-atlas-mist bg-atlas-paper">
+      <details className="mt-4 rounded-xl border border-atlas-mist bg-slate-50">
         <summary className="cursor-pointer rounded-lg px-4 py-3 text-sm font-semibold text-atlas-canopy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current">
           View exact data
         </summary>

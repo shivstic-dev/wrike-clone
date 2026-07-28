@@ -47,7 +47,7 @@ function ModalShell({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
-        className="sunny-card max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6"
+        className="workboard-card max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-atlas-mist bg-white p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby="workspace-modal-title"
@@ -255,9 +255,7 @@ function CreateProjectForm({
           id="project-priority"
           className={inputClasses}
           value={priority}
-          onChange={(event) =>
-            setPriority(event.target.value as CreateProjectRequest['priority'])
-          }
+          onChange={(event) => setPriority(event.target.value as CreateProjectRequest['priority'])}
         >
           <option value="low">Low</option>
           <option value="medium">Medium</option>
@@ -311,17 +309,13 @@ export default function WorkspacePage() {
     error: projectsError,
     refetch: refetchProjects,
   } = useWorkspaceProjects(workspaceId!);
-  const folderTasks = useTasks(
-    { folderId: selectedFolderId, perPage: 100 },
-    !!selectedFolderId,
-  );
+  const folderTasks = useTasks({ folderId: selectedFolderId, perPage: 100 }, !!selectedFolderId);
   const createFolder = useCreateFolder();
   const createProject = useCreateProject();
   const canManageStructure = membership?.role === 'admin';
   const selectedFolder = folders?.find((folder) => folder.id === selectedFolderId);
   const visibleProjects = (projects || []).filter(
-    (project) =>
-      !project.isSystem && (!selectedFolderId || project.folderId === selectedFolderId),
+    (project) => !project.isSystem && (!selectedFolderId || project.folderId === selectedFolderId),
   );
 
   function openFolderModal(andThenCreateProject = false) {
@@ -469,11 +463,7 @@ export default function WorkspacePage() {
         {/* Project list */}
         <div className="lg:col-span-9">
           {selectedFolderId && (
-            <section
-              className="mb-8"
-              aria-labelledby="folder-tasks-heading"
-              aria-live="polite"
-            >
+            <section className="mb-8" aria-labelledby="folder-tasks-heading" aria-live="polite">
               <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">

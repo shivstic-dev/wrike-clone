@@ -4,13 +4,13 @@ import { operationsAtlasColors, priorityTone, statusTone } from './tokens';
 describe('Operations Atlas tokens', () => {
   it('publishes approved colors and semantic task tones', () => {
     expect(operationsAtlasColors).toEqual({
-      canopy: '#123C3A',
-      current: '#25766F',
-      fieldNote: '#F2CB67',
-      signalCoral: '#F27B55',
-      mist: '#DCE9E6',
-      paper: '#F8FAF8',
-      ink: '#183432',
+      canopy: '#0D3B2A',
+      current: '#147A50',
+      fieldNote: '#B7D96B',
+      signalCoral: '#D85F5F',
+      mist: '#DDE5E0',
+      paper: '#F3F5F3',
+      ink: '#181C1A',
     });
     expect(statusTone).toEqual({
       todo: 'neutral',

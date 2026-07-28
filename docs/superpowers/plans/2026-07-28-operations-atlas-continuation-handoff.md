@@ -168,8 +168,8 @@ four roles after Vercel deploys the `main` push.
 ## Non-Negotiable Rules
 
 - Keep product name `OpenWork Hub`.
-- Extend the shared Sunny Studio theme contract in
-  `docs/design/sunny-studio-theme.md`; do not introduce page-local visual
+- Extend the shared Workboard theme contract in
+  `docs/design/workboard-theme.md`; do not introduce page-local visual
   systems.
 - Preserve tenant isolation, RBAC, routes, auth, Quick Task behavior, and report
   exports.

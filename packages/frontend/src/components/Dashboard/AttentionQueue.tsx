@@ -20,17 +20,17 @@ function dueLabel(dueDate: string | null): string {
 
 export function AttentionQueue({ attention }: AttentionQueueProps) {
   return (
-    <section className="sunny-card overflow-hidden rounded-3xl border border-atlas-mist bg-white">
+    <section className="workboard-card overflow-hidden rounded-2xl border border-atlas-mist bg-white">
       <header className="flex items-start justify-between gap-4 border-b border-atlas-mist px-5 py-4">
         <div>
           <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
-            Field note 02
+            Priority review
           </p>
-          <h2 className="mt-1 font-atlasDisplay text-lg font-bold text-atlas-ink">
+          <h2 className="mt-1 font-atlasDisplay text-lg font-semibold text-atlas-ink">
             Attention queue
           </h2>
         </div>
-        <span className="rounded-full bg-atlas-blush px-3 py-1 font-atlasMono text-xs font-bold text-[#a24763]">
+        <span className="rounded-full border border-red-200 bg-red-50 px-2.5 py-1 font-atlasMono text-xs font-semibold text-red-700">
           {attention.length} flagged
         </span>
       </header>
@@ -50,9 +50,7 @@ export function AttentionQueue({ attention }: AttentionQueueProps) {
                 <span
                   aria-hidden="true"
                   className={`h-2.5 w-2.5 rounded-full ${
-                    item.reason === 'unassigned'
-                      ? 'bg-atlas-fieldNote'
-                      : 'bg-atlas-signalCoral'
+                    item.reason === 'unassigned' ? 'bg-atlas-fieldNote' : 'bg-atlas-signalCoral'
                   }`}
                 />
                 <span className="min-w-0">
@@ -64,7 +62,7 @@ export function AttentionQueue({ attention }: AttentionQueueProps) {
                   </span>
                 </span>
                 <span className="text-right">
-                  <span className="block font-atlasMono text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-[#a74429]">
+                  <span className="block font-atlasMono text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-red-700">
                     {reasonLabels[item.reason]}
                   </span>
                   <span className="mt-0.5 block text-xs text-slate-500">

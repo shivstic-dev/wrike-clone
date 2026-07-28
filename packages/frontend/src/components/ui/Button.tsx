@@ -8,12 +8,11 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses = {
   primary:
-    'bg-atlas-current text-white shadow-[0_4px_0_#4f4388] hover:-translate-y-0.5 hover:bg-primary-500 hover:shadow-[0_6px_0_#4f4388] active:translate-y-0.5 active:shadow-[0_2px_0_#4f4388] focus-visible:outline-atlas-canopy motion-reduce:transform-none',
+    'bg-primary-700 text-white shadow-[0_1px_2px_rgba(13,59,42,0.18)] hover:bg-primary-800 focus-visible:outline-primary-700',
   secondary:
-    'border border-atlas-mist bg-white text-atlas-ink shadow-sm hover:bg-atlas-paper focus-visible:outline-atlas-current',
-  ghost: 'text-atlas-current hover:bg-atlas-mist/70 focus-visible:outline-atlas-current',
-  danger:
-    'bg-atlas-signalCoral text-atlas-ink shadow-[0_4px_0_#bd596a] hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-atlas-canopy motion-reduce:transform-none',
+    'border border-primary-800 bg-white text-primary-900 shadow-sm hover:bg-primary-50 focus-visible:outline-primary-700',
+  ghost: 'text-slate-600 hover:bg-slate-100 hover:text-atlas-ink focus-visible:outline-primary-700',
+  danger: 'bg-red-600 text-white shadow-sm hover:bg-red-700 focus-visible:outline-red-700',
 } as const;
 
 const sizeClasses = {
@@ -31,7 +30,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       type={type}
       className={clsx(
-        'inline-flex items-center justify-center gap-2 rounded-xl font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
         variantClasses[variant],
         sizeClasses[size],
         className,
