@@ -134,7 +134,12 @@ class FakeQuery {
   private orders: Array<{ column: string; direction: string }> = [];
   private operation:
     | { kind: 'select' }
-    | { kind: 'insert'; values: Row | Row[]; ignoreConflict: boolean }
+    | {
+        kind: 'insert';
+        values: Row | Row[];
+        ignoreConflict: boolean;
+        mergeConflict?: Row;
+      }
     | { kind: 'update'; values: Row }
     | { kind: 'delete' } = { kind: 'select' };
 
@@ -212,6 +217,11 @@ class FakeQuery {
     return this;
   }
 
+  merge(values: Row): this {
+    if (this.operation.kind === 'insert') this.operation.mergeConflict = values;
+    return this;
+  }
+
   update(values: Row): this {
     this.operation = { kind: 'update', values };
     return this;
@@ -224,10 +234,22 @@ class FakeQuery {
 
   forUpdate(): this {
     this.database.taskRowWasLocked = true;
+    this.database.taskLockQuery = this;
     return this;
   }
 
   async first(): Promise<Row | undefined> {
+    if (this.database.taskLockQuery === this) {
+      const staleHomeFolderId = this.joins.some((join) => join.table === 'task_folder_links')
+        ? this.database.rows.task_folder_links.find(
+            (link) => link.task_id === 'task-1' && link.is_home === true,
+          )?.folder_id
+        : undefined;
+      await this.database.waitForTaskLock();
+      const task = (await this.executeSelect())[0];
+      if (task && staleHomeFolderId) task.folder_id = staleHomeFolderId;
+      return task;
+    }
     return (await this.executeSelect())[0];
   }
 
@@ -270,7 +292,11 @@ class FakeQuery {
             code: '23505',
           });
         }
-        const duplicate = this.isDuplicate(source, value);
+        const duplicate = source.find((row) => this.isDuplicate(row, value));
+        if (duplicate && this.operation.mergeConflict) {
+          Object.assign(duplicate, this.operation.mergeConflict);
+          continue;
+        }
         if (duplicate && this.operation.ignoreConflict) continue;
         if (duplicate) throw Object.assign(new Error('duplicate key'), { code: '23505' });
         source.push(structuredClone(value));
@@ -286,34 +312,33 @@ class FakeQuery {
     return matches;
   }
 
-  private isDuplicate(source: Row[], value: Row): boolean {
+  private isDuplicate(row: Row, value: Row): boolean {
     if (this.table === 'task_folder_links') {
-      return source.some(
-        (row) => row.task_id === value.task_id && row.folder_id === value.folder_id,
-      );
+      return row.task_id === value.task_id && row.folder_id === value.folder_id;
     }
     if (this.table === 'folders' && value.is_system_general) {
-      return source.some(
-        (row) =>
-          row.tenant_id === value.tenant_id &&
-          row.workspace_id === value.workspace_id &&
-          row.is_system_general &&
-          row.deleted_at == null,
+      return (
+        row.tenant_id === value.tenant_id &&
+        row.workspace_id === value.workspace_id &&
+        row.is_system_general &&
+        row.deleted_at == null
       );
     }
     if (this.table === 'projects' && value.is_system) {
-      return source.some(
-        (row) =>
-          row.tenant_id === value.tenant_id &&
-          row.folder_id === value.folder_id &&
-          row.is_system &&
-          row.deleted_at == null,
+      return (
+        row.tenant_id === value.tenant_id &&
+        row.folder_id === value.folder_id &&
+        row.is_system &&
+        row.deleted_at == null
       );
     }
-    return value.id != null && source.some((row) => row.id === value.id);
+    return value.id != null && row.id === value.id;
   }
 
   private async executeSelect(): Promise<Row[]> {
+    if (this.table === 'task_folder_links') {
+      this.database.queryEvents.push('home-link:read');
+    }
     let rows = this.database.rows[this.table]!.map((row) => ({ ...row }));
     if (this.table === 'projects' && this.joins.some((join) => join.table === 'folders')) {
       rows = rows.flatMap((project) => {
@@ -379,6 +404,14 @@ class FakeDatabase {
   failActivityInsert = false;
   raceSystemProjectInsert = false;
   taskRowWasLocked = false;
+  taskLockQuery?: FakeQuery;
+  queryEvents: string[] = [];
+  private taskLockGate?: {
+    started: Promise<void>;
+    notifyStarted: () => void;
+    released: Promise<void>;
+    release: () => void;
+  };
 
   readonly knex = Object.assign((table: string) => new FakeQuery(this, table), {
     transaction: async <T>(callback: (trx: FakeDatabase['knex']) => Promise<T>): Promise<T> => {
@@ -398,6 +431,29 @@ class FakeDatabase {
 
   failNextSystemProjectInsertWithUniqueViolation(): void {
     this.raceSystemProjectInsert = true;
+  }
+
+  blockNextTaskLock(): { started: Promise<void>; release: () => void } {
+    let notifyStarted!: () => void;
+    let release!: () => void;
+    const started = new Promise<void>((resolve) => {
+      notifyStarted = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.taskLockGate = { started, notifyStarted, released, release };
+    return { started, release };
+  }
+
+  async waitForTaskLock(): Promise<void> {
+    this.queryEvents.push('task-lock:waiting');
+    if (this.taskLockGate) {
+      this.taskLockGate.notifyStarted();
+      await this.taskLockGate.released;
+      this.taskLockGate = undefined;
+    }
+    this.queryEvents.push('task-lock:acquired');
   }
 }
 
@@ -590,6 +646,53 @@ describe('TaskLocationService', () => {
         }),
       }),
     ]);
+  });
+
+  it('moves into an existing ordinary tag and preserves every other tag', async () => {
+    fakeDb.rows.task_folder_links.push({
+      tenant_id: 'tenant-1',
+      task_id: 'task-1',
+      folder_id: 'folder-2',
+      is_home: false,
+    });
+
+    await service.move('task-1', { folderId: 'folder-tag' });
+
+    expect(fakeDb.rows.task_folder_links).toEqual([
+      {
+        tenant_id: 'tenant-1',
+        task_id: 'task-1',
+        folder_id: 'folder-tag',
+        is_home: true,
+      },
+      {
+        tenant_id: 'tenant-1',
+        task_id: 'task-1',
+        folder_id: 'folder-2',
+        is_home: false,
+      },
+    ]);
+  });
+
+  it('reads the canonical home after acquiring the task lock', async () => {
+    const lock = fakeDb.blockNextTaskLock();
+    const move = service.move('task-1', { projectId: 'project-1' });
+    await lock.started;
+
+    fakeDb.rows.tasks[0]!.project_id = 'project-2';
+    fakeDb.rows.task_folder_links.find((link) => link.is_home)!.folder_id = 'folder-2';
+    lock.release();
+    await move;
+
+    expect(fakeDb.queryEvents).toEqual([
+      'task-lock:waiting',
+      'task-lock:acquired',
+      'home-link:read',
+    ]);
+    expect(JSON.parse(fakeDb.rows.activity_logs[0]!.changes).old).toEqual({
+      folderId: 'folder-2',
+      projectId: 'project-2',
+    });
   });
 
   it('rolls back project, home link and audit changes when movement fails', async () => {

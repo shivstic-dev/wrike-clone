@@ -66,12 +66,15 @@ export class TaskLocationService {
     await trx('task_folder_links')
       .where({ tenant_id: ctx.tenantId, task_id: taskId, is_home: true })
       .del();
-    await trx('task_folder_links').insert({
-      tenant_id: ctx.tenantId,
-      task_id: taskId,
-      folder_id: folderId,
-      is_home: true,
-    });
+    await trx('task_folder_links')
+      .insert({
+        tenant_id: ctx.tenantId,
+        task_id: taskId,
+        folder_id: folderId,
+        is_home: true,
+      })
+      .onConflict(['task_id', 'folder_id'])
+      .merge({ is_home: true });
   }
 
   async listDepartmentLocations(departmentId: string): Promise<TaskLocationOption[]> {
@@ -315,29 +318,32 @@ export class TaskLocationService {
   }> {
     const ctx = requireTenantContext();
     const query = trx('tasks')
-      .leftJoin({ home_link: 'task_folder_links' }, function () {
-        this.on('home_link.task_id', '=', 'tasks.id')
-          .andOn('home_link.tenant_id', '=', 'tasks.tenant_id')
-          .andOnVal('home_link.is_home', '=', true);
-      })
       .where('tasks.id', taskId)
       .where('tasks.tenant_id', ctx.tenantId)
       .whereNull('tasks.deleted_at')
-      .select('tasks.*', 'home_link.folder_id');
+      .select('tasks.*');
     if (options.forUpdate) query.forUpdate('tasks');
     const task = await query.first<{
       id: string;
       project_id: string;
-      folder_id?: string;
     }>();
     if (!task) throw new NotFoundException('Task not found');
-    if (!task.folder_id) {
+
+    const homeLink = await trx('task_folder_links')
+      .where({
+        tenant_id: ctx.tenantId,
+        task_id: taskId,
+        is_home: true,
+      })
+      .select('folder_id')
+      .first<{ folder_id: string }>();
+    if (!homeLink) {
       throw new InternalServerErrorException('Task home location not found');
     }
 
     const homeFolder = await trx('folders')
       .where({
-        id: task.folder_id,
+        id: homeLink.folder_id,
         tenant_id: ctx.tenantId,
       })
       .first<{ workspace_id: string }>();
@@ -346,7 +352,7 @@ export class TaskLocationService {
     }
     return {
       ...task,
-      folder_id: task.folder_id,
+      folder_id: homeLink.folder_id,
       department_id: homeFolder.workspace_id,
     };
   }
