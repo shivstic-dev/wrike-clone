@@ -115,9 +115,10 @@ export function resolveQuickTaskInitialDepartmentId(
   routeDepartmentId: string | undefined,
   departments: Array<{ id: string }>,
 ): string {
-  return departments.some((department) => department.id === routeDepartmentId)
-    ? routeDepartmentId || ''
-    : '';
+  if (departments.some((department) => department.id === routeDepartmentId)) {
+    return routeDepartmentId || '';
+  }
+  return departments.length === 1 ? departments[0]!.id : '';
 }
 
 export function canSetQuickTaskVisibility(

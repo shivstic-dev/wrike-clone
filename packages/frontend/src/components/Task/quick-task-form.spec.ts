@@ -167,6 +167,10 @@ describe('quick task form helpers', () => {
     expect(resolveQuickTaskInitialDepartmentId('employee-only-dept', departments)).toBe('');
   });
 
+  it('preselects the only creatable department outside a department route', () => {
+    expect(resolveQuickTaskInitialDepartmentId(undefined, [{ id: 'dept-1' }])).toBe('dept-1');
+  });
+
   it('lists every department for tenant admins and only managed departments for members', () => {
     const departments = [
       { id: 'dept-admin', departmentRole: 'admin' },
