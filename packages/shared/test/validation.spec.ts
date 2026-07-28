@@ -22,6 +22,7 @@ import {
   changePasswordSchema,
   addWorkspaceMemberSchema,
   updateWorkspaceMemberRoleSchema,
+  departmentReportFilterSchema,
 } from '../src/validation';
 
 function validUUID(): string {
@@ -504,6 +505,19 @@ describe('Validation Schemas', () => {
     it('rejects invalid role', () => {
       const result = updateWorkspaceMemberRoleSchema.safeParse({ role: 'super_admin' });
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('departmentReportFilterSchema', () => {
+    it('preserves omitted scope for role-aware backend defaults', () => {
+      const result = departmentReportFilterSchema.parse({});
+      expect(result.scope).toBeUndefined();
+    });
+
+    it('still requires a target for explicit individual scope', () => {
+      expect(
+        departmentReportFilterSchema.safeParse({ scope: 'individual' }).success,
+      ).toBe(false);
     });
   });
 

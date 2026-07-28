@@ -379,7 +379,7 @@ export const departmentReportFilterSchema = z
     status: z.nativeEnum(TaskStatus).optional(),
     priority: z.nativeEnum(TaskPriority).optional(),
     assigneeId: z.string().uuid().optional(),
-    scope: z.enum(['self', 'individual', 'combined']).optional().default('self'),
+    scope: z.enum(['self', 'individual', 'combined']).optional(),
     targetUserId: z.string().uuid().optional(),
     format: z.enum(['pdf', 'xlsx']).optional(),
   })
