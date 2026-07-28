@@ -18,6 +18,7 @@ export interface ReportFilters {
 
 export interface DepartmentReport {
   generatedAt: string;
+  filters: Record<string, string | undefined>;
   scope: {
     departmentId?: string;
     role: string;
@@ -33,6 +34,15 @@ export interface DepartmentReport {
   byStatus: Record<string, number>;
   byPriority: Record<string, number>;
   byAssignee: Array<{ assignee: string; total: number; completed: number; overdue: number }>;
+  tasks: Array<{
+    id: string;
+    departmentName: string;
+    title: string;
+    assigneeName: string | null;
+    status: string;
+    priority: string;
+    dueDate: string | null;
+  }>;
 }
 
 export function useDepartmentReport(filters: ReportFilters, enabled = true) {

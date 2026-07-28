@@ -1,16 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { useWorkspaces } from '../../api/workspaces';
 import apiClient from '../../api/client';
 import {
   downloadDepartmentReport,
   useDepartmentReport,
   type ReportFilters,
+  type ReportScope,
 } from '../../api/reports';
 import { useAuth } from '../../contexts/AuthContext';
 import { LoadingSpinner } from '../common/LoadingSpinner';
-import { ErrorDisplay } from '../common/ErrorDisplay';
+import { EmptyState } from '../common/EmptyState';
+import {
+  allowedReportScopes,
+  canExportReport,
+  defaultReportScope,
+  describeActiveReportFilters,
+  permittedReportMembers,
+} from './report-controls';
 
 function StatCard({
   label,
@@ -30,7 +39,7 @@ function StatCard({
 }
 
 export function ReportsPanel() {
-  const { membership } = useAuth();
+  const { membership, user } = useAuth();
   const { data: departments = [], isLoading: departmentsLoading } = useWorkspaces();
   const [departmentId, setDepartmentId] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -38,32 +47,56 @@ export function ReportsPanel() {
   const [status, setStatus] = useState('');
   const [priority, setPriority] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
-  const [scope, setScope] = useState<'self' | 'individual' | 'combined'>('self');
   const [targetUserId, setTargetUserId] = useState('');
   const [exporting, setExporting] = useState<'pdf' | 'xlsx' | null>(null);
   const isAdmin = membership?.role === 'admin';
-  const departmentRole = departments.find(
-    (department) => department.id === departmentId,
-  )?.departmentRole;
-  const canUseTeamScopes =
-    isAdmin ||
-    departmentRole === 'admin' ||
-    departmentRole === 'department_head' ||
-    departmentRole === 'manager';
+  const selectedDepartment = departments.find((department) => department.id === departmentId);
+  const departmentRole = selectedDepartment?.departmentRole;
+  const reportContextKey = [
+    membership?.role || '',
+    departmentId || 'all',
+    departmentRole || '',
+  ].join(':');
+  const [scopeSelection, setScopeSelection] = useState<{
+    contextKey: string;
+    value: ReportScope;
+  } | null>(null);
+  const roleReady = isAdmin || !!departmentRole;
+  const scope =
+    scopeSelection?.contextKey === reportContextKey
+      ? scopeSelection.value
+      : defaultReportScope(membership?.role, departmentRole);
+  const changeScope = (value: ReportScope) =>
+    setScopeSelection({ contextKey: reportContextKey, value });
   const members = useQuery({
     queryKey: ['workspace-members', departmentId],
     queryFn: async () => {
       const { data } = await apiClient.get(`/workspaces/${departmentId}/members`);
-      return Array.isArray(data) ? data : [];
+      return (Array.isArray(data) ? data : []) as Array<{
+        userId: string;
+        displayName?: string;
+        email: string;
+        role: string;
+      }>;
     },
     enabled: !!departmentId,
   });
+  const reportMembers = permittedReportMembers(
+    members.data || [],
+    isAdmin ? 'admin' : departmentRole,
+    user?.id,
+  );
 
   useEffect(() => {
     if (!departmentId && departments.length > 0 && !isAdmin) {
       setDepartmentId(departments[0]!.id);
     }
   }, [departmentId, departments, isAdmin]);
+
+  useEffect(() => {
+    setTargetUserId('');
+    setAssigneeId('');
+  }, [reportContextKey]);
 
   const filters = useMemo<ReportFilters>(
     () => ({
@@ -78,7 +111,10 @@ export function ReportsPanel() {
     }),
     [departmentId, dateFrom, dateTo, status, priority, assigneeId, scope, targetUserId],
   );
-  const enabled = (isAdmin || !!departmentId) && (scope !== 'individual' || !!targetUserId);
+  const enabled =
+    roleReady &&
+    (isAdmin || !!departmentId) &&
+    (scope !== 'individual' || !!targetUserId);
   const report = useDepartmentReport(filters, enabled);
 
   async function exportReport(format: 'pdf' | 'xlsx') {
@@ -86,8 +122,8 @@ export function ReportsPanel() {
     try {
       await downloadDepartmentReport(filters, format);
       toast.success(`${format.toUpperCase()} report downloaded`);
-    } catch {
-      toast.error('Report export failed');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Report export failed');
     } finally {
       setExporting(null);
     }
@@ -100,6 +136,13 @@ export function ReportsPanel() {
     data && data.totals.tasks > 0
       ? Math.round((data.totals.completed / data.totals.tasks) * 100)
       : 0;
+  const canExport = canExportReport(enabled, data?.tasks.length || 0, !!exporting);
+  const describedFilters = {
+    ...filters,
+    departmentName: selectedDepartment?.name,
+    assigneeName: reportMembers.find((member) => member.userId === assigneeId)?.displayName,
+    targetUserName: reportMembers.find((member) => member.userId === targetUserId)?.displayName,
+  };
 
   return (
     <div className="space-y-6">
@@ -121,7 +164,7 @@ export function ReportsPanel() {
             </select>
           </label>
           <label className="text-xs font-medium text-slate-600">
-            From
+            Created from
             <input
               className="input mt-1 w-full text-sm"
               type="date"
@@ -130,7 +173,7 @@ export function ReportsPanel() {
             />
           </label>
           <label className="text-xs font-medium text-slate-600">
-            To
+            Created to
             <input
               className="input mt-1 w-full text-sm"
               type="date"
@@ -171,15 +214,17 @@ export function ReportsPanel() {
             <select
               className="input mt-1 w-full text-sm"
               value={scope}
-              onChange={(event) => {
-                const nextScope = event.target.value as 'self' | 'individual' | 'combined';
-                setScope(nextScope);
-                if (nextScope !== 'individual') setTargetUserId('');
-              }}
+              onChange={(event) => changeScope(event.target.value as ReportScope)}
             >
-              <option value="self">My tasks</option>
-              {canUseTeamScopes && <option value="individual">One person</option>}
-              {canUseTeamScopes && <option value="combined">Combined team</option>}
+              {allowedReportScopes(membership?.role, departmentRole).map((option) => (
+                <option key={option} value={option}>
+                  {option === 'self'
+                    ? 'My tasks'
+                    : option === 'individual'
+                      ? 'One person'
+                      : 'Combined team'}
+                </option>
+              ))}
             </select>
           </label>
           <label className="text-xs font-medium text-slate-600">
@@ -191,12 +236,9 @@ export function ReportsPanel() {
               onChange={(event) => setTargetUserId(event.target.value)}
             >
               <option value="">Choose a person</option>
-              {(members.data || []).map((member: any) => (
-                <option
-                  key={member.userId || member.user_id}
-                  value={member.userId || member.user_id}
-                >
-                  {member.displayName || member.display_name || member.email}
+              {reportMembers.map((member) => (
+                <option key={member.userId} value={member.userId}>
+                  {member.displayName || member.email}
                 </option>
               ))}
             </select>
@@ -210,12 +252,9 @@ export function ReportsPanel() {
               onChange={(event) => setAssigneeId(event.target.value)}
             >
               <option value="">All assignees</option>
-              {(members.data || []).map((member: any) => (
-                <option
-                  key={member.userId || member.user_id}
-                  value={member.userId || member.user_id}
-                >
-                  {member.displayName || member.display_name || member.email}
+              {reportMembers.map((member) => (
+                <option key={member.userId} value={member.userId}>
+                  {member.displayName || member.email}
                 </option>
               ))}
             </select>
@@ -235,15 +274,17 @@ export function ReportsPanel() {
           </p>
           <div className="flex gap-2">
             <button
+              type="button"
               className="btn-secondary"
-              disabled={!enabled || !!exporting}
+              disabled={!canExport}
               onClick={() => exportReport('pdf')}
             >
               {exporting === 'pdf' ? 'Preparing…' : 'Export PDF'}
             </button>
             <button
+              type="button"
               className="btn-primary"
-              disabled={!enabled || !!exporting}
+              disabled={!canExport}
               onClick={() => exportReport('xlsx')}
             >
               {exporting === 'xlsx' ? 'Preparing…' : 'Export XLSX'}
@@ -253,8 +294,24 @@ export function ReportsPanel() {
       </section>
 
       {report.isLoading && <LoadingSpinner className="py-12" />}
-      {report.isError && <ErrorDisplay message="The report could not be loaded." />}
-      {data && (
+      {report.isError && (
+        <EmptyState
+          title="Report could not be loaded"
+          description="Your filters are still selected. Retry when the connection is available."
+          action={
+            <button type="button" className="btn-primary" onClick={() => report.refetch()}>
+              Retry report
+            </button>
+          }
+        />
+      )}
+      {!report.isError && data?.tasks.length === 0 && (
+        <EmptyState
+          title="No tasks match this report"
+          description={describeActiveReportFilters(describedFilters)}
+        />
+      )}
+      {!report.isError && data && data.tasks.length > 0 && (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <StatCard label="Total tasks" value={data.totals.tasks} />
@@ -311,6 +368,49 @@ export function ReportsPanel() {
               </div>
             </section>
           </div>
+
+          <section className="card overflow-hidden">
+            <div className="border-b px-4 py-3">
+              <h3 className="text-sm font-semibold text-slate-800">Current tasks</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-[760px] w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500">
+                  <tr>
+                    <th className="px-4 py-2">Department</th>
+                    <th className="px-4 py-2">Task</th>
+                    <th className="px-4 py-2">Assignee</th>
+                    <th className="px-4 py-2">Status</th>
+                    <th className="px-4 py-2">Priority</th>
+                    <th className="px-4 py-2">Due date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.tasks.map((task) => (
+                    <tr key={task.id} className="border-t">
+                      <td className="px-4 py-2">{task.departmentName}</td>
+                      <td className="px-4 py-2">
+                        <Link
+                          className="font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                          to={`/tasks/${task.id}`}
+                        >
+                          {task.title}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2">{task.assigneeName || 'Unassigned'}</td>
+                      <td className="px-4 py-2 capitalize">{task.status.replace('_', ' ')}</td>
+                      <td className="px-4 py-2 capitalize">{task.priority}</td>
+                      <td className="px-4 py-2">
+                        {task.dueDate
+                          ? new Date(task.dueDate).toLocaleDateString()
+                          : 'No due date'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </>
       )}
     </div>
