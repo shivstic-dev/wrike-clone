@@ -38,7 +38,7 @@ describe('operations atlas analytics migration', () => {
     const sql = readFileSync(migrationSqlPath, 'utf8');
 
     expect(sql).not.toMatch(
-      /\b(?:DROP|ALTER\s+TABLE|TRUNCATE|DELETE|GRANT|REVOKE|POLICY|RLS)\b/i,
+      /\b(?:DROP|ALTER\s+TABLE|TRUNCATE|DELETE|INSERT|UPDATE|CREATE\s+TABLE|GRANT|REVOKE|POLICY|RLS)\b/i,
     );
   });
 
