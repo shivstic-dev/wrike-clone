@@ -25,7 +25,7 @@ export function buildWorkspaceMembersQuery(db: Knex, workspaceId: string, tenant
         'workspace_members.user_id',
       );
     })
-    .leftJoin('tenant_memberships', function () {
+    .join('tenant_memberships', function () {
       this.on('tenant_memberships.tenant_id', '=', 'workspace_members.tenant_id')
         .andOn('tenant_memberships.user_id', '=', 'workspace_members.user_id')
         .andOnVal('tenant_memberships.is_active', '=', true);

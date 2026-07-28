@@ -61,7 +61,7 @@ export interface Workspace extends BaseEntity {
 export interface WorkspaceMember extends BaseEntity {
     workspaceId: string;
     userId: string;
-    role: 'employee' | 'manager' | 'department_head';
+    role: 'admin' | 'employee' | 'manager' | 'department_head';
 }
 export interface Folder extends BaseEntity {
     workspaceId: string;

@@ -290,14 +290,20 @@ describe('QuickTaskModal', () => {
     renderModal();
     const summary = document.querySelector<HTMLElement>('details:not([open]) > summary');
     if (!summary) throw new Error('Closed More details summary was not rendered');
+    const hiddenDescription =
+      document.querySelector<HTMLTextAreaElement>('#quick-task-description');
+    if (!hiddenDescription) throw new Error('Hidden More details field was not rendered');
 
     document
       .querySelectorAll<
         HTMLButtonElement | HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
       >('button, input, select, textarea')
       .forEach((element) => {
-        element.disabled = true;
+        if (element !== hiddenDescription) element.disabled = true;
       });
+    expect(hiddenDescription.disabled).toBe(false);
+    hiddenDescription.focus();
+    expect(document.activeElement).toBe(hiddenDescription);
     summary.focus();
     const tabEvent = new KeyboardEvent('keydown', {
       key: 'Tab',

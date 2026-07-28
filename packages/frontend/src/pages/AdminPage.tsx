@@ -6,6 +6,7 @@ import { ErrorDisplay } from '../components/common/ErrorDisplay';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { clsx } from 'clsx';
+import type { WorkspaceMember } from '@wrike-clone/shared';
 
 // ---- Add Member Modal ----
 
@@ -109,6 +110,46 @@ function AddMemberModal({ workspaceId, onClose }: { workspaceId: string; onClose
 
 // ---- Workspace Members Section ----
 
+type EditableWorkspaceMemberRole = Exclude<WorkspaceMember['role'], 'admin'>;
+
+export function WorkspaceMemberRoleControl({
+  role,
+  disabled,
+  onRoleChange,
+}: {
+  role: WorkspaceMember['role'];
+  disabled: boolean;
+  onRoleChange: (role: EditableWorkspaceMemberRole) => void;
+}) {
+  if (role === 'admin') {
+    return (
+      <span className="rounded-lg border border-purple-200 bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700">
+        Admin
+      </span>
+    );
+  }
+
+  return (
+    <select
+      className={clsx(
+        'rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium',
+        role === 'department_head'
+          ? 'bg-amber-50 text-amber-700'
+          : role === 'manager'
+            ? 'bg-blue-50 text-blue-700'
+            : 'bg-slate-50 text-slate-600',
+      )}
+      value={role}
+      disabled={disabled}
+      onChange={(event) => onRoleChange(event.target.value as EditableWorkspaceMemberRole)}
+    >
+      <option value="employee">Employee</option>
+      <option value="manager">Manager</option>
+      <option value="department_head">Department Head</option>
+    </select>
+  );
+}
+
 function WorkspaceMembers({ workspaceId }: { workspaceId: string }) {
   const {
     data: members,
@@ -177,28 +218,16 @@ function WorkspaceMembers({ workspaceId }: { workspaceId: string }) {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <select
-                  className={clsx(
-                    'rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium',
-                    member.role === 'department_head'
-                      ? 'bg-amber-50 text-amber-700'
-                      : member.role === 'manager'
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'bg-slate-50 text-slate-600',
-                  )}
-                  value={member.role}
+                <WorkspaceMemberRoleControl
+                  role={member.role}
                   disabled={updateRole.isPending}
-                  onChange={(event) =>
+                  onRoleChange={(role) =>
                     updateRole.mutate({
                       userId: member.userId || member.user_id,
-                      role: event.target.value,
+                      role,
                     })
                   }
-                >
-                  <option value="employee">Employee</option>
-                  <option value="manager">Manager</option>
-                  <option value="department_head">Department Head</option>
-                </select>
+                />
                 <button
                   onClick={() => {
                     if (confirm('Remove this member from the department?')) {

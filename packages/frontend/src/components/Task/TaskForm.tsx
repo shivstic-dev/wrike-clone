@@ -57,6 +57,7 @@ export function TaskForm({
   const [visibility, setVisibility] = useState<Task['visibility']>(
     initialValues?.visibility || 'department',
   );
+  const assignableAssignees = assignees.filter((assignee) => assignee.role !== 'admin');
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -204,7 +205,7 @@ export function TaskForm({
             className={inputClasses}
             value={assigneeIds}
             multiple
-            size={Math.min(Math.max(assignees.length, 3), 6)}
+            size={Math.min(Math.max(assignableAssignees.length, 3), 6)}
             onChange={(event) => {
               setAssigneeIds(
                 Array.from(event.currentTarget.selectedOptions, (option) => option.value),
@@ -212,7 +213,7 @@ export function TaskForm({
               setAssigneesChanged(true);
             }}
           >
-            {assignees.map((assignee) => (
+            {assignableAssignees.map((assignee) => (
               <option key={assignee.userId} value={assignee.userId}>
                 {assignee.displayName || assignee.email}
                 {assignee.role ? ` (${assignee.role.replace('_', ' ')})` : ''}
