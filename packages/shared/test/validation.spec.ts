@@ -10,6 +10,7 @@ import {
   createFolderSchema,
   createProjectSchema,
   createTaskSchema,
+  moveTaskLocationSchema,
   updateTaskSchema,
   taskFilterSchema,
   inviteUserSchema,
@@ -280,6 +281,34 @@ describe('Validation Schemas', () => {
         status: 'nonexistent_status',
       });
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('quick task location validation', () => {
+    it('accepts a department-only quick task', () => {
+      expect(
+        createTaskSchema.safeParse({
+          departmentId: '00000000-0000-4000-8000-000000000001',
+          title: 'Prepare banner',
+        }).success,
+      ).toBe(true);
+    });
+
+    it('keeps project-only creation backward compatible', () => {
+      expect(
+        createTaskSchema.safeParse({
+          projectId: '00000000-0000-4000-8000-000000000002',
+          title: 'Prepare banner',
+        }).success,
+      ).toBe(true);
+    });
+
+    it('rejects creation without a department or project', () => {
+      expect(createTaskSchema.safeParse({ title: 'Prepare banner' }).success).toBe(false);
+    });
+
+    it('requires a folder or project when moving', () => {
+      expect(moveTaskLocationSchema.safeParse({}).success).toBe(false);
     });
   });
 

@@ -90,6 +90,7 @@ export interface Folder extends BaseEntity {
   icon: string | null;
   sortOrder: number;
   isArchived: boolean;
+  isSystemGeneral: boolean;
   metadata: Record<string, unknown>;
 }
 
@@ -119,6 +120,7 @@ export interface Project extends BaseEntity {
   budget: number | null;
   actualCost: number | null;
   visibility: 'global' | 'department';
+  isSystem: boolean;
   taskCounts?: Array<{ status: string; count: number | string }>;
 }
 
@@ -126,6 +128,10 @@ export interface Project extends BaseEntity {
 
 export interface Task extends BaseEntity {
   projectId: string;
+  folderId?: string;
+  folderName?: string;
+  projectName?: string;
+  isSystemProject?: boolean;
   departmentId: string;
   departmentName?: string;
   parentTaskId: string | null;

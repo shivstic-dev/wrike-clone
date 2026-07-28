@@ -159,21 +159,43 @@ export const updateProjectSchema = z
 
 // ── Task ───────────────────────────────────────────────────────
 
-export const createTaskSchema = z.object({
-  projectId: uuidField,
-  parentTaskId: uuidField.optional(),
-  assigneeId: uuidField.optional(),
-  assigneeIds: z.array(uuidField).max(50).optional(),
-  title: z.string().min(1).max(500),
-  description: z.string().max(10000).optional(),
-  status: z.nativeEnum(TaskStatus).optional(),
-  priority: z.nativeEnum(TaskPriority).optional(),
-  estimatedHours: z.number().nonnegative().optional(),
-  startDate: isoDate.optional(),
-  dueDate: isoDate.optional(),
-  visibility: z.enum(['global', 'department']).optional().default('department'),
-  customFields: z.record(z.unknown()).optional(),
-});
+export const taskLocationInputSchema = z
+  .object({
+    departmentId: uuidField.optional(),
+    folderId: uuidField.optional(),
+    projectId: uuidField.optional(),
+  })
+  .refine((value) => !!value.departmentId || !!value.projectId, {
+    message: 'departmentId or projectId is required',
+    path: ['departmentId'],
+  });
+
+export const moveTaskLocationSchema = z
+  .object({
+    folderId: uuidField.optional(),
+    projectId: uuidField.optional(),
+  })
+  .refine((value) => !!value.folderId || !!value.projectId, {
+    message: 'folderId or projectId is required',
+    path: ['folderId'],
+  });
+
+export const createTaskSchema = taskLocationInputSchema.and(
+  z.object({
+    parentTaskId: uuidField.optional(),
+    assigneeId: uuidField.optional(),
+    assigneeIds: z.array(uuidField).max(50).optional(),
+    title: z.string().min(1).max(500),
+    description: z.string().max(10000).optional(),
+    status: z.nativeEnum(TaskStatus).optional(),
+    priority: z.nativeEnum(TaskPriority).optional(),
+    estimatedHours: z.number().nonnegative().optional(),
+    startDate: isoDate.optional(),
+    dueDate: isoDate.optional(),
+    visibility: z.enum(['global', 'department']).optional().default('department'),
+    customFields: z.record(z.unknown()).optional(),
+  }),
+);
 
 export const updateTaskSchema = z
   .object({
@@ -372,6 +394,8 @@ export type InviteUserInput = z.infer<typeof inviteUserSchema>;
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
 export type CreateFolderInput = z.infer<typeof createFolderSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+export type TaskLocationInput = z.infer<typeof taskLocationInputSchema>;
+export type MoveTaskLocationInput = z.infer<typeof moveTaskLocationSchema>;
 export type CreateTaskInput = z.input<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type TaskFilterInput = z.infer<typeof taskFilterSchema>;
