@@ -12,7 +12,7 @@ const variantClasses = {
     'border border-atlas-mist bg-white text-atlas-canopy hover:bg-atlas-paper focus-visible:outline-atlas-current',
   ghost: 'text-atlas-canopy hover:bg-atlas-mist focus-visible:outline-atlas-current',
   danger:
-    'bg-atlas-signalCoral text-atlas-ink hover:bg-[#D96745] focus-visible:outline-atlas-canopy',
+    'bg-atlas-signalCoral text-atlas-ink hover:shadow-md focus-visible:outline-atlas-canopy',
 } as const;
 
 const sizeClasses = {

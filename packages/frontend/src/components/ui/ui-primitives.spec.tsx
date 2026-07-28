@@ -60,6 +60,15 @@ describe('Operations Atlas UI primitives', () => {
     expect(danger).toContain('focus-visible:outline-offset-2');
   });
 
+  it('keeps the danger hover state on the AA-safe coral and ink pair', () => {
+    const danger = renderToStaticMarkup(<Button variant="danger">Delete task</Button>);
+
+    expect(danger).toContain('bg-atlas-signalCoral');
+    expect(danger).toContain('text-atlas-ink');
+    expect(danger).not.toContain('hover:bg-');
+    expect(danger).toContain('hover:shadow-md');
+  });
+
   it('suppresses skeleton animation when reduced motion is requested', () => {
     const html = renderToStaticMarkup(<Skeleton />);
 
