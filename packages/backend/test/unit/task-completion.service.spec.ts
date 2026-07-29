@@ -106,7 +106,7 @@ describe('TaskCompletionService', () => {
   it('clears prior confirmation metadata when malformed completed data is marked ready', async () => {
     const { service, update } = createService({
       status: 'completed',
-      handoff_status: 'confirmed',
+      handoff_status: 'pending',
       handoff_confirmed_by: 'previous-completer',
       handoff_confirmed_at: new Date('2026-07-30T00:00:00.000Z'),
     } as any);
@@ -119,6 +119,46 @@ describe('TaskCompletionService', () => {
       handoff_confirmed_by: null,
       handoff_confirmed_at: null,
     }));
+  });
+
+  it('keeps an already confirmed completion unchanged when Not yet is retried', async () => {
+    const confirmedTask = {
+      status: 'completed',
+      handoff_status: 'confirmed',
+      handoff_confirmed_by: 'previous-completer',
+      handoff_confirmed_at: new Date('2026-07-30T00:00:00.000Z'),
+    } as any;
+    const { service, update, notifications } = createService(confirmedTask);
+
+    const result = await tenantContext.run(context, () =>
+      service.complete('task-1', { outcome: 'not_yet' }),
+    );
+
+    expect(result).toMatchObject(confirmedTask);
+    expect(update).not.toHaveBeenCalled();
+    expect(notifications.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate task ids before starting bulk completion work', async () => {
+    const { service } = createService();
+    const complete = jest.spyOn(service, 'complete');
+
+    try {
+      await expect(service.completeMany({
+        items: [
+          { taskId: 'task-1', outcome: 'confirmed' },
+          { taskId: 'task-1', outcome: 'not_yet' },
+        ],
+      })).rejects.toMatchObject({
+        response: {
+          code: 'DUPLICATE_TASK_COMPLETION',
+          message: 'Each task can appear only once in a bulk completion request',
+        },
+      });
+      expect(complete).not.toHaveBeenCalled();
+    } finally {
+      complete.mockRestore();
+    }
   });
 
   it('completes a not-required task without confirmation metadata', async () => {

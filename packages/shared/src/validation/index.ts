@@ -265,6 +265,9 @@ export const taskCompletionSchema = z.object({
   outcome: z.enum(['confirmed', 'not_yet']),
 });
 
+export const BULK_TASK_COMPLETION_DUPLICATE_MESSAGE =
+  'Each task can appear only once in a bulk completion request';
+
 export const bulkTaskCompletionSchema = z.object({
   items: z
     .array(
@@ -275,6 +278,18 @@ export const bulkTaskCompletionSchema = z.object({
     )
     .min(1)
     .max(100),
+}).superRefine(({ items }, ctx) => {
+  const seenTaskIds = new Set<string>();
+  items.forEach((item, index) => {
+    if (seenTaskIds.has(item.taskId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: BULK_TASK_COMPLETION_DUPLICATE_MESSAGE,
+        path: ['items', index, 'taskId'],
+      });
+    }
+    seenTaskIds.add(item.taskId);
+  });
 });
 
 export const dashboardTaskBucketSchema = z.enum([

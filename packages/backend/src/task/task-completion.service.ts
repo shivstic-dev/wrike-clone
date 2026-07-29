@@ -1,5 +1,12 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  BULK_TASK_COMPLETION_DUPLICATE_MESSAGE,
   BulkTaskCompletionRequest,
   BulkTaskCompletionResult,
   HandoffStatus,
@@ -43,6 +50,17 @@ export class TaskCompletionService {
   }
 
   async completeMany(input: BulkTaskCompletionRequest): Promise<BulkTaskCompletionResult> {
+    const seenTaskIds = new Set<string>();
+    for (const item of input.items) {
+      if (seenTaskIds.has(item.taskId)) {
+        throw new BadRequestException({
+          code: 'DUPLICATE_TASK_COMPLETION',
+          message: BULK_TASK_COMPLETION_DUPLICATE_MESSAGE,
+        });
+      }
+      seenTaskIds.add(item.taskId);
+    }
+
     const data: any[] = [];
     const errors: BulkTaskCompletionResult['errors'] = [];
 
@@ -131,6 +149,13 @@ export class TaskCompletionService {
   }
 
   private async markReadyForHandoff(trx: Knex.Transaction, task: TaskRow): Promise<TaskRow> {
+    if (
+      task.status === TaskStatus.COMPLETED &&
+      task.handoff_status === HandoffStatus.CONFIRMED
+    ) {
+      return task;
+    }
+
     if (!task.handoff_required) {
       throw new ConflictException({
         code: 'HANDOFF_CONFIRMATION_REQUIRED',

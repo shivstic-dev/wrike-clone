@@ -29,6 +29,17 @@ describe('TaskController completion routes', () => {
     expect(taskCompletion.completeMany).toHaveBeenCalledWith({ items: [{ taskId, outcome: 'not_yet' }] });
   });
 
+  it('rejects duplicate bulk task ids before calling the completion service', async () => {
+    await expect(controller.completeMany({
+      items: [
+        { taskId, outcome: 'confirmed' },
+        { taskId, outcome: 'not_yet' },
+      ],
+    })).rejects.toThrow('Each task can appear only once in a bulk completion request');
+
+    expect(taskCompletion.completeMany).not.toHaveBeenCalled();
+  });
+
   it('requires status-write permission for handoff completion routes', () => {
     expect(Reflect.getMetadata(PERMISSIONS_KEY, (TaskController as any).prototype.complete)).toEqual(['task:status:update']);
     expect(Reflect.getMetadata(PERMISSIONS_KEY, (TaskController as any).prototype.completeMany)).toEqual(['task:status:update']);

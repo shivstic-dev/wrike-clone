@@ -301,7 +301,7 @@ describe('useTaskCompletionFlow', () => {
     expect(completionMutation.mutateAsync).not.toHaveBeenCalled();
   });
 
-  it('returns the first pending promise when completion is requested twice', async () => {
+  it('deduplicates repeated completion requests for the same required task', async () => {
     let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
     const container = document.createElement('div');
     document.body.append(container);
@@ -319,7 +319,7 @@ describe('useTaskCompletionFlow', () => {
     let second: Promise<Task | null> | undefined;
     act(() => {
       first = requestCompletion?.(task);
-      second = requestCompletion?.({ ...task, id: 'task-2' });
+      second = requestCompletion?.(task);
     });
     if (!first || !second) throw new Error('Completion requests were not created');
 
@@ -327,6 +327,38 @@ describe('useTaskCompletionFlow', () => {
     act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
     await expect(first).resolves.toBeNull();
     await expect(second).resolves.toBeNull();
+  });
+
+  it('rejects a different required task while another confirmation is pending', async () => {
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    mounted.push({ root, container });
+
+    function Harness() {
+      const flow = useTaskCompletionFlow();
+      requestCompletion = flow.requestCompletion;
+      return <HandoffCompletionDialog {...flow.dialogProps} />;
+    }
+
+    act(() => root.render(<Harness />));
+    let first: Promise<Task | null> | undefined;
+    let second: Promise<Task | null> | undefined;
+    act(() => {
+      first = requestCompletion?.(task);
+      second = requestCompletion?.({ ...task, id: 'task-2', title: 'Prepare the annual report' });
+    });
+    if (!first || !second) throw new Error('Completion requests were not created');
+
+    const differentTaskRejection = expect(second).rejects.toThrow(
+      'Another task is already awaiting handoff confirmation',
+    );
+    expect(second).not.toBe(first);
+    act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+
+    await differentTaskRejection;
+    await expect(first).resolves.toBeNull();
   });
 
   it('settles an open confirmation as cancelled when the flow unmounts', async () => {

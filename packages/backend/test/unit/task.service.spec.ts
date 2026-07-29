@@ -174,6 +174,7 @@ describe('TaskService', () => {
       await service.findAll({ page: 1, perPage: 25, folderId: 'folder-home' });
 
       expectCanonicalLocationJoin(qb);
+      expectTenantSafeHandoffOwnerJoin(qb);
       expect(qb.andWhere).toHaveBeenCalledWith('home_link.folder_id', 'folder-home');
       expect(qb.select).toHaveBeenCalledWith(
         expect.anything(),
@@ -236,6 +237,7 @@ describe('TaskService', () => {
       await service.findById('task-1');
 
       expectCanonicalLocationJoin(qb);
+      expectTenantSafeHandoffOwnerJoin(qb);
       expect(qb.select).toHaveBeenCalledWith(
         'tasks.*',
         'workspaces.name as department_name',
@@ -514,6 +516,48 @@ describe('TaskService', () => {
       expect(qb.update.mock.calls.some(([updates]: [Record<string, unknown>]) => 'handoff_owner_id' in updates)).toBe(false);
     });
 
+    it('does not rewrite or log a bulk assignment when every target already has it', async () => {
+      tenantContext.enterWith({ tenantId: 't1', userId: 'manager-1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      const existingTask = {
+        id: 'task-1',
+        title: 'A',
+        status: TaskStatus.TODO,
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        assignee_id: 'u1',
+      };
+      const taskQb = createQb();
+      taskQb.then = (resolve: any) => resolve([existingTask]);
+      taskQb.catch = noop;
+      taskQb.returning.mockResolvedValue([existingTask]);
+      const assigneeQb = createQb();
+      assigneeQb.then = (resolve: any) => resolve([
+        { task_id: 'task-1', user_id: 'u1', is_primary: true },
+      ]);
+      assigneeQb.catch = noop;
+      const activityQb = createQb();
+      const memberQb = createQb();
+      memberQb.first.mockResolvedValue({ user_id: 'u1' });
+      mockDb.mockImplementation((table: string) => {
+        if (table === 'tasks') return taskQb;
+        if (table === 'task_assignees') return assigneeQb;
+        if (table === 'activity_logs') return activityQb;
+        if (table === 'workspace_members') return memberQb;
+        return createQb();
+      });
+
+      const result = await service.bulkUpdate({
+        taskIds: ['task-1'],
+        updates: { assigneeIds: ['u1'] },
+      });
+
+      expect(result).toEqual([existingTask]);
+      expect(taskQb.update).not.toHaveBeenCalled();
+      expect(assigneeQb.del).not.toHaveBeenCalled();
+      expect(assigneeQb.insert).not.toHaveBeenCalled();
+      expect(activityQb.insert).not.toHaveBeenCalled();
+    });
+
     it('updates multiple tasks', async () => {
       tenantContext.enterWith({
         tenantId: 't1',
@@ -552,6 +596,41 @@ describe('TaskService', () => {
         updates: { status: 'in_progress' as any },
       });
       expect(results).toHaveLength(2);
+    });
+  });
+
+  describe('addAssignee', () => {
+    it('returns the current task without rewriting or logging an existing assignment', async () => {
+      tenantContext.enterWith({ tenantId: 't1', userId: 'manager-1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      const visibleTask = {
+        id: 'task-1',
+        title: 'A',
+        status: TaskStatus.TODO,
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        assignee_id: 'u1',
+      };
+      const authoritativeTask = {
+        ...visibleTask,
+        assignees: [{ task_id: 'task-1', user_id: 'u1', assigned_by_id: 'original-manager' }],
+      };
+      qb.first
+        .mockResolvedValueOnce(visibleTask)
+        .mockResolvedValueOnce({ user_id: 'u1' });
+      qb.then = (resolve: any) => resolve(authoritativeTask.assignees);
+      qb.catch = noop;
+      const findById = jest.spyOn(service, 'findById').mockResolvedValue(authoritativeTask as any);
+
+      try {
+        const result = await service.addAssignee('task-1', 'u1');
+
+        expect(result).toEqual(authoritativeTask);
+        expect(qb.update).not.toHaveBeenCalled();
+        expect(qb.del).not.toHaveBeenCalled();
+        expect(qb.insert).not.toHaveBeenCalled();
+      } finally {
+        findById.mockRestore();
+      }
     });
   });
 
@@ -725,5 +804,37 @@ function expectCanonicalLocationJoin(qb: any) {
     { home_folder: 'folders' },
     'home_folder.id',
     'home_link.folder_id',
+  );
+}
+
+function expectTenantSafeHandoffOwnerJoin(qb: any) {
+  const membershipJoin = qb.leftJoin.mock.calls.find(
+    ([table]: [Record<string, string>]) =>
+      table?.handoff_owner_membership === 'tenant_memberships',
+  );
+  expect(membershipJoin).toBeDefined();
+
+  const joinClause: any = {
+    on: jest.fn(),
+    andOn: jest.fn(),
+  };
+  joinClause.on.mockReturnValue(joinClause);
+  joinClause.andOn.mockReturnValue(joinClause);
+  membershipJoin[1].call(joinClause);
+
+  expect(joinClause.on).toHaveBeenCalledWith(
+    'handoff_owner_membership.tenant_id',
+    '=',
+    'tasks.tenant_id',
+  );
+  expect(joinClause.andOn).toHaveBeenCalledWith(
+    'handoff_owner_membership.user_id',
+    '=',
+    'tasks.handoff_owner_id',
+  );
+  expect(qb.leftJoin).toHaveBeenCalledWith(
+    { handoff_owner: 'users' },
+    'handoff_owner.id',
+    'handoff_owner_membership.user_id',
   );
 }

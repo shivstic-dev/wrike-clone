@@ -1,6 +1,9 @@
 import type { Knex } from 'knex';
 
 const handoffSchemaSql = `
+-- Handoff actor columns reference globally identified users. Confidential
+-- profile reads must additionally require tenant_memberships(tenant_id, user_id)
+-- matching the task tenant, so malformed imported IDs cannot expose user data.
 ALTER TABLE tasks
   ADD COLUMN IF NOT EXISTS handoff_required BOOLEAN NOT NULL DEFAULT true,
   ADD COLUMN IF NOT EXISTS handoff_status TEXT NOT NULL DEFAULT 'pending',

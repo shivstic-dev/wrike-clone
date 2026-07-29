@@ -24,6 +24,7 @@ import {
   updateWorkspaceMemberRoleSchema,
   departmentReportFilterSchema,
   taskCompletionSchema,
+  bulkTaskCompletionSchema,
 } from '../src/validation';
 
 function validUUID(): string {
@@ -357,6 +358,28 @@ describe('Validation Schemas', () => {
       expect(taskCompletionSchema.parse({ outcome: 'not_yet' })).toEqual({ outcome: 'not_yet' });
       expect(() => taskCompletionSchema.parse({ outcome: 'sent' })).toThrow();
     });
+  });
+
+  describe('bulkTaskCompletionSchema', () => {
+    it.each(['confirmed', 'not_yet'] as const)(
+      'rejects a duplicate task even when its second outcome is %s',
+      (secondOutcome) => {
+        const result = bulkTaskCompletionSchema.safeParse({
+          items: [
+            { taskId: validUUID(), outcome: 'confirmed' },
+            { taskId: validUUID(), outcome: secondOutcome },
+          ],
+        });
+
+        expect(result.success).toBe(false);
+        if (result.success) throw new Error('Duplicate task completion unexpectedly parsed');
+        expect(result.error.issues).toContainEqual({
+          code: 'custom',
+          message: 'Each task can appear only once in a bulk completion request',
+          path: ['items', 1, 'taskId'],
+        });
+      },
+    );
   });
 
   describe('taskFilterSchema', () => {

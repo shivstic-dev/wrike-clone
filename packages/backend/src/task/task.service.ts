@@ -99,7 +99,20 @@ export class TaskService {
       })
       .leftJoin({ task_project: 'projects' }, 'task_project.id', 'tasks.project_id')
       .leftJoin({ home_folder: 'folders' }, 'home_folder.id', 'home_link.folder_id')
-      .leftJoin({ handoff_owner: 'users' }, 'handoff_owner.id', 'tasks.handoff_owner_id');
+      // The schema FK targets global users. Profile data is safe to expose only
+      // when that user also has membership in the task tenant.
+      .leftJoin({ handoff_owner_membership: 'tenant_memberships' }, function () {
+        this.on('handoff_owner_membership.tenant_id', '=', 'tasks.tenant_id').andOn(
+          'handoff_owner_membership.user_id',
+          '=',
+          'tasks.handoff_owner_id',
+        );
+      })
+      .leftJoin(
+        { handoff_owner: 'users' },
+        'handoff_owner.id',
+        'handoff_owner_membership.user_id',
+      );
 
     if (!tenantAdmin) {
       query = applyTaskAccessScope(query, { ...ctx, role: 'member' });
@@ -183,7 +196,18 @@ export class TaskService {
       })
       .leftJoin({ task_project: 'projects' }, 'task_project.id', 'tasks.project_id')
       .leftJoin({ home_folder: 'folders' }, 'home_folder.id', 'home_link.folder_id')
-      .leftJoin({ handoff_owner: 'users' }, 'handoff_owner.id', 'tasks.handoff_owner_id')
+      .leftJoin({ handoff_owner_membership: 'tenant_memberships' }, function () {
+        this.on('handoff_owner_membership.tenant_id', '=', 'tasks.tenant_id').andOn(
+          'handoff_owner_membership.user_id',
+          '=',
+          'tasks.handoff_owner_id',
+        );
+      })
+      .leftJoin(
+        { handoff_owner: 'users' },
+        'handoff_owner.id',
+        'handoff_owner_membership.user_id',
+      )
       .where('tasks.id', id)
       .andWhere('tasks.tenant_id', ctx.tenantId)
       .whereNull('tasks.deleted_at')
@@ -722,21 +746,21 @@ export class TaskService {
     const current = await this.getTaskAssignees(taskId);
     const ids = current.map((assignee) => assignee.user_id as string);
     const changed = !ids.includes(userId);
-    if (changed) ids.push(userId);
+    if (!changed) return this.findById(taskId);
+
+    ids.push(userId);
     await this.db.transaction(async (trx) => {
       await this.replaceTaskAssignees(taskId, ids, trx);
       await trx('tasks')
         .where({ id: taskId, tenant_id: ctx.tenantId })
         .update({
           assignee_id: ids[0] || null,
-          ...(changed ? { handoff_owner_id: ctx.userId } : {}),
+          handoff_owner_id: ctx.userId,
           updated_at: new Date(),
         });
     });
     await this.logActivity(ctx.userId, 'task', taskId, 'task:assignee:added', { userId });
-    if (changed) {
-      await this.createAssignmentNotification({ ...task, assignee_id: userId });
-    }
+    await this.createAssignmentNotification({ ...task, assignee_id: userId });
     return this.findById(taskId);
   }
 
@@ -796,6 +820,37 @@ export class TaskService {
     }
 
     // Check if all updates are the same (uniform change — the common case)
+    const assignmentProvided =
+      input.updates.assigneeId !== undefined || input.updates.assigneeIds !== undefined;
+    const assignmentOnly =
+      assignmentProvided &&
+      updateFields.every((field) => field === 'assigneeId' || field === 'assigneeIds');
+    if (assignmentOnly) {
+      const desiredAssigneeIds = this.uniqueAssigneeIds(input.updates);
+      const currentAssignees = await this.db('task_assignees')
+        .where({ tenant_id: ctx.tenantId })
+        .whereIn('task_id', input.taskIds)
+        .select('task_id', 'user_id', 'is_primary');
+      const currentByTask = new Map<string, Array<{ user_id: string; is_primary: boolean }>>();
+      for (const assignee of currentAssignees) {
+        const values = currentByTask.get(assignee.task_id) || [];
+        values.push(assignee);
+        currentByTask.set(assignee.task_id, values);
+      }
+      const everyAssignmentMatches = existingTasks.every((task) => {
+        const current = currentByTask.get(task.id) || [];
+        const currentIds = new Set(current.map((assignee) => assignee.user_id));
+        const primary = current.find((assignee) => assignee.is_primary)?.user_id || null;
+        return (
+          currentIds.size === desiredAssigneeIds.length &&
+          desiredAssigneeIds.every((assigneeId) => currentIds.has(assigneeId)) &&
+          primary === (desiredAssigneeIds[0] || null) &&
+          (task.assignee_id || null) === (desiredAssigneeIds[0] || null)
+        );
+      });
+      if (everyAssignmentMatches) return existingTasks;
+    }
+
     const keys = Object.keys(input.updates);
     if (keys.length > 0 && input.taskIds.length > 0) {
       // Try uniform update first: UPDATE ... WHERE id = ANY(?) AND tenant_id = ?

@@ -7,7 +7,7 @@
  * frontend (form validation), so rules never diverge.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.dashboardTasksQuerySchema = exports.dashboardOverviewQuerySchema = exports.departmentReportFilterSchema = exports.paginationSchema = exports.addTaskAssigneeSchema = exports.changeDepartmentMemberRoleSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.createDependencySchema = exports.dashboardTaskBucketSchema = exports.bulkTaskCompletionSchema = exports.taskCompletionSchema = exports.bulkTaskUpdateSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.moveTaskLocationSchema = exports.taskLocationInputSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
+exports.dashboardTasksQuerySchema = exports.dashboardOverviewQuerySchema = exports.departmentReportFilterSchema = exports.paginationSchema = exports.addTaskAssigneeSchema = exports.changeDepartmentMemberRoleSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.createDependencySchema = exports.dashboardTaskBucketSchema = exports.bulkTaskCompletionSchema = exports.BULK_TASK_COMPLETION_DUPLICATE_MESSAGE = exports.taskCompletionSchema = exports.bulkTaskUpdateSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.moveTaskLocationSchema = exports.taskLocationInputSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
 const zod_1 = require("zod");
 const enums_1 = require("../enums");
 // ── Helpers ────────────────────────────────────────────────────
@@ -212,6 +212,7 @@ exports.bulkTaskUpdateSchema = zod_1.z.object({
 exports.taskCompletionSchema = zod_1.z.object({
     outcome: zod_1.z.enum(['confirmed', 'not_yet']),
 });
+exports.BULK_TASK_COMPLETION_DUPLICATE_MESSAGE = 'Each task can appear only once in a bulk completion request';
 exports.bulkTaskCompletionSchema = zod_1.z.object({
     items: zod_1.z
         .array(zod_1.z.object({
@@ -220,6 +221,18 @@ exports.bulkTaskCompletionSchema = zod_1.z.object({
     }))
         .min(1)
         .max(100),
+}).superRefine(({ items }, ctx) => {
+    const seenTaskIds = new Set();
+    items.forEach((item, index) => {
+        if (seenTaskIds.has(item.taskId)) {
+            ctx.addIssue({
+                code: zod_1.z.ZodIssueCode.custom,
+                message: exports.BULK_TASK_COMPLETION_DUPLICATE_MESSAGE,
+                path: ['items', index, 'taskId'],
+            });
+        }
+        seenTaskIds.add(item.taskId);
+    });
 });
 exports.dashboardTaskBucketSchema = zod_1.z.enum([
     'active',
