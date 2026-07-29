@@ -237,6 +237,12 @@ export default function TaskDetailPage() {
           (member) => member.role === 'employee' || member.userId === user?.id,
         )
       : departmentMembers;
+  const handoffConfirmer = task.handoffConfirmedBy
+    ? departmentMembers.find((member) => member.userId === task.handoffConfirmedBy) ||
+      (user?.id === task.handoffConfirmedBy ? user : undefined)
+    : undefined;
+  const handoffConfirmerName =
+    handoffConfirmer?.displayName || handoffConfirmer?.email || 'A team member';
 
   return (
     <div className="mx-auto max-w-4xl p-6">
@@ -292,8 +298,9 @@ export default function TaskDetailPage() {
           {/* Status and Priority */}
           <div className="mb-6 grid grid-cols-3 gap-4">
             <div>
-              <label className="label">Status</label>
+              <label className="label" htmlFor="task-status">Status</label>
               <select
+                id="task-status"
                 value={task.status}
                 onChange={(e) => handleStatusChange(e.target.value)}
                 className="input text-sm"
@@ -356,7 +363,7 @@ export default function TaskDetailPage() {
               {task.handoffConfirmedBy && (
                 <div>
                   <dt className="text-slate-400">Confirmed by</dt>
-                  <dd className="font-medium text-slate-700">{task.handoffConfirmedBy}</dd>
+                  <dd className="font-medium text-slate-700">{handoffConfirmerName}</dd>
                 </div>
               )}
               {task.handoffConfirmedAt && (

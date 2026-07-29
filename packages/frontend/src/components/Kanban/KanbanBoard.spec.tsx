@@ -9,6 +9,15 @@ import { KanbanBoard } from './KanbanBoard';
 const mocks = vi.hoisted(() => ({
   updateTask: vi.fn(),
   requestCompletion: vi.fn(),
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
+}));
+
+vi.mock('react-hot-toast', () => ({
+  default: {
+    success: mocks.toastSuccess,
+    error: mocks.toastError,
+  },
 }));
 
 const task: Task = {
@@ -91,6 +100,14 @@ vi.mock('@dnd-kit/core', () => ({
 let container: HTMLDivElement;
 let root: Root | undefined;
 
+function getByRole<T extends HTMLElement>(role: 'button', name: string): T {
+  const control = [...container.querySelectorAll<HTMLElement>('button')].find(
+    (candidate) => candidate.textContent?.trim() === name,
+  );
+  if (!(control instanceof HTMLElement)) throw new Error(`${role} named ${name} was not rendered`);
+  return control as T;
+}
+
 beforeEach(() => {
   (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   task.status = TaskStatus.IN_PROGRESS;
@@ -102,6 +119,8 @@ beforeEach(() => {
     status: TaskStatus.COMPLETED,
     handoffStatus: 'confirmed' as Task['handoffStatus'],
   });
+  mocks.toastSuccess.mockReset();
+  mocks.toastError.mockReset();
   container = document.createElement('div');
   document.body.append(container);
 });
@@ -119,10 +138,8 @@ describe('KanbanBoard handoff completion', () => {
       root.render(<KanbanBoard tasks={[task]} />);
     });
 
-    const completed = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Drop in Completed');
-    if (!completed) throw new Error('Completed drop control was not rendered');
     await act(async () => {
-      completed.click();
+      getByRole<HTMLButtonElement>('button', 'Drop in Completed').click();
       await Promise.resolve();
     });
 
@@ -137,14 +154,65 @@ describe('KanbanBoard handoff completion', () => {
       root.render(<KanbanBoard tasks={[task]} />);
     });
 
-    const inProgress = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Drop in In progress');
-    if (!inProgress) throw new Error('In progress drop control was not rendered');
     await act(async () => {
-      inProgress.click();
+      getByRole<HTMLButtonElement>('button', 'Drop in In progress').click();
       await Promise.resolve();
     });
 
     expect(mocks.updateTask).toHaveBeenCalledWith({ id: 'task-1', status: 'in_progress' });
     expect(mocks.requestCompletion).not.toHaveBeenCalled();
+  });
+
+  it('keeps a Not yet task outside Completed and shows the Ready for handoff toast', async () => {
+    mocks.requestCompletion.mockResolvedValue({
+      ...task,
+      status: TaskStatus.IN_PROGRESS,
+      handoffStatus: 'ready' as Task['handoffStatus'],
+    });
+    act(() => {
+      root = createRoot(container);
+      root.render(<KanbanBoard tasks={[task]} />);
+    });
+
+    await act(async () => {
+      getByRole<HTMLButtonElement>('button', 'Drop in Completed').click();
+      await Promise.resolve();
+    });
+
+    expect(task.status).toBe(TaskStatus.IN_PROGRESS);
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('Saved in Ready for handoff');
+  });
+
+  it('leaves the Kanban task in place when confirmation is cancelled', async () => {
+    mocks.requestCompletion.mockResolvedValue(null);
+    act(() => {
+      root = createRoot(container);
+      root.render(<KanbanBoard tasks={[task]} />);
+    });
+
+    await act(async () => {
+      getByRole<HTMLButtonElement>('button', 'Drop in Completed').click();
+      await Promise.resolve();
+    });
+
+    expect(task.status).toBe(TaskStatus.IN_PROGRESS);
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it('shows an error when Kanban handoff completion fails', async () => {
+    mocks.requestCompletion.mockRejectedValue(new Error('Network unavailable'));
+    act(() => {
+      root = createRoot(container);
+      root.render(<KanbanBoard tasks={[task]} />);
+    });
+
+    await act(async () => {
+      getByRole<HTMLButtonElement>('button', 'Drop in Completed').click();
+      await Promise.resolve();
+    });
+
+    expect(mocks.toastError).toHaveBeenCalledWith('Failed to update task status');
   });
 });
