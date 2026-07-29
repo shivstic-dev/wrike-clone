@@ -103,6 +103,24 @@ describe('TaskCompletionService', () => {
     }), expect.anything());
   });
 
+  it('clears prior confirmation metadata when malformed completed data is marked ready', async () => {
+    const { service, update } = createService({
+      status: 'completed',
+      handoff_status: 'confirmed',
+      handoff_confirmed_by: 'previous-completer',
+      handoff_confirmed_at: new Date('2026-07-30T00:00:00.000Z'),
+    } as any);
+
+    await tenantContext.run(context, () => service.complete('task-1', { outcome: 'not_yet' }));
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'in_progress',
+      handoff_status: 'ready',
+      handoff_confirmed_by: null,
+      handoff_confirmed_at: null,
+    }));
+  });
+
   it('completes a not-required task without confirmation metadata', async () => {
     const { service, update } = createService({ handoff_required: false, handoff_status: 'not_required' });
 

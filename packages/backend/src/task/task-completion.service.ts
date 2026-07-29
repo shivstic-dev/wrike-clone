@@ -148,6 +148,8 @@ export class TaskCompletionService {
           status: nextStatus,
           completed_at: nextStatus === TaskStatus.COMPLETED ? task.completed_at : null,
           handoff_status: HandoffStatus.READY,
+          handoff_confirmed_by: null,
+          handoff_confirmed_at: null,
           handoff_ready_at: task.handoff_ready_at || new Date(),
           updated_at: new Date(),
         })
@@ -188,7 +190,7 @@ export class TaskCompletionService {
           userId,
           type: 'handoff_ready',
           title: 'Ready for handoff',
-          body: `Confirm whether “${task.title}” has been shared with the intended recipient.`,
+          body: `Confirm whether "${task.title}" has been shared with the intended recipient.`,
           data: { taskId: task.id, handoffOwnerId: task.handoff_owner_id || null },
         },
         trx,
