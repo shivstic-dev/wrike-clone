@@ -9,6 +9,8 @@ import {
   buildDashboardParams,
   dashboardKeys,
   requestDashboardOverview,
+  requestDashboardTasks,
+  useDashboardTasks,
   useDashboardOverview,
 } from './dashboard';
 
@@ -76,6 +78,25 @@ describe('dashboard API', () => {
     expect(config?.params?.toString()).toBe('departmentId=department-1&days=30');
   });
 
+  it('serializes the ready-for-handoff bucket and current department exactly', async () => {
+    const response = { generatedAt: '2026-07-30T12:00:00.000Z', bucket: 'ready_for_handoff', data: [] };
+    getMock.mockResolvedValueOnce({ data: response });
+
+    await expect(
+      requestDashboardTasks({
+        departmentId: ' department-1 ',
+        days: 30,
+        bucket: 'ready_for_handoff',
+      }),
+    ).resolves.toBe(response);
+
+    const [, config] = getMock.mock.calls[0] ?? [];
+    expect(getMock).toHaveBeenCalledWith('/dashboard/tasks', expect.any(Object));
+    expect(config?.params?.toString()).toBe(
+      'departmentId=department-1&days=30&bucket=ready_for_handoff',
+    );
+  });
+
   it('does not fetch when the overview query is disabled', async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -83,6 +104,30 @@ describe('dashboard API', () => {
 
     function Harness() {
       useDashboardOverview({ days: 30 }, false);
+      return null;
+    }
+
+    mountedContainer = document.createElement('div');
+    document.body.append(mountedContainer);
+    mountedRoot = createRoot(mountedContainer);
+
+    await act(async () => {
+      mountedRoot?.render(
+        createElement(QueryClientProvider, { client: queryClient }, createElement(Harness)),
+      );
+      await Promise.resolve();
+    });
+
+    expect(getMock).not.toHaveBeenCalled();
+  });
+
+  it('does not fetch bucket tasks until a valid selection enables it', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    function Harness() {
+      useDashboardTasks({ bucket: 'overdue', days: 30 }, false);
       return null;
     }
 

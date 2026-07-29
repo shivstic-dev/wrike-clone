@@ -1,4 +1,4 @@
-import type { DashboardOverview } from '@wrike-clone/shared';
+import type { DashboardOverview, DashboardTaskBucket } from '@wrike-clone/shared';
 import type { GroupedDepartmentTasks } from '../../api/tasks';
 import { AdminDashboard } from './AdminDashboard';
 import { DepartmentHeadDashboard } from './DepartmentHeadDashboard';
@@ -8,6 +8,7 @@ import { ManagerDashboard } from './ManagerDashboard';
 export interface RoleDashboardProps {
   overview: DashboardOverview;
   grouped?: GroupedDepartmentTasks;
+  onSelectBucket: (bucket: DashboardTaskBucket) => void;
 }
 
 export function RoleDashboard(props: RoleDashboardProps) {

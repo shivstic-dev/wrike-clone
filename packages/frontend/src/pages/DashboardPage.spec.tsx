@@ -7,6 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   TaskPriority,
   TaskStatus,
+  HandoffStatus,
+  type DashboardOverview,
+  type DashboardTaskListResponse,
   type PaginatedResponse,
   type Task,
 } from '@wrike-clone/shared';
@@ -56,7 +59,25 @@ const mocks = vi.hoisted(() => ({
   retryGrouped: vi.fn(),
   retryMine: vi.fn(),
   myTaskCalls: [] as unknown[][],
+  dashboardTaskCalls: [] as unknown[][],
 }));
+
+const overview: DashboardOverview = {
+  generatedAt: '2026-07-30T12:00:00.000Z',
+  windowDays: 30,
+  scope: { departmentId: 'department-1', role: 'department_head' },
+  totals: { active: 8, completed: 3, overdue: 2, blocked: 1, unassigned: 0, readyForHandoff: 1 },
+  comparison: { completedPercentChange: 0, createdPercentChange: 0 },
+  daily: [], byStatus: {}, byPriority: {}, capacity: [], attention: [], departments: [],
+};
+
+const dashboardTasks: DashboardTaskListResponse = {
+  generatedAt: '2026-07-30T12:00:00.000Z', bucket: 'overdue', data: [{
+    id: 'task-self-assigned', title: 'Self assigned follow-up', projectId: 'project-1', projectName: 'Community launch',
+    departmentId: 'department-1', status: TaskStatus.IN_PROGRESS, handoffStatus: HandoffStatus.PENDING, handoffOwner: null,
+    assignees: [{ userId: 'user-1', name: 'Harper Head' }], dueDate: null, handoffReadyAt: null,
+  }],
+};
 
 vi.mock('react-hot-toast', () => ({
   default: { success: vi.fn(), error: vi.fn() },
@@ -71,11 +92,15 @@ vi.mock('../contexts/AuthContext', () => ({
 
 vi.mock('../api/dashboard', () => ({
   useDashboardOverview: () => ({
-    data: undefined,
+    data: overview,
     isLoading: false,
     error: null,
     refetch: vi.fn(),
   }),
+  useDashboardTasks: (...args: unknown[]) => {
+    mocks.dashboardTaskCalls.push(args);
+    return { data: dashboardTasks, isLoading: false, error: null, refetch: vi.fn() };
+  },
 }));
 
 vi.mock('../api/tasks', () => ({
@@ -157,6 +182,7 @@ beforeEach(() => {
   mocks.retryGrouped.mockReset();
   mocks.retryMine.mockReset();
   mocks.myTaskCalls.length = 0;
+  mocks.dashboardTaskCalls.length = 0;
   container = document.createElement('div');
   document.body.append(container);
 });
@@ -219,6 +245,23 @@ describe('DashboardPage access activity', () => {
 });
 
 describe('DashboardPage personal tasks', () => {
+  it('keeps the current department and reveals self-assigned tasks behind the selected total', async () => {
+    await renderPage();
+
+    const metric = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.getAttribute('aria-label') === 'Show 2 overdue tasks',
+    );
+    expect(metric).toBeTruthy();
+    act(() => metric?.click());
+
+    expect(mocks.dashboardTaskCalls.some((call) => {
+      const [filters, enabled] = call as [{ bucket?: string; departmentId?: string }, boolean];
+      return filters.bucket === 'overdue' && filters.departmentId === 'department-1' && enabled === true;
+    })).toBe(true);
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('Overdue');
+    expect(container.textContent).toContain('Self assigned follow-up');
+  });
+
   it('shows task identities for management roles even when grouped lanes are unavailable', async () => {
     mocks.mine.data = {
       data: [
@@ -233,6 +276,12 @@ describe('DashboardPage personal tasks', () => {
           title: 'Prepare launch brief',
           description: null,
           status: TaskStatus.TODO,
+          handoffRequired: true,
+          handoffStatus: HandoffStatus.PENDING,
+          handoffOwnerId: 'user-2',
+          handoffReadyAt: null,
+          handoffConfirmedBy: null,
+          handoffConfirmedAt: null,
           priority: TaskPriority.MEDIUM,
           estimatedHours: null,
           actualHours: null,
@@ -272,6 +321,12 @@ describe('DashboardPage personal tasks', () => {
       title: 'Current personal assignment',
       description: null,
       status: TaskStatus.TODO,
+      handoffRequired: true,
+      handoffStatus: HandoffStatus.PENDING,
+      handoffOwnerId: 'user-2',
+      handoffReadyAt: null,
+      handoffConfirmedBy: null,
+      handoffConfirmedAt: null,
       priority: TaskPriority.MEDIUM,
       estimatedHours: null,
       actualHours: null,

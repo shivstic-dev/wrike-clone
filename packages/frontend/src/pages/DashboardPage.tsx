@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import type { Task } from '@wrike-clone/shared';
-import { useDashboardOverview } from '../api/dashboard';
+import type { DashboardTaskBucket, Task } from '@wrike-clone/shared';
+import { useDashboardOverview, useDashboardTasks } from '../api/dashboard';
 import {
   useGroupedDepartmentTasks,
   useMyTasks,
@@ -16,6 +16,7 @@ import {
   useWorkspaces,
 } from '../api/workspaces';
 import { RoleDashboard } from '../components/Dashboard/RoleDashboard';
+import { DashboardTaskDrawer } from '../components/Dashboard/DashboardTaskDrawer';
 import { ErrorDisplay } from '../components/common/ErrorDisplay';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { useAuth } from '../contexts/AuthContext';
@@ -116,6 +117,7 @@ function greeting(displayName?: string | null, email?: string): string {
 
 export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedBucket, setSelectedBucket] = useState<DashboardTaskBucket | null>(null);
   const departmentId = searchParams.get('department') || '';
   const { membership, user } = useAuth();
   const departments = useWorkspaces();
@@ -137,6 +139,14 @@ export default function DashboardPage() {
   const overview = useDashboardOverview(
     { departmentId: departmentId || undefined, days: 30 },
     overviewEnabled,
+  );
+  const dashboardTasks = useDashboardTasks(
+    {
+      bucket: selectedBucket ?? 'active',
+      departmentId: departmentId || undefined,
+      days: 30,
+    },
+    overviewEnabled && selectedBucket !== null,
   );
 
   const members = useWorkspaceMembers(departmentId);
@@ -168,6 +178,12 @@ export default function DashboardPage() {
       { replace: true },
     );
   }
+
+  function selectBucket(bucket: DashboardTaskBucket) {
+    setSelectedBucket(bucket);
+  }
+
+  const closeDashboardTaskDrawer = useCallback(() => setSelectedBucket(null), []);
 
   async function updateRole(
     userId: string,
@@ -313,7 +329,13 @@ export default function DashboardPage() {
             />
           )}
 
-          {overview.data && <RoleDashboard overview={overview.data} grouped={usableGrouped} />}
+          {overview.data && (
+            <RoleDashboard
+              grouped={usableGrouped}
+              onSelectBucket={selectBucket}
+              overview={overview.data}
+            />
+          )}
 
           {((managementView && !!departmentId && grouped.error) ||
             (showPersonalTasks && mine.error)) && (
@@ -456,6 +478,13 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+      {selectedBucket && (
+        <DashboardTaskDrawer
+          bucket={selectedBucket}
+          onClose={closeDashboardTaskDrawer}
+          query={dashboardTasks}
+        />
+      )}
     </div>
   );
 }

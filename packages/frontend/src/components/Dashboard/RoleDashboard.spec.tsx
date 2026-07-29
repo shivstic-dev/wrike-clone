@@ -38,6 +38,7 @@ function overview({ role }: { role: DashboardViewerRole }): DashboardOverview {
       overdue: 2,
       blocked: 1,
       unassigned: 1,
+      readyForHandoff: 3,
     },
     comparison: {
       completedPercentChange: 25,
@@ -88,7 +89,13 @@ async function renderDashboard(
 ): Promise<void> {
   await act(async () => {
     root = createRoot(container);
-    root.render(<RoleDashboard overview={value} grouped={groupedValue ?? undefined} />);
+    root.render(
+      <RoleDashboard
+        grouped={groupedValue ?? undefined}
+        onSelectBucket={() => undefined}
+        overview={value}
+      />,
+    );
     await Promise.resolve();
   });
 }
@@ -112,6 +119,22 @@ afterEach(() => {
 });
 
 describe('RoleDashboard', () => {
+  it('sends the selected bucket from an accessible exact-count metric', async () => {
+    const onSelectBucket = vi.fn();
+    await act(async () => {
+      root = createRoot(container);
+      root.render(<RoleDashboard overview={overview({ role: 'manager' })} onSelectBucket={onSelectBucket} />);
+      await Promise.resolve();
+    });
+
+    const metric = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.getAttribute('aria-label') === 'Show 2 overdue tasks',
+    );
+    expect(metric).toBeTruthy();
+    act(() => metric?.click());
+    expect(onSelectBucket).toHaveBeenCalledWith('overdue');
+  });
+
   it.each([
     ['employee', ['My workload'], ['Team capacity', 'Create task']],
     ['manager', ['My workload', 'Team capacity', 'Unassigned work'], []],

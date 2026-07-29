@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import type { DashboardOverview, Task } from '@wrike-clone/shared';
+import type { DashboardOverview, DashboardTaskBucket, Task } from '@wrike-clone/shared';
 import type { DepartmentTaskGroup, GroupedDepartmentTasks } from '../../api/tasks';
 import { AttentionQueue } from './AttentionQueue';
 import { DepartmentPulse } from './DepartmentPulse';
@@ -12,6 +12,7 @@ const DistributionChart = lazy(() => import('./DistributionChart'));
 export interface RoleCompositionProps {
   overview: DashboardOverview;
   grouped?: GroupedDepartmentTasks;
+  onSelectBucket: (bucket: DashboardTaskBucket) => void;
 }
 
 function ChartLoading() {
@@ -44,8 +45,8 @@ export function AtlasPanel({
   );
 }
 
-export function OverviewCore({ overview }: Pick<RoleCompositionProps, 'overview'>) {
-  return <DepartmentPulse overview={overview} />;
+export function OverviewCore({ overview, onSelectBucket }: Pick<RoleCompositionProps, 'overview' | 'onSelectBucket'>) {
+  return <DepartmentPulse overview={overview} onSelectBucket={onSelectBucket} />;
 }
 
 export function WorkMovementPanel({ overview }: { overview: DashboardOverview }) {
@@ -163,10 +164,10 @@ export function PeopleWork({ groups, title }: { groups: DepartmentTaskGroup[]; t
   );
 }
 
-export function EmployeeDashboard({ overview }: RoleCompositionProps) {
+export function EmployeeDashboard({ overview, onSelectBucket }: RoleCompositionProps) {
   return (
     <div className="space-y-5" data-dashboard-role="employee">
-      <OverviewCore overview={overview} />
+      <OverviewCore overview={overview} onSelectBucket={onSelectBucket} />
       <div className="grid items-stretch gap-4 xl:grid-cols-12">
         <div className="min-w-0 xl:col-span-8">
           <WorkMovementPanel overview={overview} />

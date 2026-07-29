@@ -9,10 +9,10 @@ import {
   type RoleCompositionProps,
 } from './EmployeeDashboard';
 
-export function ManagerDashboard({ grouped, overview }: RoleCompositionProps) {
+export function ManagerDashboard({ grouped, overview, onSelectBucket }: RoleCompositionProps) {
   return (
     <div className="space-y-5" data-dashboard-role="manager">
-      <OverviewCore overview={overview} />
+      <OverviewCore overview={overview} onSelectBucket={onSelectBucket} />
 
       <div className="grid items-stretch gap-4 xl:grid-cols-12">
         <div className="min-w-0 xl:col-span-8">
