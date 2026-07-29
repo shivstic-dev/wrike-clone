@@ -3,7 +3,7 @@
  * Used by load balancers, orchestration, and monitoring.
  */
 
-import { Controller, Get, Inject } from '@nestjs/common';
+import { Controller, Get, Inject, ServiceUnavailableException } from '@nestjs/common';
 import { Knex } from 'knex';
 import { DATABASE_PROVIDER } from '../database/database.module';
 import { loadAppConfig } from '../config/app.config';
@@ -47,7 +47,7 @@ export class HealthController {
       await this.db.raw('SELECT 1');
       return { status: 'ready' };
     } catch {
-      return { status: 'not ready' };
+      throw new ServiceUnavailableException({ status: 'not ready' });
     }
   }
 }

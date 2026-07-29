@@ -7,7 +7,14 @@
  * metadata columns. A migration must create these tables before use.
  */
 
-import { Injectable, NotFoundException, Inject, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+  Inject,
+  Logger,
+} from '@nestjs/common';
 import { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
 import { DATABASE_PROVIDER } from '../database/database.module';
@@ -19,6 +26,34 @@ function safeJsonParse(val: unknown): Record<string, unknown> {
   if (typeof val === 'string') return JSON.parse(val);
   if (typeof val === 'object') return val as Record<string, unknown>;
   return {};
+}
+
+const REQUEST_FIELD_TYPES = new Set(['text', 'textarea', 'number']);
+const MAX_REQUEST_FIELDS = 50;
+const MAX_FIELD_VALUE_LENGTH = 10_000;
+
+export interface RequestFormField {
+  name: string;
+  type: 'text' | 'textarea' | 'number';
+  required: boolean;
+  options?: string[];
+}
+
+interface RequestFormRow {
+  id: string;
+  tenant_id: string;
+  folder_id: string;
+  created_by_id: string;
+  name: string;
+  description: string | null;
+  form_fields: unknown;
+  is_public: boolean;
+}
+
+interface RequestFormFolder {
+  id: string;
+  tenant_id: string;
+  workspace_id: string;
 }
 
 @Injectable()
@@ -237,17 +272,26 @@ export class CustomizationService {
    */
   async getPublicForm(formId: string) {
     const form = await this.db('request_forms')
-      .where({ id: formId })
-      .select('id', 'name', 'description', 'form_fields', 'tenant_id')
-      .first();
+      .where({ id: formId, is_public: true })
+      .select(
+        'id',
+        'name',
+        'description',
+        'form_fields',
+        'tenant_id',
+        'folder_id',
+        'created_by_id',
+        'is_public',
+      )
+      .first<RequestFormRow>();
     if (!form) throw new NotFoundException('Request form not found');
+    await this.requireAvailableFormFolder(form, this.db);
 
     return {
       id: form.id,
       name: form.name,
       description: form.description,
-      fields:
-        typeof form.form_fields === 'string' ? JSON.parse(form.form_fields) : form.form_fields,
+      fields: this.normalizeFieldDefinitions(form.form_fields),
     };
   }
 
@@ -257,44 +301,7 @@ export class CustomizationService {
    * fallback for created_by since no authenticated user context exists.
    */
   async submitPublicRequestForm(formId: string, values: Record<string, unknown>) {
-    const form = await this.db('request_forms')
-      .where({ id: formId })
-      .select('id', 'name', 'folder_id', 'tenant_id', 'form_fields')
-      .first();
-    if (!form) throw new NotFoundException('Request form not found');
-
-    const fields = Array.isArray(form.form_fields)
-      ? form.form_fields
-      : safeJsonParse(form.form_fields) || [];
-
-    // Find a system user or the form creator as fallback author
-    let authorId = form.created_by_id;
-    if (!authorId) {
-      // Fall back to first admin in the tenant
-      const adminUser = await this.db('tenant_memberships')
-        .where({ tenant_id: form.tenant_id, role: 'admin' })
-        .join('users', 'tenant_memberships.user_id', 'users.id')
-        .select('users.id')
-        .first();
-      if (adminUser) authorId = adminUser.id;
-    }
-
-    // Create a task from the form submission
-    const taskId = uuidv4();
-    const title = String(values['title'] || values['name'] || `Request: ${form.name}`);
-    const [task] = await this.db('tasks')
-      .insert({
-        id: taskId,
-        tenant_id: form.tenant_id,
-        project_id: form.folder_id,
-        created_by_id: authorId,
-        title,
-        description: JSON.stringify(values),
-        custom_fields: JSON.stringify(values),
-      })
-      .returning('*');
-
-    return task;
+    return this.submitForm(formId, values);
   }
 
   // ── Request Forms ─────────────────────────────────────────
@@ -310,49 +317,308 @@ export class CustomizationService {
     description?: string;
     folderId: string;
     fields: Array<{ name: string; type: string; required: boolean; options?: string[] }>;
+    isPublic?: boolean;
   }) {
     const ctx = requireTenantContext();
+    const name = input.name?.trim();
+    if (!name) throw new BadRequestException('Form name is required');
+    if (name.length > 256) {
+      throw new BadRequestException('Form name must be 256 characters or fewer');
+    }
+    const fields = this.normalizeFieldDefinitions(input.fields);
     const id = uuidv4();
-    const [form] = await this.db('request_forms')
-      .insert({
-        id,
-        tenant_id: ctx.tenantId,
-        name: input.name,
-        description: input.description || null,
-        folder_id: input.folderId,
-        form_fields: JSON.stringify(input.fields),
-        created_by_id: ctx.userId,
-      })
-      .returning('*');
-    return form;
+    return this.db.transaction(async (trx) => {
+      const folder = await trx('folders')
+        .where({
+          id: input.folderId,
+          tenant_id: ctx.tenantId,
+          is_archived: false,
+        })
+        .whereNull('deleted_at')
+        .first();
+      if (!folder) throw new NotFoundException('Folder not found');
+
+      const [form] = await trx('request_forms')
+        .insert({
+          id,
+          tenant_id: ctx.tenantId,
+          name,
+          description: input.description?.trim() || null,
+          folder_id: input.folderId,
+          form_fields: JSON.stringify(fields),
+          created_by_id: ctx.userId,
+          is_public: input.isPublic ?? false,
+        })
+        .returning('*');
+      return form;
+    });
   }
 
   async submitRequestForm(formId: string, values: Record<string, unknown>) {
     const ctx = requireTenantContext();
-    const form = await this.db('request_forms')
+    return this.submitForm(formId, values, {
+      tenantId: ctx.tenantId,
+      authorId: ctx.userId,
+    });
+  }
+
+  async updateRequestFormPublication(formId: string, isPublic: boolean) {
+    const ctx = requireTenantContext();
+    const [form] = await this.db('request_forms')
       .where({ id: formId, tenant_id: ctx.tenantId })
-      .first();
-    if (!form) throw new NotFoundException('Request form not found');
-
-    const fields = Array.isArray(form.form_fields)
-      ? form.form_fields
-      : safeJsonParse(form.form_fields) || [];
-
-    // Create a task from the form submission
-    const taskId = uuidv4();
-    const title = String(values['title'] || values['name'] || `Request: ${form.name}`);
-    const [task] = await this.db('tasks')
-      .insert({
-        id: taskId,
-        tenant_id: ctx.tenantId,
-        project_id: form.folder_id,
-        created_by_id: ctx.userId,
-        title,
-        description: JSON.stringify(values),
-        custom_fields: JSON.stringify(values),
-      })
+      .update({ is_public: isPublic })
       .returning('*');
+    if (!form) throw new NotFoundException('Request form not found');
+    return form;
+  }
 
-    return task;
+  private async submitForm(
+    formId: string,
+    values: unknown,
+    authenticated?: { tenantId: string; authorId: string },
+  ) {
+    return this.db.transaction(async (trx) => {
+      const query = trx('request_forms').where({ id: formId });
+      if (authenticated) query.where({ tenant_id: authenticated.tenantId });
+      const form = await query.first<RequestFormRow>();
+      if (!form) throw new NotFoundException('Request form not found');
+      if (!authenticated && !form.is_public) {
+        throw new NotFoundException('Request form not found');
+      }
+
+      const folder = await this.requireAvailableFormFolder(form, trx);
+      const fields = this.normalizeFieldDefinitions(form.form_fields);
+      const normalizedValues = this.normalizeSubmissionValues(fields, values);
+      const authorId = authenticated?.authorId || form.created_by_id;
+      if (!authorId) {
+        throw new InternalServerErrorException('Request form has no submission owner');
+      }
+      const project = await this.resolveInboxProject(form, authorId, trx);
+
+      const taskId = uuidv4();
+      const submittedTitle = normalizedValues['title'] ?? normalizedValues['name'];
+      const title =
+        typeof submittedTitle === 'string' && submittedTitle.trim()
+          ? submittedTitle.trim()
+          : `Request: ${form.name}`;
+      const description =
+        typeof normalizedValues['description'] === 'string'
+          ? normalizedValues['description']
+          : null;
+
+      const [task] = await trx('tasks')
+        .insert({
+          id: taskId,
+          tenant_id: form.tenant_id,
+          project_id: project.id,
+          department_id: folder.workspace_id,
+          created_by_id: authorId,
+          title,
+          description,
+          status: 'todo',
+          priority: 'low',
+          visibility: 'department',
+          sort_order: 0,
+          custom_fields: JSON.stringify(normalizedValues),
+        })
+        .returning('*');
+
+      await trx('task_folder_links')
+        .insert({
+          tenant_id: form.tenant_id,
+          task_id: taskId,
+          folder_id: folder.id,
+          is_home: true,
+        })
+        .onConflict(['task_id', 'folder_id'])
+        .merge({ is_home: true });
+
+      return task;
+    });
+  }
+
+  private async requireAvailableFormFolder(
+    form: Pick<RequestFormRow, 'folder_id' | 'tenant_id'>,
+    database: Knex | Knex.Transaction,
+  ): Promise<RequestFormFolder> {
+    const folder = await database('folders')
+      .where({
+        id: form.folder_id,
+        tenant_id: form.tenant_id,
+        is_archived: false,
+      })
+      .whereNull('deleted_at')
+      .first<RequestFormFolder>();
+    if (!folder) throw new NotFoundException('Request form not found');
+    return folder;
+  }
+
+  private async resolveInboxProject(
+    form: Pick<RequestFormRow, 'tenant_id' | 'folder_id'>,
+    ownerId: string,
+    trx: Knex.Transaction,
+  ): Promise<{ id: string }> {
+    const read = () =>
+      trx('projects')
+        .where({
+          tenant_id: form.tenant_id,
+          folder_id: form.folder_id,
+          is_system: true,
+        })
+        .whereNull('deleted_at')
+        .first<{ id: string }>();
+
+    let project = await read();
+    if (!project) {
+      await trx('projects')
+        .insert({
+          id: uuidv4(),
+          tenant_id: form.tenant_id,
+          folder_id: form.folder_id,
+          owner_id: ownerId,
+          name: 'General Tasks',
+          description: 'Automatic project for direct tasks',
+          status: 'active',
+          priority: 'low',
+          visibility: 'department',
+          is_system: true,
+        })
+        .onConflict()
+        .ignore();
+      project = await read();
+    }
+    if (!project) {
+      throw new InternalServerErrorException('Request inbox project could not be provisioned');
+    }
+    return project;
+  }
+
+  private normalizeFieldDefinitions(value: unknown): RequestFormField[] {
+    let fields: unknown = value;
+    if (typeof fields === 'string') {
+      try {
+        fields = JSON.parse(fields);
+      } catch {
+        throw new BadRequestException('Request form configuration is invalid');
+      }
+    }
+    if (!Array.isArray(fields)) {
+      throw new BadRequestException('Request form fields must be an array');
+    }
+    if (fields.length > MAX_REQUEST_FIELDS) {
+      throw new BadRequestException(`Request forms support at most ${MAX_REQUEST_FIELDS} fields`);
+    }
+
+    const normalized = fields.map((candidate, index): RequestFormField => {
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        throw new BadRequestException(`Field ${index + 1} is invalid`);
+      }
+      const raw = candidate as Record<string, unknown>;
+      const name = typeof raw['name'] === 'string' ? raw['name'].trim() : '';
+      if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name)) {
+        throw new BadRequestException(
+          `Field ${index + 1} name must start with a letter and contain only letters, numbers, or underscores`,
+        );
+      }
+      if (typeof raw['type'] !== 'string' || !REQUEST_FIELD_TYPES.has(raw['type'])) {
+        throw new BadRequestException(`Field "${name}" has an unsupported type`);
+      }
+      if (typeof raw['required'] !== 'boolean') {
+        throw new BadRequestException(`Field "${name}" must declare whether it is required`);
+      }
+
+      let options: string[] | undefined;
+      if (raw['options'] !== undefined) {
+        if (
+          raw['type'] !== 'text' ||
+          !Array.isArray(raw['options']) ||
+          raw['options'].length === 0
+        ) {
+          throw new BadRequestException(`Field "${name}" options are invalid`);
+        }
+        options = raw['options'].map((option) => {
+          if (typeof option !== 'string' || !option.trim() || option.length > 200) {
+            throw new BadRequestException(`Field "${name}" options are invalid`);
+          }
+          return option.trim();
+        });
+        if (new Set(options).size !== options.length) {
+          throw new BadRequestException(`Field "${name}" options must be unique`);
+        }
+      }
+
+      return {
+        name,
+        type: raw['type'] as RequestFormField['type'],
+        required: raw['required'],
+        ...(options ? { options } : {}),
+      };
+    });
+
+    const names = normalized.map((field) => field.name);
+    if (new Set(names).size !== names.length) {
+      throw new BadRequestException('Field names must be unique');
+    }
+    return normalized;
+  }
+
+  private normalizeSubmissionValues(
+    fields: RequestFormField[],
+    value: unknown,
+  ): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new BadRequestException('Submission values must be an object');
+    }
+    const values = value as Record<string, unknown>;
+    const declaredNames = new Set(fields.map((field) => field.name));
+    for (const name of Object.keys(values)) {
+      if (!declaredNames.has(name)) {
+        throw new BadRequestException(`Unknown field "${name}"`);
+      }
+    }
+
+    const normalized: Record<string, unknown> = {};
+    for (const field of fields) {
+      const rawValue = values[field.name];
+      const isEmpty =
+        rawValue === undefined ||
+        rawValue === null ||
+        (typeof rawValue === 'string' && rawValue.trim() === '');
+      if (isEmpty) {
+        if (field.required) {
+          throw new BadRequestException(`Field "${field.name}" is required`);
+        }
+        continue;
+      }
+
+      if (field.type === 'number') {
+        const numberValue =
+          typeof rawValue === 'number'
+            ? rawValue
+            : typeof rawValue === 'string'
+              ? Number(rawValue)
+              : Number.NaN;
+        if (!Number.isFinite(numberValue)) {
+          throw new BadRequestException(`Field "${field.name}" must be a number`);
+        }
+        normalized[field.name] = numberValue;
+        continue;
+      }
+
+      if (typeof rawValue !== 'string') {
+        throw new BadRequestException(`Field "${field.name}" must be text`);
+      }
+      if (rawValue.length > MAX_FIELD_VALUE_LENGTH) {
+        throw new BadRequestException(
+          `Field "${field.name}" must be ${MAX_FIELD_VALUE_LENGTH} characters or fewer`,
+        );
+      }
+      const textValue = rawValue.trim();
+      if (field.options && !field.options.includes(textValue)) {
+        throw new BadRequestException(`Field "${field.name}" has an invalid option`);
+      }
+      normalized[field.name] = textValue;
+    }
+    return normalized;
   }
 }

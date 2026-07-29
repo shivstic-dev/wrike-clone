@@ -394,12 +394,13 @@ function BlueprintsManager() {
 
 // ─── Request Forms Tab ───────────────────────────────────────
 
-function RequestFormsManager() {
+export function RequestFormsManager() {
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [folderId, setFolderId] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
 
   const { data: folders } = useQuery({
     queryKey: ['all-folders'],
@@ -428,6 +429,7 @@ function RequestFormsManager() {
         name: formName,
         description: formDesc.trim() || undefined,
         folderId,
+        isPublic,
         fields: [
           { name: 'title', type: 'text', required: true },
           { name: 'description', type: 'text', required: false },
@@ -440,9 +442,22 @@ function RequestFormsManager() {
       setFormName('');
       setFormDesc('');
       setFolderId('');
+      setIsPublic(false);
       toast.success('Request form created');
     },
     onError: (err: any) => toast.error(err.response?.data?.error?.message || 'Failed to create'),
+  });
+
+  const updatePublication = useMutation({
+    mutationFn: async ({ formId, isPublic }: { formId: string; isPublic: boolean }) => {
+      await apiClient.patch(`/customization/request-forms/${formId}`, { isPublic });
+    },
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['request-forms'] });
+      toast.success(variables.isPublic ? 'Request form published' : 'Request form unpublished');
+    },
+    onError: (err: any) =>
+      toast.error(err.response?.data?.error?.message || 'Failed to update publication'),
   });
 
   return (
@@ -481,6 +496,32 @@ function RequestFormsManager() {
                 <p className="text-xs text-slate-400 mt-0.5">
                   Fields: {Array.isArray(f.form_fields) ? f.form_fields.length : 0}
                 </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span
+                  className={clsx(
+                    'rounded-full px-2 py-1 text-xs font-medium',
+                    f.is_public
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-slate-100 text-slate-600',
+                  )}
+                >
+                  {f.is_public ? 'Published' : 'Unpublished'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updatePublication.mutate({ formId: f.id, isPublic: !Boolean(f.is_public) })
+                  }
+                  disabled={updatePublication.isPending}
+                  className="btn-secondary btn-sm text-xs"
+                >
+                  {updatePublication.isPending
+                    ? 'Saving...'
+                    : f.is_public
+                      ? 'Unpublish'
+                      : 'Publish'}
+                </button>
               </div>
             </div>
           ))}
@@ -525,6 +566,20 @@ function RequestFormsManager() {
                 ))}
               </select>
             </div>
+            <label className="flex items-start gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={isPublic}
+                onChange={(event) => setIsPublic(event.target.checked)}
+              />
+              <span>
+                <span className="block font-medium">Publish for external submissions</span>
+                <span className="block text-xs text-slate-500">
+                  Anyone with the form link can view and submit it.
+                </span>
+              </span>
+            </label>
             <div className="flex gap-2">
               <button
                 onClick={() => addForm.mutate()}

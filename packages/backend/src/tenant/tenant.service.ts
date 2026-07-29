@@ -5,7 +5,7 @@
 import { Injectable, NotFoundException, ConflictException, Inject, Logger } from '@nestjs/common';
 import { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
-import { hash } from 'bcrypt';
+import { hash } from 'bcryptjs';
 import { DATABASE_PROVIDER } from '../database/database.module';
 import { requireTenantContext } from '../common/tenant-context';
 import type {

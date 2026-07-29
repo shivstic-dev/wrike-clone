@@ -13,7 +13,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Knex } from 'knex';
-import { compare, hash } from 'bcrypt';
+import { compare, hash } from 'bcryptjs';
 import { sign } from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { createHash, randomBytes } from 'crypto';

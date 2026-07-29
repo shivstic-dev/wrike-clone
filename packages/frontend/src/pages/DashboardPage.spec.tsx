@@ -4,6 +4,12 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  TaskPriority,
+  TaskStatus,
+  type PaginatedResponse,
+  type Task,
+} from '@wrike-clone/shared';
 import DashboardPage from './DashboardPage';
 
 interface MemberValue {
@@ -25,6 +31,16 @@ interface ChangeValue {
 }
 
 const mocks = vi.hoisted(() => ({
+  grouped: {
+    data: undefined as import('../api/tasks').GroupedDepartmentTasks | undefined,
+    isLoading: false,
+    error: null as Error | null,
+  },
+  mine: {
+    data: undefined as PaginatedResponse<Task> | undefined,
+    isLoading: false,
+    error: null as Error | null,
+  },
   members: {
     data: undefined as MemberValue[] | undefined,
     isLoading: false,
@@ -37,6 +53,9 @@ const mocks = vi.hoisted(() => ({
   },
   retryMembers: vi.fn(),
   retryChanges: vi.fn(),
+  retryGrouped: vi.fn(),
+  retryMine: vi.fn(),
+  myTaskCalls: [] as unknown[][],
 }));
 
 vi.mock('react-hot-toast', () => ({
@@ -61,17 +80,16 @@ vi.mock('../api/dashboard', () => ({
 
 vi.mock('../api/tasks', () => ({
   useGroupedDepartmentTasks: () => ({
-    data: undefined,
-    isLoading: false,
-    error: null,
-    refetch: vi.fn(),
+    ...mocks.grouped,
+    refetch: mocks.retryGrouped,
   }),
-  useMyTasks: () => ({
-    data: undefined,
-    isLoading: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
+  useMyTasks: (...args: unknown[]) => {
+    mocks.myTaskCalls.push(args);
+    return {
+      ...mocks.mine,
+      refetch: mocks.retryMine,
+    };
+  },
 }));
 
 vi.mock('../api/workspaces', () => ({
@@ -128,8 +146,17 @@ beforeEach(() => {
   mocks.changes.data = undefined;
   mocks.changes.isLoading = false;
   mocks.changes.error = null;
+  mocks.grouped.data = undefined;
+  mocks.grouped.isLoading = false;
+  mocks.grouped.error = null;
+  mocks.mine.data = undefined;
+  mocks.mine.isLoading = false;
+  mocks.mine.error = null;
   mocks.retryMembers.mockReset();
   mocks.retryChanges.mockReset();
+  mocks.retryGrouped.mockReset();
+  mocks.retryMine.mockReset();
+  mocks.myTaskCalls.length = 0;
   container = document.createElement('div');
   document.body.append(container);
 });
@@ -188,5 +215,100 @@ describe('DashboardPage access activity', () => {
 
     expect(container.textContent).toContain('No department members are available');
     expect(container.textContent).toContain('No recent role changes are recorded');
+  });
+});
+
+describe('DashboardPage personal tasks', () => {
+  it('shows task identities for management roles even when grouped lanes are unavailable', async () => {
+    mocks.mine.data = {
+      data: [
+        {
+          id: 'task-1',
+          tenantId: 'tenant-1',
+          projectId: 'project-1',
+          departmentId: 'department-1',
+          parentTaskId: null,
+          assigneeId: 'user-1',
+          createdById: 'user-2',
+          title: 'Prepare launch brief',
+          description: null,
+          status: TaskStatus.TODO,
+          priority: TaskPriority.MEDIUM,
+          estimatedHours: null,
+          actualHours: null,
+          startDate: null,
+          dueDate: null,
+          completedAt: null,
+          visibility: 'department',
+          sortOrder: 0,
+          customFields: {},
+          isRecurring: false,
+          recurrenceRule: null,
+          createdAt: '2026-07-29T00:00:00.000Z',
+          updatedAt: '2026-07-29T00:00:00.000Z',
+          deletedAt: null,
+        },
+      ],
+      meta: { page: 1, perPage: 100, total: 1, totalPages: 1 },
+    };
+
+    await renderPage();
+
+    expect(container.textContent).toContain('My tasks');
+    expect(container.textContent).toContain('Prepare launch brief');
+    expect(mocks.myTaskCalls.length).toBeGreaterThan(0);
+    expect(mocks.myTaskCalls.every((call) => call.length === 1)).toBe(true);
+  });
+
+  it('shows fresh personal assignments when a cached grouped lane fails to refresh', async () => {
+    const currentTask = {
+      id: 'task-current',
+      tenantId: 'tenant-1',
+      projectId: 'project-1',
+      departmentId: 'department-1',
+      parentTaskId: null,
+      assigneeId: 'user-1',
+      createdById: 'user-2',
+      title: 'Current personal assignment',
+      description: null,
+      status: TaskStatus.TODO,
+      priority: TaskPriority.MEDIUM,
+      estimatedHours: null,
+      actualHours: null,
+      startDate: null,
+      dueDate: null,
+      completedAt: null,
+      visibility: 'department' as const,
+      sortOrder: 0,
+      customFields: {},
+      isRecurring: false,
+      recurrenceRule: null,
+      createdAt: '2026-07-29T00:00:00.000Z',
+      updatedAt: '2026-07-29T00:00:00.000Z',
+      deletedAt: null,
+    };
+    const staleTask = {
+      ...currentTask,
+      id: 'task-stale',
+      title: 'Stale grouped assignment',
+    };
+    mocks.mine.data = {
+      data: [currentTask],
+      meta: { page: 1, perPage: 100, total: 1, totalPages: 1 },
+    };
+    mocks.grouped.data = {
+      viewerRole: 'department_head',
+      myTasks: [staleTask],
+      managerGroups: [],
+      employeeGroups: [],
+      unassigned: [],
+      members: [],
+    };
+    mocks.grouped.error = new Error('refresh failed');
+
+    await renderPage();
+
+    expect(container.textContent).toContain('Current personal assignment');
+    expect(container.textContent).not.toContain('Stale grouped assignment');
   });
 });

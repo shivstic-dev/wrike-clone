@@ -1,6 +1,7 @@
 import {
   loadAppConfig,
   loadCorsOrigins,
+  loadDatabaseConfig,
   parseCorsOrigins,
   validateProductionConfig,
 } from './app.config';
@@ -60,5 +61,16 @@ describe('application configuration', () => {
     };
 
     expect(validateProductionConfig).toThrow('CORS_ORIGINS is required');
+  });
+
+  it('uses a one-connection pool by default for hosted DATABASE_URL deployments', () => {
+    process.env.DATABASE_URL = 'postgresql://example.invalid/database';
+    delete process.env.DB_MAX_CONNECTIONS;
+    delete process.env.DB_IDLE_TIMEOUT_MS;
+
+    expect(loadDatabaseConfig()).toMatchObject({
+      maxConnections: 1,
+      idleTimeoutMs: 1000,
+    });
   });
 });

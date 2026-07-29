@@ -132,7 +132,6 @@ export default function DashboardPage() {
   const grouped = useGroupedDepartmentTasks(departmentId, managementView && !!departmentId);
   const mine = useMyTasks(
     { departmentId: departmentId || undefined, perPage: 100 },
-    !!departmentId && !managementView,
   );
   const overviewEnabled = tenantAdmin || !!departmentId;
   const overview = useDashboardOverview(
@@ -202,8 +201,10 @@ export default function DashboardPage() {
       })
     : null;
 
-  const showGroupedFallback = managementView && !!departmentId && !overview.data && !!grouped.data;
-  const showPersonalTasks = !managementView && !!departmentId;
+  const usableGrouped = grouped.error ? undefined : grouped.data;
+  const showGroupedFallback =
+    managementView && !!departmentId && !overview.data && !!usableGrouped;
+  const showPersonalTasks = !managementView || !departmentId || !usableGrouped;
 
   return (
     <div className="workboard-canvas min-h-full p-4 sm:p-6 lg:p-8">
@@ -312,15 +313,16 @@ export default function DashboardPage() {
             />
           )}
 
-          {overview.data && <RoleDashboard overview={overview.data} grouped={grouped.data} />}
+          {overview.data && <RoleDashboard overview={overview.data} grouped={usableGrouped} />}
 
-          {(grouped.error || mine.error) && (
+          {((managementView && !!departmentId && grouped.error) ||
+            (showPersonalTasks && mine.error)) && (
             <ErrorDisplay
               title="Task lanes are unavailable"
               message="The live overview remains available while task lanes are retried."
               onRetry={() => {
-                if (managementView) void grouped.refetch();
-                else void mine.refetch();
+                if (managementView && departmentId) void grouped.refetch();
+                if (showPersonalTasks) void mine.refetch();
               }}
             />
           )}
@@ -333,7 +335,7 @@ export default function DashboardPage() {
           {managementView && !!departmentId && grouped.isLoading && (
             <LoadingSpinner className="py-10" size="md" />
           )}
-          {showGroupedFallback && <GroupedTaskLedger grouped={grouped.data!} />}
+          {showGroupedFallback && <GroupedTaskLedger grouped={usableGrouped!} />}
 
           {tenantAdmin && !departmentId && (
             <section className="workboard-card rounded-2xl border border-atlas-mist bg-white px-5 py-5">

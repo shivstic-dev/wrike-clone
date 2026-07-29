@@ -71,7 +71,10 @@ export class NotificationService {
   }
 
   async markAsRead(id: string): Promise<void> {
-    await this.db('notifications').where({ id }).update({ is_read: true });
+    const ctx = requireTenantContext();
+    await this.db('notifications')
+      .where({ id, tenant_id: ctx.tenantId, user_id: ctx.userId })
+      .update({ is_read: true });
   }
 
   async markAllAsRead(): Promise<void> {

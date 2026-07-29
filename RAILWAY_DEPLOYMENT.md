@@ -27,8 +27,8 @@ Railway should auto-detect the monorepo. Configure these settings:
 
 ### Build Settings
 - **Root Directory**: Leave as `/` (root)
-- **Build Command**: `npm install && npm run build -w @wrike-clone/shared && npm run build -w @wrike-clone/backend`
-- **Start Command**: `cd packages/backend && npm run start:prod`
+- **Build Command**: `npm ci && npm run build -w @wrike-clone/shared && npm run build -w @wrike-clone/backend`
+- **Start Command**: `bash scripts/railway-start.sh`
 
 ### Environment Variables
 
@@ -39,7 +39,11 @@ NODE_ENV=production
 PORT=4000
 
 # Database (use your Supabase connection pooler)
-DATABASE_URL=postgresql://postgres.qmzxjfirlppveoxkynbt:*Cankidskidscan393@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres
+DATABASE_URL=postgresql://postgres.PROJECT_REF:URL_ENCODED_PASSWORD@POOLER_HOST:6543/postgres
+DB_SSL=true
+DB_MAX_CONNECTIONS=1
+DB_IDLE_TIMEOUT_MS=1000
+DB_APP_ROLE=openwork_app
 
 # JWT Secrets (generate new ones for production!)
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
@@ -48,8 +52,15 @@ JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-this-in-production
 # API Configuration
 API_PREFIX=api/v1
 
-# CORS (add your frontend URL once deployed)
-CORS_ORIGINS=http://localhost:5173,https://your-frontend-domain.vercel.app
+# Public URLs
+CORS_ORIGINS=https://wrike-clone-three.vercel.app
+APP_PUBLIC_URL=https://wrike-clone-three.vercel.app
+ALLOW_PUBLIC_REGISTRATION=false
+
+# Private Supabase Storage (backend only)
+SUPABASE_URL=https://lsjeobyrmxiqewehhjai.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=copy-from-supabase-project-api-settings
+SUPABASE_STORAGE_BUCKET=work-management-files
 ```
 
 **Important**: Generate strong secrets for JWT_SECRET and JWT_REFRESH_SECRET. Use:
@@ -79,14 +90,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 Once you have your Railway URL:
 
-1. Add it to the `CORS_ORIGINS` environment variable
-2. Example: `http://localhost:5173,https://your-app.up.railway.app,https://your-frontend.vercel.app`
+1. Keep only browser frontend origins in `CORS_ORIGINS`.
+2. Production value: `https://wrike-clone-three.vercel.app`
 
 ## Monitoring and Logs
 
 - **View Logs**: Click on your service → "Deployments" → Click the deployment → "View Logs"
 - **Metrics**: Railway provides CPU, Memory, and Network usage metrics
-- **Health Check**: Railway automatically monitors your `/health` endpoint
+- **Health Check**: Set Railway's health-check path to `/api/v1/health/ready`
 
 ## Troubleshooting
 
@@ -103,13 +114,6 @@ Once you have your Railway URL:
 - Check environment variables are set correctly
 - View logs for error messages
 - Ensure database migrations have been run
-
-## Cost
-
-Railway offers:
-- **$5 free credits per month** (plenty for development/testing)
-- Pay-as-you-go after free credits
-- Typical usage for this app: $3-10/month depending on traffic
 
 ## Next Steps
 

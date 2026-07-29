@@ -123,7 +123,7 @@ export class TaskService {
     }
     if (search) {
       query = query.andWhereRaw(
-        `to_tsvector('english', coalesce(tasks.title, '') || ' ' || coalesce(tasks.description, '')) @@ plainto_tsquery('english', ?)`,
+        `tasks.search_vec @@ plainto_tsquery('english', ?)`,
         [search],
       );
     }

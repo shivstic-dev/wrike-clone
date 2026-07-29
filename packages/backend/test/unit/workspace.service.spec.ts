@@ -1,7 +1,7 @@
 import { WorkspaceService } from '../../src/workspace/workspace.service';
 import { tenantContext } from '../../src/common/tenant-context';
 
-jest.mock('bcrypt', () => ({
+jest.mock('bcryptjs', () => ({
   hash: jest.fn().mockResolvedValue('hashed-password'),
 }));
 

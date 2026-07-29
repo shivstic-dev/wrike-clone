@@ -7,7 +7,7 @@ import { AuthService } from '../../src/auth/auth.service';
 import { DATABASE_PROVIDER } from '../../src/database/database.module';
 import { UnauthorizedException, ConflictException } from '@nestjs/common';
 
-jest.mock('bcrypt', () => ({
+jest.mock('bcryptjs', () => ({
   compare: jest.fn(),
   hash: jest.fn(),
 }));
@@ -17,7 +17,7 @@ jest.mock('jsonwebtoken', () => ({
   verify: jest.fn(),
 }));
 
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 function createQb() {
   return {

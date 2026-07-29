@@ -1,14 +1,16 @@
-import { readdirSync, readFileSync } from 'fs';
+import { readdirSync } from 'fs';
 import { resolve } from 'path';
 import type { Knex } from 'knex';
-import { down } from '../../src/migrations/018_operations_atlas_analytics';
+import { down, up } from '../../src/migrations/018_operations_atlas_analytics';
 
 const repositoryRoot = resolve(__dirname, '../../../..');
-const migrationSqlPath = resolve(
-  repositoryRoot,
-  'supabase/migrations/20260728183000_operations_atlas_analytics.sql',
-);
 const migrationWrapperRoot = resolve(repositoryRoot, 'packages/backend/src/migrations');
+
+function recordingKnex(statements: string[]): Knex {
+  return {
+    raw: async (statement: string) => statements.push(statement),
+  } as unknown as Knex;
+}
 
 describe('operations atlas analytics migration', () => {
   it('keeps Jest specs out of the Knex migration discovery directory', () => {
@@ -19,8 +21,13 @@ describe('operations atlas analytics migration', () => {
     expect(migrationSpecs).toEqual([]);
   });
 
-  it('creates exactly the tenant-scoped dashboard indexes with their query predicates', () => {
-    const sql = readFileSync(migrationSqlPath, 'utf8').replace(/\r\n/g, '\n');
+  it('creates exactly the tenant-scoped dashboard indexes without an external SQL file', async () => {
+    const statements: string[] = [];
+
+    await up(recordingKnex(statements));
+
+    expect(statements).toHaveLength(1);
+    const sql = statements[0]!.replace(/\r\n/g, '\n');
 
     expect(sql.match(/\bCREATE\s+(?:UNIQUE\s+)?INDEX\b/gi)).toHaveLength(3);
     expect(sql).toContain(
@@ -34,8 +41,12 @@ describe('operations atlas analytics migration', () => {
     );
   });
 
-  it('contains no destructive or security-changing SQL', () => {
-    const sql = readFileSync(migrationSqlPath, 'utf8').replace(/\r\n/g, '\n');
+  it('contains no destructive or security-changing SQL', async () => {
+    const statements: string[] = [];
+
+    await up(recordingKnex(statements));
+
+    const sql = statements[0]!.replace(/\r\n/g, '\n');
 
     expect(sql).not.toMatch(
       /\b(?:DROP|ALTER\s+TABLE|TRUNCATE|DELETE|INSERT|UPDATE|CREATE\s+TABLE|GRANT|REVOKE|POLICY|RLS)\b/i,
@@ -44,11 +55,8 @@ describe('operations atlas analytics migration', () => {
 
   it('rolls back only the analytics indexes', async () => {
     const statements: string[] = [];
-    const knex = {
-      raw: async (statement: string) => statements.push(statement),
-    } as unknown as Knex;
 
-    await down(knex);
+    await down(recordingKnex(statements));
 
     expect(statements).toEqual([
       'DROP INDEX IF EXISTS idx_tasks_tenant_department_created_at',

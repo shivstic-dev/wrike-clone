@@ -6,6 +6,7 @@
  */
 import { Controller, Get, Post, Param, Body } from '@nestjs/common';
 import { CustomizationService } from './customization.service';
+import { SubmitRequestFormDto } from './dto/request-form.dto';
 
 @Controller('public/forms')
 export class PublicFormsController {
@@ -27,7 +28,7 @@ export class PublicFormsController {
   @Post(':formId/submit')
   async submitForm(
     @Param('formId') formId: string,
-    @Body() body: { values: Record<string, unknown> },
+    @Body() body: SubmitRequestFormDto,
   ) {
     return this.customizationService.submitPublicRequestForm(formId, body.values);
   }

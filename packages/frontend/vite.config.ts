@@ -19,13 +19,16 @@ export default defineConfig({
     },
   },
   build: {
+    target: 'es2022',
     outDir: 'dist',
     sourcemap: false,
+    cssCodeSplit: true,
     rollupOptions: {
       output: {
         manualChunks: {
-          react: ['react', 'react-dom', 'react-router-dom'],
-          query: ['@tanstack/react-query', '@tanstack/react-table'],
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          query: ['@tanstack/react-query', '@tanstack/react-table', '@tanstack/react-virtual'],
+          dnd: ['@dnd-kit/core', '@dnd-kit/sortable'],
           monitoring: ['@sentry/react'],
         },
       },

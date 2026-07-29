@@ -9,7 +9,7 @@
  */
 
 import knex, { Knex } from 'knex';
-import { hash } from 'bcrypt';
+import { hash } from 'bcryptjs';
 
 const SALT_ROUNDS = 12;
 

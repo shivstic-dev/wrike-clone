@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm install && npm run build -w @wrike-clone/shared && npm run build -w @wrike-clone/backend"
+buildCommand = "npm ci && npm run build -w @wrike-clone/shared && npm run build -w @wrike-clone/backend"
 
 [deploy]
 startCommand = "bash scripts/railway-start.sh"

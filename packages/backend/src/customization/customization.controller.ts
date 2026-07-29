@@ -8,6 +8,11 @@ import { CustomizationService } from './customization.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
+import {
+  CreateRequestFormDto,
+  SubmitRequestFormDto,
+  UpdateRequestFormPublicationDto,
+} from './dto/request-form.dto';
 
 @Controller('customization')
 @UseGuards(AuthGuard, RolesGuard)
@@ -118,24 +123,25 @@ export class CustomizationController {
   }
 
   @Post('request-forms')
-  @Permissions('project:create')
-  async createRequestForm(
-    @Body()
-    body: {
-      name: string;
-      description?: string;
-      folderId: string;
-      fields: Array<{ name: string; type: string; required: boolean; options?: string[] }>;
-    },
-  ) {
+  @Permissions('tenant:manage')
+  async createRequestForm(@Body() body: CreateRequestFormDto) {
     return this.customizationService.createRequestForm(body);
+  }
+
+  @Patch('request-forms/:formId')
+  @Permissions('tenant:manage')
+  async updateRequestFormPublication(
+    @Param('formId') formId: string,
+    @Body() body: UpdateRequestFormPublicationDto,
+  ) {
+    return this.customizationService.updateRequestFormPublication(formId, body.isPublic);
   }
 
   @Post('request-forms/:formId/submit')
   @Permissions('task:create')
   async submitRequestForm(
     @Param('formId') formId: string,
-    @Body() body: { values: Record<string, unknown> },
+    @Body() body: SubmitRequestFormDto,
   ) {
     return this.customizationService.submitRequestForm(formId, body.values);
   }

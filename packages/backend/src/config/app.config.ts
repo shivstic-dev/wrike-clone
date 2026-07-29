@@ -141,8 +141,10 @@ export function loadDatabaseConfig(): DatabaseConfig {
       user: '',
       password: '',
       ssl: process.env['DB_SSL'] === 'true',
-      maxConnections: parseInt(process.env['DB_MAX_CONNECTIONS'] || '10', 10),
-      idleTimeoutMs: parseInt(process.env['DB_IDLE_TIMEOUT_MS'] || '10000', 10),
+      // DATABASE_URL is used by hosted/serverless deployments. Keep the
+      // default pool tiny so warm function instances cannot exhaust Supabase.
+      maxConnections: parseInt(process.env['DB_MAX_CONNECTIONS'] || '1', 10),
+      idleTimeoutMs: parseInt(process.env['DB_IDLE_TIMEOUT_MS'] || '1000', 10),
     };
   }
 

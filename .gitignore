@@ -41,5 +41,9 @@ docker/volumes/
 .cache/
 .worktrees/
 graphify-out/
+.superpowers/
 tmp/
 temp/
+
+.vercel
+.env*

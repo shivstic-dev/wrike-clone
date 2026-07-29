@@ -4,6 +4,7 @@
  */
 
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { loadAppConfig, validateProductionConfig } from './config/app.config';
 import { initSentry } from './common/sentry';
@@ -18,6 +19,14 @@ async function bootstrap(): Promise<void> {
   validateProductionConfig();
   const config = loadAppConfig();
   const app = await NestFactory.create(AppModule);
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
 
   // Security headers
   app.use(helmet());

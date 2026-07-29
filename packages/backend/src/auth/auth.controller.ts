@@ -18,6 +18,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { loadCorsOrigins } from '../config/app.config';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '../common/guards/auth.guard';
@@ -41,6 +42,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async login(
     @Req() req: Request,
     @Body() body: unknown,

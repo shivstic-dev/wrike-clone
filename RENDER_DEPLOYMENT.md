@@ -56,7 +56,7 @@ Click "Advanced" and add these environment variables:
 | `NODE_ENV` | `production` |
 | `PORT` | `4000` |
 | `API_PREFIX` | `api/v1` |
-| `DATABASE_URL` | `postgresql://postgres.qmzxjfirlppveoxkynbt:*Cankidskidscan393@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres` |
+| `DATABASE_URL` | `postgresql://postgres.PROJECT_REF:URL_ENCODED_PASSWORD@POOLER_HOST:6543/postgres` |
 | `JWT_SECRET` | Generate a unique 32-byte secret for this environment |
 | `JWT_REFRESH_SECRET` | Generate a different unique 32-byte secret |
 | `CORS_ORIGINS` | `*` |

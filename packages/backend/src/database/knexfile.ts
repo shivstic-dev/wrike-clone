@@ -40,7 +40,8 @@ const config: Knex.Config = {
   connection: buildConnection(),
   pool: {
     min: 0,
-    max: parseInt(process.env['DB_MAX_CONNECTIONS'] || '10', 10),
+    max: parseInt(process.env['DB_MAX_CONNECTIONS'] || '1', 10),
+    idleTimeoutMillis: parseInt(process.env['DB_IDLE_TIMEOUT_MS'] || '1000', 10),
   },
   migrations: {
     directory: resolve(__dirname, '../migrations'),

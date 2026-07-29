@@ -1,13 +1,16 @@
-import { readFile } from 'fs/promises';
-import { resolve } from 'path';
 import type { Knex } from 'knex';
 
 export async function up(knex: Knex): Promise<void> {
-  const migrationPath = resolve(
-    __dirname,
-    '../../../../supabase/migrations/20260728183000_operations_atlas_analytics.sql',
-  );
-  await knex.raw(await readFile(migrationPath, 'utf8'));
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_tasks_tenant_department_created_at
+  ON tasks (tenant_id, department_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_tenant_department_completed_at
+  ON tasks (tenant_id, department_id, completed_at)
+  WHERE completed_at IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_tasks_tenant_department_status_due_date
+  ON tasks (tenant_id, department_id, status, due_date)
+  WHERE deleted_at IS NULL;`);
 }
 
 export async function down(knex: Knex): Promise<void> {
