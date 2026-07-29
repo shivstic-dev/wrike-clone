@@ -94,24 +94,45 @@ function renderDialog(
   return props;
 }
 
+function getByRole<T extends HTMLElement>(role: 'button' | 'dialog' | 'heading', name: string): T {
+  const selector = {
+    button: 'button, [role="button"]',
+    dialog: '[role="dialog"]',
+    heading: 'h1, h2, h3, h4, h5, h6, [role="heading"]',
+  }[role];
+  const match = Array.from(document.querySelectorAll<HTMLElement>(selector)).find((candidate) => {
+    const labelledBy = candidate.getAttribute('aria-labelledby');
+    const accessibleName = labelledBy
+      ? labelledBy
+          .split(/\s+/)
+          .map((id) => document.getElementById(id)?.textContent?.trim() ?? '')
+          .join(' ')
+      : candidate.getAttribute('aria-label') || candidate.textContent?.trim();
+    return accessibleName === name;
+  });
+  if (!(match instanceof HTMLElement)) throw new Error(`${role} ${name} was not found`);
+  return match as T;
+}
+
 function getButton(name: string): HTMLButtonElement {
-  const button = Array.from(document.querySelectorAll('button')).find(
-    (candidate) => candidate.textContent?.trim() === name,
-  );
-  if (!(button instanceof HTMLButtonElement)) throw new Error(`Button ${name} was not found`);
-  return button;
+  return getByRole<HTMLButtonElement>('button', name);
 }
 
 describe('HandoffCompletionDialog', () => {
   it('anchors the confirmation to the intended recipient and exposes both choices by name', () => {
     renderDialog();
 
-    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
-    expect(dialog?.getAttribute('aria-modal')).toBe('true');
-    expect(dialog?.textContent).toContain(
+    const dialog = getByRole<HTMLDivElement>('dialog', 'Confirm final handoff');
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(
+      getByRole<HTMLHeadingElement>(
+        'heading',
       'Has the finished work been shared with the intended recipient?',
+      ),
+    ).toBeInstanceOf(HTMLHeadingElement);
+    expect(getByRole<HTMLHeadingElement>('heading', 'Asha Mehta')).toBeInstanceOf(
+      HTMLHeadingElement,
     );
-    expect(dialog?.textContent).toContain('Asha Mehta');
     expect(getButton('Yes, handoff completed')).toBeInstanceOf(HTMLButtonElement);
     expect(getButton('Not yet')).toBeInstanceOf(HTMLButtonElement);
   });
@@ -134,6 +155,22 @@ describe('HandoffCompletionDialog', () => {
     act(() => getButton('Yes, handoff completed').click());
 
     expect(props.onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('cycles focus between the available handoff choices', () => {
+    renderDialog();
+    const notYet = getButton('Not yet');
+    const confirmed = getButton('Yes, handoff completed');
+
+    confirmed.focus();
+    act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' })));
+    expect(document.activeElement).toBe(notYet);
+
+    notYet.focus();
+    act(() =>
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true })),
+    );
+    expect(document.activeElement).toBe(confirmed);
   });
 });
 
@@ -216,5 +253,129 @@ describe('useTaskCompletionFlow', () => {
 
     await expect(result).resolves.toBeNull();
     expect(completionMutation.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('returns the first pending promise when completion is requested twice', async () => {
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    mounted.push({ root, container });
+
+    function Harness() {
+      const flow = useTaskCompletionFlow();
+      requestCompletion = flow.requestCompletion;
+      return <HandoffCompletionDialog {...flow.dialogProps} />;
+    }
+
+    act(() => root.render(<Harness />));
+    let first: Promise<Task | null> | undefined;
+    let second: Promise<Task | null> | undefined;
+    act(() => {
+      first = requestCompletion?.(task);
+      second = requestCompletion?.({ ...task, id: 'task-2' });
+    });
+    if (!first || !second) throw new Error('Completion requests were not created');
+
+    expect(second).toBe(first);
+    act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    await expect(first).resolves.toBeNull();
+    await expect(second).resolves.toBeNull();
+  });
+
+  it('settles an open confirmation as cancelled when the flow unmounts', async () => {
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    mounted.push({ root, container });
+
+    function Harness() {
+      requestCompletion = useTaskCompletionFlow().requestCompletion;
+      return null;
+    }
+
+    act(() => root.render(<Harness />));
+    let result: Promise<Task | null> | undefined;
+    act(() => {
+      result = requestCompletion?.(task);
+    });
+    if (!result) throw new Error('Completion request was not created');
+    act(() => root.unmount());
+
+    await expect(result).resolves.toBeNull();
+  });
+
+  it('locks an in-flight completion before React publishes pending state', async () => {
+    let resolveMutation: ((value: Task) => void) | undefined;
+    completionMutation.mutateAsync.mockReturnValue(
+      new Promise<Task>((resolve) => {
+        resolveMutation = resolve;
+      }),
+    );
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    mounted.push({ root, container });
+
+    function Harness() {
+      const flow = useTaskCompletionFlow();
+      requestCompletion = flow.requestCompletion;
+      return <HandoffCompletionDialog {...flow.dialogProps} />;
+    }
+
+    act(() => root.render(<Harness />));
+    let result: Promise<Task | null> | undefined;
+    act(() => {
+      result = requestCompletion?.(task);
+    });
+    if (!result || !resolveMutation) throw new Error('Completion request was not created');
+    act(() => {
+      getButton('Yes, handoff completed').click();
+      getButton('Yes, handoff completed').click();
+    });
+
+    expect(completionMutation.mutateAsync).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveMutation(task);
+      await result;
+    });
+    await expect(result).resolves.toEqual(task);
+  });
+
+  it('clears a failed completion so the member can make a new choice', async () => {
+    completionMutation.mutateAsync.mockRejectedValueOnce(new Error('Network unavailable'));
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    mounted.push({ root, container });
+
+    function Harness() {
+      const flow = useTaskCompletionFlow();
+      requestCompletion = flow.requestCompletion;
+      return <HandoffCompletionDialog {...flow.dialogProps} />;
+    }
+
+    act(() => root.render(<Harness />));
+    let failed: Promise<Task | null> | undefined;
+    act(() => {
+      failed = requestCompletion?.(task);
+    });
+    if (!failed) throw new Error('Completion request was not created');
+    await act(async () => {
+      getButton('Yes, handoff completed').click();
+      await failed?.catch(() => undefined);
+    });
+    await expect(failed).rejects.toThrow('Network unavailable');
+
+    let retry: Promise<Task | null> | undefined;
+    act(() => {
+      retry = requestCompletion?.(task);
+    });
+    if (!retry) throw new Error('Retry request was not created');
+    act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    await expect(retry).resolves.toBeNull();
   });
 });

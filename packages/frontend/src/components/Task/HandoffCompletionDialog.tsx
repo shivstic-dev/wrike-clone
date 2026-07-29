@@ -99,9 +99,9 @@ export function HandoffCompletionDialog({
           </div>
 
           <div className="flex flex-1 flex-col px-5 py-5 sm:px-6">
-            <p id="handoff-completion-question" className="text-base leading-6 text-slate-700">
+            <h3 id="handoff-completion-question" className="text-base font-medium leading-6 text-slate-700">
               Has the finished work been shared with the intended recipient?
-            </p>
+            </h3>
 
             <div className="mt-5 rounded-xl border border-atlas-mist border-l-4 border-l-atlas-current bg-atlas-sky px-4 py-3.5">
               <div className="flex items-start gap-3">
@@ -117,7 +117,7 @@ export function HandoffCompletionDialog({
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-atlas-canopy">
                     Intended recipient
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-atlas-ink">{ownerName}</p>
+                  <h3 className="mt-1 text-sm font-semibold text-atlas-ink">{ownerName}</h3>
                   <p className="mt-1 text-xs leading-5 text-slate-600">
                     Task owner
                   </p>
