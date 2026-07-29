@@ -17,6 +17,8 @@ import { useUpdateTask } from '../../api/tasks';
 import { TASK_STATUS } from '../../api/enums';
 import type { Task } from '@wrike-clone/shared';
 import toast from 'react-hot-toast';
+import { HandoffCompletionDialog } from '../Task/HandoffCompletionDialog';
+import { useTaskCompletionFlow } from '../Task/useTaskCompletionFlow';
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -32,6 +34,18 @@ const COLUMNS: { status: string; title: string; color: string }[] = [
 export function KanbanBoard({ tasks }: KanbanBoardProps) {
   const updateTask = useUpdateTask();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const { requestCompletion, dialogProps } = useTaskCompletionFlow();
+
+  const completeWithHandoff = async (task: Task) => {
+    const completedTask = await requestCompletion(task);
+    if (!completedTask) return;
+
+    if (completedTask.handoffStatus === 'ready') {
+      toast.success('Saved in Ready for handoff');
+    } else {
+      toast.success('Handoff confirmed and task completed');
+    }
+  };
 
   const columns = COLUMNS.map((col) => ({
     ...col,
@@ -73,13 +87,17 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
       if (!task || task.status === targetStatus) return;
 
       try {
+        if (targetStatus === TASK_STATUS.COMPLETED) {
+          await completeWithHandoff(task);
+          return;
+        }
         await updateTask.mutateAsync({ id: taskId, status: targetStatus });
         toast.success(`Moved to ${targetStatus.replace('_', ' ')}`);
       } catch {
         toast.error('Failed to update task status');
       }
     },
-    [tasks, updateTask],
+    [tasks, updateTask, requestCompletion],
   );
 
   return (
@@ -103,6 +121,7 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
       </div>
 
       <DragOverlay>{activeTask ? <TaskCard task={activeTask} /> : null}</DragOverlay>
+      <HandoffCompletionDialog {...dialogProps} />
     </DndContext>
   );
 }

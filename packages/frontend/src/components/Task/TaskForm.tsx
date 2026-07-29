@@ -57,6 +57,7 @@ export function TaskForm({
   const [visibility, setVisibility] = useState<Task['visibility']>(
     initialValues?.visibility || 'department',
   );
+  const [handoffRequired, setHandoffRequired] = useState(initialValues?.handoffRequired ?? true);
   const assignableAssignees = assignees.filter((assignee) => assignee.role !== 'admin');
 
   const handleSubmit = async (e: FormEvent) => {
@@ -73,6 +74,7 @@ export function TaskForm({
       estimatedHours: estimatedHours ?? undefined,
       startDate: startDate ? new Date(startDate).toISOString() : undefined,
       dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+      handoffRequired,
       ...(canSetVisibility ? { visibility } : {}),
       projectId: projectId || initialValues?.projectId,
     } as Partial<Task>);
@@ -241,6 +243,27 @@ export function TaskForm({
           />
         </div>
       </div>
+
+      <fieldset className="rounded-xl border border-atlas-mist bg-atlas-sky/50 px-4 py-3">
+        <legend className="sr-only">Final handoff</legend>
+        <div className="flex items-start gap-3">
+          <input
+            id="handoffRequired"
+            type="checkbox"
+            checked={handoffRequired}
+            onChange={(event) => setHandoffRequired(event.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-atlas-current focus:ring-atlas-current"
+          />
+          <div>
+            <label htmlFor="handoffRequired" className="text-sm font-semibold text-atlas-ink">
+              Final handoff required
+            </label>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              OpenWork only asks for confirmation; it does not store or send the work.
+            </p>
+          </div>
+        </div>
+      </fieldset>
 
       <div className="flex justify-end gap-3 pt-2">
         {onCancel && (

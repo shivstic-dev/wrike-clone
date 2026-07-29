@@ -8,6 +8,8 @@ import TaskDetailPage from './TaskDetailPage';
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   moveLocation: vi.fn(),
+  updateTask: vi.fn(),
+  requestCompletion: vi.fn(),
   departmentRole: 'manager',
 }));
 
@@ -30,6 +32,13 @@ const task = {
   dueDate: null,
   estimatedHours: null,
   actualHours: null,
+  handoffRequired: true,
+  handoffStatus: 'pending',
+  handoffOwnerId: 'owner-1',
+  handoffOwner: { id: 'owner-1', displayName: 'Asha Owner', email: 'asha@example.org' },
+  handoffReadyAt: null,
+  handoffConfirmedBy: null,
+  handoffConfirmedAt: null,
 };
 
 vi.mock('react-router-dom', () => ({
@@ -52,8 +61,26 @@ vi.mock('../api/tasks', () => ({
     refetch: vi.fn(),
   }),
   useUpdateTask: () => ({
-    mutateAsync: vi.fn(),
+    mutateAsync: mocks.updateTask,
   }),
+}));
+
+vi.mock('../components/Task/useTaskCompletionFlow', () => ({
+  useTaskCompletionFlow: () => ({
+    requestCompletion: mocks.requestCompletion,
+    dialogProps: {
+      open: false,
+      task: null,
+      isPending: false,
+      onConfirm: vi.fn(),
+      onNotYet: vi.fn(),
+      onCancel: vi.fn(),
+    },
+  }),
+}));
+
+vi.mock('../components/Task/HandoffCompletionDialog', () => ({
+  HandoffCompletionDialog: () => null,
 }));
 
 vi.mock('../api/task-locations', () => ({
@@ -127,8 +154,13 @@ beforeEach(() => {
     }
   ).IS_REACT_ACT_ENVIRONMENT = true;
   mocks.departmentRole = 'manager';
+  task.status = 'todo';
   mocks.moveLocation.mockReset();
   mocks.moveLocation.mockResolvedValue(task);
+  mocks.updateTask.mockReset();
+  mocks.updateTask.mockResolvedValue(task);
+  mocks.requestCompletion.mockReset();
+  mocks.requestCompletion.mockResolvedValue({ ...task, status: 'completed', handoffStatus: 'confirmed' });
   container = document.createElement('div');
   document.body.append(container);
 });
@@ -187,5 +219,44 @@ describe('TaskDetailPage location editor', () => {
     });
 
     expect(container.querySelector('#task-location-folder')).toBeNull();
+  });
+});
+
+describe('TaskDetailPage handoff completion', () => {
+  it('opens handoff confirmation when status changes to completed', async () => {
+    act(() => {
+      root = createRoot(container);
+      root.render(<TaskDetailPage />);
+    });
+
+    const status = container.querySelector<HTMLSelectElement>('select');
+    if (!status) throw new Error('Status control was not rendered');
+
+    await act(async () => {
+      changeSelect(status, 'completed');
+      await Promise.resolve();
+    });
+
+    expect(mocks.requestCompletion).toHaveBeenCalledWith(task);
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+  });
+
+  it('uses the generic update only when reopening from Completed', async () => {
+    task.status = 'completed';
+
+    act(() => {
+      root = createRoot(container);
+      root.render(<TaskDetailPage />);
+    });
+
+    const status = container.querySelector<HTMLSelectElement>('select');
+    if (!status) throw new Error('Status control was not rendered');
+    await act(async () => {
+      changeSelect(status, 'in_progress');
+      await Promise.resolve();
+    });
+
+    expect(mocks.updateTask).toHaveBeenCalledWith({ id: 'task-1', status: 'in_progress' });
+    expect(mocks.requestCompletion).not.toHaveBeenCalled();
   });
 });

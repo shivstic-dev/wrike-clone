@@ -3,6 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { TaskForm } from './TaskForm';
 
 describe('TaskForm', () => {
+  it('requires final handoff by default and explains that no work is stored or sent', () => {
+    const markup = renderToStaticMarkup(<TaskForm onSubmit={async () => undefined} />);
+
+    expect(markup).toContain('Final handoff required');
+    expect(markup).toContain('OpenWork only asks for confirmation; it does not store or send the work.');
+    expect(markup).toContain('checked=""');
+  });
+
   it('does not offer tenant admins as task assignees', () => {
     const markup = renderToStaticMarkup(
       <TaskForm
