@@ -7,13 +7,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   TaskPriority,
   TaskStatus,
-  HandoffStatus,
   type DashboardOverview,
   type DashboardTaskListResponse,
   type PaginatedResponse,
   type Task,
 } from '@wrike-clone/shared';
 import DashboardPage from './DashboardPage';
+
+const pendingHandoffStatus = 'pending' as unknown as Task['handoffStatus'];
 
 interface MemberValue {
   userId: string;
@@ -74,7 +75,7 @@ const overview: DashboardOverview = {
 const dashboardTasks: DashboardTaskListResponse = {
   generatedAt: '2026-07-30T12:00:00.000Z', bucket: 'overdue', data: [{
     id: 'task-self-assigned', title: 'Self assigned follow-up', projectId: 'project-1', projectName: 'Community launch',
-    departmentId: 'department-1', status: TaskStatus.IN_PROGRESS, handoffStatus: HandoffStatus.PENDING, handoffOwner: null,
+    departmentId: 'department-1', status: TaskStatus.IN_PROGRESS, handoffStatus: pendingHandoffStatus, handoffOwner: null,
     assignees: [{ userId: 'user-1', name: 'Harper Head' }], dueDate: null, handoffReadyAt: null,
   }],
 };
@@ -277,7 +278,7 @@ describe('DashboardPage personal tasks', () => {
           description: null,
           status: TaskStatus.TODO,
           handoffRequired: true,
-          handoffStatus: HandoffStatus.PENDING,
+          handoffStatus: pendingHandoffStatus,
           handoffOwnerId: 'user-2',
           handoffReadyAt: null,
           handoffConfirmedBy: null,
@@ -322,7 +323,7 @@ describe('DashboardPage personal tasks', () => {
       description: null,
       status: TaskStatus.TODO,
       handoffRequired: true,
-      handoffStatus: HandoffStatus.PENDING,
+      handoffStatus: pendingHandoffStatus,
       handoffOwnerId: 'user-2',
       handoffReadyAt: null,
       handoffConfirmedBy: null,

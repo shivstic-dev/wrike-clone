@@ -2,16 +2,19 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { HandoffStatus, TaskStatus, type DashboardTaskListResponse } from '@wrike-clone/shared';
+import { TaskStatus, type DashboardTaskListResponse } from '@wrike-clone/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardTaskDrawer } from './DashboardTaskDrawer';
+
+const pendingHandoffStatus =
+  'pending' as unknown as DashboardTaskListResponse['data'][number]['handoffStatus'];
 
 const response: DashboardTaskListResponse = {
   generatedAt: '2026-07-30T12:00:00.000Z',
   bucket: 'ready_for_handoff',
   data: [{
     id: 'task-1', title: 'Send grant update', projectId: 'project-1', projectName: 'Grant campaign',
-    departmentId: 'department-1', status: TaskStatus.IN_PROGRESS, handoffStatus: HandoffStatus.PENDING,
+    departmentId: 'department-1', status: TaskStatus.IN_PROGRESS, handoffStatus: pendingHandoffStatus,
     handoffOwner: { id: 'owner-1', displayName: 'Maya Owner', email: 'maya@example.com' },
     assignees: [{ userId: 'assignee-1', name: 'Eli Assignee' }], dueDate: '2026-08-01T00:00:00.000Z',
     handoffReadyAt: '2026-07-30T10:00:00.000Z',
