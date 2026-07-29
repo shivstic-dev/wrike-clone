@@ -15,7 +15,7 @@ describe('task location controllers', () => {
     {} as never,
     locations as never,
   );
-  const taskController = new TaskController(taskService as never);
+  const taskController = new TaskController(taskService as never, {} as never);
 
   afterEach(() => jest.clearAllMocks());
 
