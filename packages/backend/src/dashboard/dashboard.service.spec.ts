@@ -131,6 +131,21 @@ describe('buildDashboardRowsQuery', () => {
     expect(bindings).toContain('department-current');
     expect(bindings).toContain('tenant-current');
   });
+
+  it('binds handoff-owner profile details through a membership in the task tenant', () => {
+    const { sql } = normalizedSql(buildDashboardRowsQuery(db, baseScope));
+
+    expect(sql).toContain('left join "tenant_memberships" as "dashboard_handoff_owner_membership"');
+    expect(sql).toContain(
+      '"dashboard_handoff_owner_membership"."tenant_id" = "tasks"."tenant_id"',
+    );
+    expect(sql).toContain(
+      '"dashboard_handoff_owner_membership"."user_id" = "tasks"."handoff_owner_id"',
+    );
+    expect(sql).toContain(
+      '"dashboard_handoff_owner"."id" = "dashboard_handoff_owner_membership"."user_id"',
+    );
+  });
 });
 
 describe('DashboardService', () => {

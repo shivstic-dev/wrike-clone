@@ -202,7 +202,18 @@ export function buildDashboardRowsQuery(
         'tasks.tenant_id',
       );
     })
-    .leftJoin('users as dashboard_handoff_owner', 'dashboard_handoff_owner.id', 'tasks.handoff_owner_id')
+    .leftJoin('tenant_memberships as dashboard_handoff_owner_membership', function () {
+      this.on('dashboard_handoff_owner_membership.tenant_id', '=', 'tasks.tenant_id').andOn(
+        'dashboard_handoff_owner_membership.user_id',
+        '=',
+        'tasks.handoff_owner_id',
+      );
+    })
+    .leftJoin(
+      'users as dashboard_handoff_owner',
+      'dashboard_handoff_owner.id',
+      'dashboard_handoff_owner_membership.user_id',
+    )
     .where('tasks.tenant_id', scope.tenantId)
     .whereNull('tasks.deleted_at')
     .select(
