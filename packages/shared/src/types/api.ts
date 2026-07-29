@@ -273,7 +273,7 @@ export interface DashboardTaskSummary {
   status: TaskStatus;
   handoffStatus: HandoffStatus;
   handoffOwner: Pick<User, 'id' | 'displayName' | 'email'> | null;
-  assignees: TaskAssignee[];
+  assignees: Array<{ userId: string; name: string }>;
   dueDate: string | null;
   handoffReadyAt: string | null;
 }
@@ -285,6 +285,12 @@ export type DashboardTaskBucket =
   | 'blocked'
   | 'unassigned'
   | 'ready_for_handoff';
+
+export interface DashboardTaskListResponse {
+  generatedAt: string;
+  bucket: DashboardTaskBucket;
+  data: DashboardTaskSummary[];
+}
 
 // ── Task Dependencies ──────────────────────────────────────────
 
@@ -352,7 +358,14 @@ export interface DashboardOverview {
   generatedAt: string;
   windowDays: 30;
   scope: { departmentId?: string; role: DashboardViewerRole };
-  totals: { active: number; completed: number; overdue: number; blocked: number; unassigned: number };
+  totals: {
+    active: number;
+    completed: number;
+    overdue: number;
+    blocked: number;
+    unassigned: number;
+    readyForHandoff: number;
+  };
   comparison: { completedPercentChange: number | null; createdPercentChange: number | null };
   daily: Array<{ date: string; created: number; completed: number }>;
   byStatus: Record<string, number>;

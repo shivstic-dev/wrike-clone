@@ -1,6 +1,10 @@
 import { BadRequestException, ForbiddenException, HttpStatus } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
-import type { DashboardOverview } from '@wrike-clone/shared';
+import type {
+  DashboardOverview,
+  DashboardTaskBucket,
+  DashboardTaskSummary,
+} from '@wrike-clone/shared';
 import knex, { type Knex } from 'knex';
 import { ZodError } from 'zod';
 import { tenantContext, type TenantContextData } from '../common/tenant-context';
@@ -27,6 +31,12 @@ function row(
     createdAt: new Date('2026-07-20T09:00:00.000Z'),
     completedAt: null,
     dueDate: null,
+    handoffStatus: 'pending',
+    handoffReadyAt: null,
+    updatedAt: new Date('2026-07-28T00:00:00.000Z'),
+    projectId: 'project-1',
+    projectName: 'Community work',
+    handoffOwner: null,
     assignees: [],
     ...overrides,
   };
@@ -153,6 +163,7 @@ describe('DashboardService', () => {
 
     const taskRowsQuery = {
       join: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       whereNull: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
@@ -393,6 +404,97 @@ describe('DashboardService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(dbRows).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['employee', 'department-1'],
+    ['manager', 'department-1'],
+    ['department_head', 'department-1'],
+    ['admin', undefined],
+  ] as const)('uses the dashboard row query for %s task buckets', async (role, departmentId) => {
+    departmentAccess.getReportScope.mockResolvedValue({
+      role,
+      departmentId,
+      ownTasksOnly: role === 'employee',
+    });
+    dbRows.mockResolvedValue([
+      row({ id: 'ready', handoffStatus: 'ready', handoffReadyAt: new Date('2026-07-27T12:00:00Z') }),
+      row({ id: 'pending' }),
+    ]);
+
+    const result = await tenantContext.run(context, () =>
+      service.tasks({ departmentId, days: 30, bucket: 'ready_for_handoff' }),
+    );
+
+    expect(result.bucket).toBe('ready_for_handoff');
+    expect(result.data.map((item) => item.id)).toEqual(['ready']);
+    expect(db).toHaveBeenCalledWith('tasks');
+  });
+
+  it('rejects a foreign admin department before task bucket rows are queried', async () => {
+    const foreignDepartmentId = 'f517ea4b-c009-4465-bd2c-6064489f07c7';
+    departmentAccess.getReportScope.mockResolvedValue({
+      role: 'admin',
+      departmentId: foreignDepartmentId,
+      ownTasksOnly: false,
+    });
+    workspaceExists.mockResolvedValue(undefined);
+
+    await expect(
+      tenantContext.run(context, () =>
+        service.tasks({
+          departmentId: foreignDepartmentId,
+          days: 30,
+          bucket: 'ready_for_handoff',
+        }),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(dbRows).not.toHaveBeenCalled();
+  });
+
+  it('returns only safe task summary fields in deterministic ready, due, and update order', async () => {
+    departmentAccess.getReportScope.mockResolvedValue({
+      role: 'admin',
+      departmentId: undefined,
+      ownTasksOnly: false,
+    });
+    dbRows.mockResolvedValue([
+      row({
+        id: 'later-ready',
+        title: 'Zulu',
+        handoffStatus: 'ready',
+        handoffReadyAt: new Date('2026-07-27T11:00:00.000Z'),
+        dueDate: new Date('2026-07-30T00:00:00.000Z'),
+      }),
+      row({
+        id: 'earlier-ready',
+        title: 'Alpha',
+        handoffStatus: 'ready',
+        handoffReadyAt: new Date('2026-07-27T10:00:00.000Z'),
+        dueDate: new Date('2026-07-31T00:00:00.000Z'),
+      }),
+    ]);
+
+    const result = await tenantContext.run(context, () =>
+      service.tasks({ days: 30, bucket: 'ready_for_handoff' }),
+    );
+
+    expect(result.data).toEqual([
+      {
+        id: 'earlier-ready',
+        title: 'Alpha',
+        projectId: 'project-1',
+        projectName: 'Community work',
+        departmentId: 'department-1',
+        status: 'todo',
+        handoffStatus: 'ready',
+        handoffOwner: null,
+        assignees: [],
+        dueDate: '2026-07-31T00:00:00.000Z',
+        handoffReadyAt: '2026-07-27T10:00:00.000Z',
+      },
+      expect.objectContaining({ id: 'later-ready' }),
+    ]);
+  });
 });
 
 describe('DashboardController', () => {
@@ -415,6 +517,19 @@ describe('DashboardController', () => {
     await controller.overview({ departmentId });
 
     expect(overview).toHaveBeenCalledWith({ departmentId, days: 30 });
+  });
+
+  it('validates a task bucket and passes the typed query to the service', async () => {
+    const tasks = jest.fn<
+      Promise<{ generatedAt: string; bucket: DashboardTaskBucket; data: DashboardTaskSummary[] }>,
+      [{ departmentId?: string; days: 30; bucket: DashboardTaskBucket }]
+    >();
+    const controller = new DashboardController({ tasks } as never);
+    tasks.mockResolvedValue({ generatedAt: '2026-07-28T12:00:00.000Z', bucket: 'ready_for_handoff', data: [] });
+
+    await controller.tasks({ bucket: 'ready_for_handoff' });
+
+    expect(tasks).toHaveBeenCalledWith({ bucket: 'ready_for_handoff', days: 30 });
   });
 
   it('returns a safe 400 response for unsupported windows without calling the service', async () => {

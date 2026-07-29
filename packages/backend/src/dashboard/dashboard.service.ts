@@ -1,10 +1,20 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import type { DashboardOverview, DashboardViewerRole } from '@wrike-clone/shared';
+import type {
+  DashboardOverview,
+  DashboardTaskBucket,
+  DashboardTaskListResponse,
+  DashboardTaskSummary,
+  DashboardViewerRole,
+} from '@wrike-clone/shared';
 import type { Knex } from 'knex';
 import { requireTenantContext } from '../common/tenant-context';
 import { DATABASE_PROVIDER } from '../database/database.module';
 import { DepartmentAccessService } from '../rbac/department-access.service';
-import { buildDashboardMetrics, type DashboardTaskRow } from './dashboard-metrics';
+import {
+  buildDashboardMetrics,
+  taskMatchesDashboardBucket,
+  type DashboardTaskRow,
+} from './dashboard-metrics';
 
 export interface DashboardQueryScope {
   tenantId: string;
@@ -185,6 +195,14 @@ export function buildDashboardRowsQuery(
         'tasks.tenant_id',
       );
     })
+    .leftJoin('projects as dashboard_project', function () {
+      this.on('dashboard_project.id', '=', 'tasks.project_id').andOn(
+        'dashboard_project.tenant_id',
+        '=',
+        'tasks.tenant_id',
+      );
+    })
+    .leftJoin('users as dashboard_handoff_owner', 'dashboard_handoff_owner.id', 'tasks.handoff_owner_id')
     .where('tasks.tenant_id', scope.tenantId)
     .whereNull('tasks.deleted_at')
     .select(
@@ -197,6 +215,14 @@ export function buildDashboardRowsQuery(
       'tasks.created_at as createdAt',
       'tasks.completed_at as completedAt',
       'tasks.due_date as dueDate',
+      'tasks.handoff_status as handoffStatus',
+      'tasks.handoff_ready_at as handoffReadyAt',
+      'tasks.updated_at as updatedAt',
+      'tasks.project_id as projectId',
+      'dashboard_project.name as projectName',
+      db.raw(
+        `CASE WHEN dashboard_handoff_owner.id IS NULL THEN NULL ELSE jsonb_build_object('id', dashboard_handoff_owner.id, 'displayName', dashboard_handoff_owner.display_name, 'email', dashboard_handoff_owner.email) END AS "handoffOwner"`,
+      ),
       assigneeProjection(db, scope),
     );
 
@@ -226,6 +252,39 @@ function compareText(left: string, right: string): number {
   if (left < right) return -1;
   if (left > right) return 1;
   return 0;
+}
+
+function compareNullableDate(left: Date | null, right: Date | null): number {
+  if (left === right) return 0;
+  if (left === null) return 1;
+  if (right === null) return -1;
+  return left.getTime() - right.getTime();
+}
+
+function compareDashboardTaskRows(left: DashboardTaskRow, right: DashboardTaskRow): number {
+  return (
+    compareNullableDate(left.handoffReadyAt, right.handoffReadyAt) ||
+    compareNullableDate(left.dueDate, right.dueDate) ||
+    right.updatedAt.getTime() - left.updatedAt.getTime() ||
+    compareText(left.title, right.title) ||
+    compareText(left.id, right.id)
+  );
+}
+
+function toDashboardTaskSummary(row: DashboardTaskRow): DashboardTaskSummary {
+  return {
+    id: row.id,
+    title: row.title,
+    projectId: row.projectId,
+    projectName: row.projectName,
+    departmentId: row.departmentId,
+    status: row.status as DashboardTaskSummary['status'],
+    handoffStatus: row.handoffStatus as DashboardTaskSummary['handoffStatus'],
+    handoffOwner: row.handoffOwner,
+    assignees: row.assignees,
+    dueDate: row.dueDate?.toISOString() ?? null,
+    handoffReadyAt: row.handoffReadyAt?.toISOString() ?? null,
+  };
 }
 
 function buildDepartmentComparison(
@@ -286,12 +345,12 @@ export class DashboardService {
     private readonly departmentAccess: DepartmentAccessService,
   ) {}
 
-  async overview(input: {
-    departmentId?: string;
-    days: 30;
-  }): Promise<DashboardOverview> {
+  private async resolveScope(departmentIdInput?: string): Promise<{
+    role: DashboardViewerRole;
+    scope: DashboardQueryScope;
+  }> {
     const ctx = requireTenantContext();
-    const resolved = await this.departmentAccess.getReportScope(input.departmentId);
+    const resolved = await this.departmentAccess.getReportScope(departmentIdInput);
     if (!isDashboardRole(resolved.role)) {
       throw new ForbiddenException('Dashboard access denied');
     }
@@ -299,7 +358,7 @@ export class DashboardService {
       throw new ForbiddenException('A department is required for dashboard access');
     }
     const departmentId =
-      resolved.role === 'admin' ? input.departmentId : resolved.departmentId;
+      resolved.role === 'admin' ? departmentIdInput : resolved.departmentId;
     if (resolved.role === 'admin' && departmentId) {
       const department = await this.db('workspaces')
         .where({ id: departmentId, tenant_id: ctx.tenantId })
@@ -310,12 +369,22 @@ export class DashboardService {
       }
     }
 
-    const scope: DashboardQueryScope = {
-      tenantId: ctx.tenantId,
-      userId: ctx.userId,
+    return {
       role: resolved.role,
-      departmentId,
+      scope: {
+        tenantId: ctx.tenantId,
+        userId: ctx.userId,
+        role: resolved.role,
+        departmentId,
+      },
     };
+  }
+
+  async overview(input: {
+    departmentId?: string;
+    days: 30;
+  }): Promise<DashboardOverview> {
+    const { role, scope } = await this.resolveScope(input.departmentId);
     const now = new Date();
     const rows = (await buildDashboardRowsQuery(this.db, scope)) as DashboardTaskRow[];
     const metrics = buildDashboardMetrics(rows, now, input.days);
@@ -324,12 +393,31 @@ export class DashboardService {
       generatedAt: now.toISOString(),
       windowDays: input.days,
       scope: {
-        departmentId,
-        role: resolved.role,
+        departmentId: scope.departmentId,
+        role,
       },
       ...metrics,
       departments:
-        resolved.role === 'admin' ? buildDepartmentComparison(rows, now) : [],
+        role === 'admin' ? buildDepartmentComparison(rows, now) : [],
+    };
+  }
+
+  async tasks(input: {
+    departmentId?: string;
+    days: 30;
+    bucket: DashboardTaskBucket;
+  }): Promise<DashboardTaskListResponse> {
+    const { scope } = await this.resolveScope(input.departmentId);
+    const now = new Date();
+    const rows = (await buildDashboardRowsQuery(this.db, scope)) as DashboardTaskRow[];
+
+    return {
+      generatedAt: now.toISOString(),
+      bucket: input.bucket,
+      data: rows
+        .filter((row) => taskMatchesDashboardBucket(row, input.bucket, now))
+        .sort(compareDashboardTaskRows)
+        .map(toDashboardTaskSummary),
     };
   }
 }

@@ -438,6 +438,19 @@ export const dashboardOverviewQuerySchema: z.ZodType<
   days: z.coerce.number().default(30).refine((days): days is 30 => days === 30),
 });
 
+export const dashboardTasksQuerySchema = z.object({
+  departmentId: uuidField.optional(),
+  days: z.coerce.number().default(30).refine((days): days is 30 => days === 30),
+  bucket: z.enum([
+    'active',
+    'completed',
+    'overdue',
+    'blocked',
+    'unassigned',
+    'ready_for_handoff',
+  ]),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type AdminResetPasswordInput = z.infer<typeof adminResetPasswordSchema>;

@@ -10,6 +10,12 @@ export interface DashboardTaskRow {
   createdAt: Date;
   completedAt: Date | null;
   dueDate: Date | null;
+  handoffStatus: string;
+  handoffReadyAt: Date | null;
+  updatedAt: Date;
+  projectId: string;
+  projectName: string | null;
+  handoffOwner: { id: string; displayName: string; email: string } | null;
   assignees: Array<{ userId: string; name: string }>;
 }
 
@@ -40,6 +46,34 @@ function utcDayStart(value: Date): number {
 
 function isWithin(timestamp: number, startInclusive: number, endExclusive: number): boolean {
   return timestamp >= startInclusive && timestamp < endExclusive;
+}
+
+/**
+ * Defines the exact membership rule for both dashboard totals and the
+ * corresponding task-list endpoint. This deliberately does not apply the
+ * reporting window: active work is actionable regardless of when it began.
+ */
+export function taskMatchesDashboardBucket(
+  row: DashboardTaskRow,
+  bucket: 'active' | 'completed' | 'overdue' | 'blocked' | 'unassigned' | 'ready_for_handoff',
+  now: Date,
+): boolean {
+  const isCompleted = row.status === COMPLETED_STATUS;
+
+  switch (bucket) {
+    case 'active':
+      return !isCompleted;
+    case 'completed':
+      return isCompleted;
+    case 'overdue':
+      return !isCompleted && row.dueDate !== null && row.dueDate.getTime() < now.getTime();
+    case 'blocked':
+      return !isCompleted && row.status === 'blocked';
+    case 'unassigned':
+      return !isCompleted && row.assignees.length === 0;
+    case 'ready_for_handoff':
+      return !isCompleted && row.handoffStatus === 'ready';
+  }
 }
 
 function percentChange(current: number, previous: number): number | null {
@@ -118,8 +152,6 @@ export function buildDashboardMetrics(
   const currentEndExclusive = utcDayStart(now) + DAY_MS;
   const currentStart = currentEndExclusive - windowDays * DAY_MS;
   const previousStart = currentStart - windowDays * DAY_MS;
-  const nowTimestamp = now.getTime();
-
   const daily: DashboardMetrics['daily'] = Array.from({ length: windowDays }, (_, index) => ({
     date: new Date(currentStart + index * DAY_MS).toISOString().slice(0, 10),
     created: 0,
@@ -130,11 +162,6 @@ export function buildDashboardMetrics(
   let previousCreated = 0;
   let currentCompleted = 0;
   let previousCompleted = 0;
-  let completed = 0;
-  let overdue = 0;
-  let blocked = 0;
-  let unassigned = 0;
-
   const capacityByUserId = new Map<string, CapacityItem>();
   const attentionByTaskId = new Map<string, AttentionItem>();
 
@@ -163,20 +190,14 @@ export function buildDashboardMetrics(
       previousCompleted += 1;
     }
 
-    const isCompleted = row.status === COMPLETED_STATUS;
-    if (isCompleted) {
-      completed += 1;
+    if (taskMatchesDashboardBucket(row, 'completed', now)) {
       continue;
     }
 
-    const rowIsOverdue = row.dueDate !== null && row.dueDate.getTime() < nowTimestamp;
-    const rowIsBlocked = row.status === 'blocked';
+    const rowIsOverdue = taskMatchesDashboardBucket(row, 'overdue', now);
+    const rowIsBlocked = taskMatchesDashboardBucket(row, 'blocked', now);
     const assignees = uniqueSortedAssignees(row.assignees);
-    const rowIsUnassigned = assignees.length === 0;
-
-    if (rowIsOverdue) overdue += 1;
-    if (rowIsBlocked) blocked += 1;
-    if (rowIsUnassigned) unassigned += 1;
+    const rowIsUnassigned = taskMatchesDashboardBucket(row, 'unassigned', now);
 
     for (const assignee of assignees) {
       const current = capacityByUserId.get(assignee.userId);
@@ -219,11 +240,14 @@ export function buildDashboardMetrics(
 
   return {
     totals: {
-      active: rows.length - completed,
-      completed,
-      overdue,
-      blocked,
-      unassigned,
+      active: rows.filter((row) => taskMatchesDashboardBucket(row, 'active', now)).length,
+      completed: rows.filter((row) => taskMatchesDashboardBucket(row, 'completed', now)).length,
+      overdue: rows.filter((row) => taskMatchesDashboardBucket(row, 'overdue', now)).length,
+      blocked: rows.filter((row) => taskMatchesDashboardBucket(row, 'blocked', now)).length,
+      unassigned: rows.filter((row) => taskMatchesDashboardBucket(row, 'unassigned', now)).length,
+      readyForHandoff: rows.filter((row) =>
+        taskMatchesDashboardBucket(row, 'ready_for_handoff', now),
+      ).length,
     },
     comparison: {
       completedPercentChange: percentChange(currentCompleted, previousCompleted),

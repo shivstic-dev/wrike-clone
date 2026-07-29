@@ -1,12 +1,18 @@
-import { buildDashboardMetrics, type DashboardTaskRow } from './dashboard-metrics';
+import {
+  buildDashboardMetrics,
+  taskMatchesDashboardBucket,
+  type DashboardTaskRow,
+} from './dashboard-metrics';
 
 type TaskOverrides = Partial<
-  Omit<DashboardTaskRow, 'createdAt' | 'completedAt' | 'dueDate'>
+  Omit<DashboardTaskRow, 'createdAt' | 'completedAt' | 'dueDate' | 'handoffReadyAt' | 'updatedAt'>
 > & {
   id: string;
   createdAt?: Date | string;
   completedAt?: Date | string | null;
   dueDate?: Date | string | null;
+  handoffReadyAt?: Date | string | null;
+  updatedAt?: Date | string;
 };
 
 type DailyMetric = { date: string; created: number; completed: number };
@@ -28,6 +34,12 @@ function task(overrides: TaskOverrides): DashboardTaskRow {
     createdAt: date(overrides.createdAt, new Date('2026-01-01T00:00:00Z'))!,
     completedAt: date(overrides.completedAt, null),
     dueDate: date(overrides.dueDate, null),
+    handoffStatus: overrides.handoffStatus ?? 'pending',
+    handoffReadyAt: date(overrides.handoffReadyAt, null),
+    updatedAt: date(overrides.updatedAt, new Date('2026-07-28T00:00:00Z'))!,
+    projectId: overrides.projectId ?? 'project-1',
+    projectName: overrides.projectName ?? 'Community work',
+    handoffOwner: overrides.handoffOwner ?? null,
     assignees: overrides.assignees ?? [{ userId: 'user-1', name: 'Ada' }],
   };
 }
@@ -184,6 +196,7 @@ describe('buildDashboardMetrics', () => {
       overdue: 1,
       blocked: 1,
       unassigned: 1,
+      readyForHandoff: 0,
     });
     expect(result.byStatus).toEqual({ blocked: 1, completed: 1, todo: 2 });
     expect(Object.keys(result.byStatus)).toEqual(['blocked', 'completed', 'todo']);
@@ -192,6 +205,44 @@ describe('buildDashboardMetrics', () => {
       { userId: 'user-2', name: 'Grace', openTasks: 2, overdue: 1 },
       { userId: 'user-1', name: 'Ada', openTasks: 1, overdue: 1 },
     ]);
+  });
+
+  it('derives every dashboard total from the same bucket predicate as the task list', () => {
+    const rows = [
+      task({ id: 'active' }),
+      task({ id: 'completed', status: 'completed' }),
+      task({ id: 'overdue', dueDate: '2026-07-20T00:00:00Z' }),
+      task({ id: 'blocked', status: 'blocked' }),
+      task({ id: 'unassigned', assignees: [] }),
+      task({ id: 'ready', handoffStatus: 'ready', handoffReadyAt: '2026-07-27T12:00:00Z' }),
+      task({
+        id: 'completed-ready',
+        status: 'completed',
+        handoffStatus: 'ready',
+        handoffReadyAt: '2026-07-27T12:00:00Z',
+      }),
+    ];
+    const metrics = buildDashboardMetrics(rows, now, 30);
+
+    expect(metrics.totals.active).toBe(
+      rows.filter((current) => taskMatchesDashboardBucket(current, 'active', now)).length,
+    );
+    expect(metrics.totals.completed).toBe(
+      rows.filter((current) => taskMatchesDashboardBucket(current, 'completed', now)).length,
+    );
+    expect(metrics.totals.overdue).toBe(
+      rows.filter((current) => taskMatchesDashboardBucket(current, 'overdue', now)).length,
+    );
+    expect(metrics.totals.blocked).toBe(
+      rows.filter((current) => taskMatchesDashboardBucket(current, 'blocked', now)).length,
+    );
+    expect(metrics.totals.unassigned).toBe(
+      rows.filter((current) => taskMatchesDashboardBucket(current, 'unassigned', now)).length,
+    );
+    expect(metrics.totals.readyForHandoff).toBe(
+      rows.filter((current) => taskMatchesDashboardBucket(current, 'ready_for_handoff', now))
+        .length,
+    );
   });
 
   it('deduplicates attention by reason priority and orders it independently of row order', () => {
