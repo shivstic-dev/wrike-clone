@@ -512,7 +512,23 @@ export class TaskService {
 
     const updated = await this.db.transaction(async (trx) => {
       if (input.status && input.status !== TaskStatus.COMPLETED && existing.status === TaskStatus.COMPLETED) {
-        return this.taskCompletion.reopenInTransaction(trx, existing, input.status);
+        const reopened = await this.taskCompletion.reopenInTransaction(trx, existing, input.status);
+        const nonStatusUpdates = { ...updates };
+        delete nonStatusUpdates.status;
+        delete nonStatusUpdates.completed_at;
+        const hasNonStatusChanges = Object.keys(nonStatusUpdates).some(
+          (field) => field !== 'updated_at',
+        );
+        if (!hasNonStatusChanges) return reopened;
+
+        const [row] = await trx('tasks')
+          .where({ id, tenant_id: ctx.tenantId })
+          .update(nonStatusUpdates)
+          .returning('*');
+        if (assigneesProvided) {
+          await this.replaceTaskAssignees(id, desiredAssigneeIds, trx);
+        }
+        return row;
       }
       const [row] = await trx('tasks')
         .where({ id, tenant_id: ctx.tenantId })

@@ -440,18 +440,20 @@ describe('TaskService', () => {
       expect(qb.update).not.toHaveBeenCalled();
     });
 
-    it('clears confirmation through the completion service when reopening', async () => {
+    it('keeps other PATCH fields while reopening clears handoff confirmation', async () => {
       tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
-      const completed = { id: 'task-1', status: TaskStatus.COMPLETED, tenant_id: 't1', department_id: 'dept-1', assignee_id: 'u1', handoff_required: true };
+      const completed = { id: 'task-1', title: 'Original', status: TaskStatus.COMPLETED, tenant_id: 't1', department_id: 'dept-1', assignee_id: 'u1', handoff_required: true };
       qb.first.mockResolvedValue(completed);
       taskCompletion.reopenInTransaction.mockResolvedValue({ ...completed, status: TaskStatus.IN_PROGRESS, handoff_status: 'pending', handoff_confirmed_by: null, handoff_confirmed_at: null });
+      qb.returning.mockResolvedValue([{ ...completed, title: 'Revised', status: TaskStatus.IN_PROGRESS, handoff_status: 'pending', handoff_confirmed_by: null, handoff_confirmed_at: null }]);
       qb.then = (resolve: any) => resolve([]);
       qb.catch = noop;
 
-      const result = await service.update('task-1', { status: TaskStatus.IN_PROGRESS });
+      const result = await service.update('task-1', { status: TaskStatus.IN_PROGRESS, title: 'Revised' });
 
       expect(taskCompletion.reopenInTransaction).toHaveBeenCalledWith(expect.anything(), completed, TaskStatus.IN_PROGRESS);
-      expect(result).toMatchObject({ status: TaskStatus.IN_PROGRESS, handoff_status: 'pending', handoff_confirmed_by: null, handoff_confirmed_at: null });
+      expect(qb.update).toHaveBeenCalledWith(expect.objectContaining({ title: 'Revised' }));
+      expect(result).toMatchObject({ title: 'Revised', status: TaskStatus.IN_PROGRESS, handoff_status: 'pending', handoff_confirmed_by: null, handoff_confirmed_at: null });
     });
     it('updates task with valid changes', async () => {
       tenantContext.enterWith({
