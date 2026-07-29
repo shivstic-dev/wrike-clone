@@ -87,9 +87,19 @@ export function TaskTable({ tasks, isLoading }: TaskTableProps) {
       columnHelper.accessor('status', {
         header: 'Status',
         cell: (info) => (
-          <span className={clsx('badge', statusBadge[info.getValue()])}>
-            {info.getValue().replace('_', ' ')}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className={clsx('badge', statusBadge[info.getValue()])}>
+              {info.getValue().replace('_', ' ')}
+            </span>
+            {info.row.original.handoffStatus === 'ready' && (
+              <span
+                className="rounded-full bg-atlas-cream px-2 py-0.5 text-[10px] font-semibold text-atlas-current ring-1 ring-inset ring-atlas-mist"
+                aria-label="Ready for handoff"
+              >
+                Ready for handoff
+              </span>
+            )}
+          </div>
         ),
       }),
       columnHelper.accessor('priority', {
