@@ -172,6 +172,18 @@ describe('HandoffCompletionDialog', () => {
     );
     expect(document.activeElement).toBe(confirmed);
   });
+
+  it('keeps reverse tabbing inside the dialog from the initial heading focus', () => {
+    renderDialog();
+    const heading = getByRole<HTMLHeadingElement>('heading', 'Confirm final handoff');
+    const confirmed = getButton('Yes, handoff completed');
+
+    expect(document.activeElement).toBe(heading);
+    act(() =>
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true })),
+    );
+    expect(document.activeElement).toBe(confirmed);
+  });
 });
 
 describe('useTaskCompletionFlow', () => {
@@ -196,6 +208,40 @@ describe('useTaskCompletionFlow', () => {
       outcome: 'confirmed',
     });
     expect(result).toEqual(task);
+  });
+
+  it('shares one immediate completion mutation for rapid requests to the same task', async () => {
+    let resolveMutation: ((value: Task) => void) | undefined;
+    completionMutation.mutateAsync.mockReturnValue(
+      new Promise<Task>((resolve) => {
+        resolveMutation = resolve;
+      }),
+    );
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    mounted.push({ root, container });
+
+    function Harness() {
+      requestCompletion = useTaskCompletionFlow().requestCompletion;
+      return null;
+    }
+
+    act(() => root.render(<Harness />));
+    let first: Promise<Task | null> | undefined;
+    let second: Promise<Task | null> | undefined;
+    act(() => {
+      first = requestCompletion?.({ ...task, handoffRequired: false });
+      second = requestCompletion?.({ ...task, handoffRequired: false });
+    });
+    if (!first || !second || !resolveMutation) throw new Error('Completion requests were not created');
+
+    expect(second).toBe(first);
+    expect(completionMutation.mutateAsync).toHaveBeenCalledTimes(1);
+    resolveMutation(task);
+    await expect(first).resolves.toEqual(task);
+    await expect(second).resolves.toEqual(task);
   });
 
   it('resolves Not yet only after the member makes that explicit choice', async () => {

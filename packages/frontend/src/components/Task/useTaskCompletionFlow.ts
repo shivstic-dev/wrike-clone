@@ -17,6 +17,7 @@ export function useTaskCompletionFlow(): {
   const completeTask = useCompleteTask();
   const [taskAwaitingConfirmation, setTaskAwaitingConfirmation] = useState<Task | null>(null);
   const pendingCompletionRef = useRef<PendingCompletion | null>(null);
+  const immediateCompletionPromisesRef = useRef(new Map<string, Promise<Task | null>>());
   const isResolvingRef = useRef(false);
   const isMountedRef = useRef(false);
 
@@ -26,6 +27,7 @@ export function useTaskCompletionFlow(): {
     return () => {
       isMountedRef.current = false;
       isResolvingRef.current = false;
+      immediateCompletionPromisesRef.current.clear();
       const pendingCompletion = pendingCompletionRef.current;
       pendingCompletionRef.current = null;
       pendingCompletion?.resolve(null);
@@ -76,7 +78,18 @@ export function useTaskCompletionFlow(): {
   const requestCompletion = useCallback(
     (task: Task): Promise<Task | null> => {
       if (!task.handoffRequired) {
-        return completeTask.mutateAsync({ taskId: task.id, outcome: 'confirmed' });
+        const existingCompletion = immediateCompletionPromisesRef.current.get(task.id);
+        if (existingCompletion) return existingCompletion;
+
+        const completion = completeTask.mutateAsync({ taskId: task.id, outcome: 'confirmed' });
+        immediateCompletionPromisesRef.current.set(task.id, completion);
+        const removeCompletion = () => {
+          if (immediateCompletionPromisesRef.current.get(task.id) === completion) {
+            immediateCompletionPromisesRef.current.delete(task.id);
+          }
+        };
+        void completion.then(removeCompletion, removeCompletion);
+        return completion;
       }
 
       const currentPendingCompletion = pendingCompletionRef.current;
