@@ -23,6 +23,7 @@ import {
   addWorkspaceMemberSchema,
   updateWorkspaceMemberRoleSchema,
   departmentReportFilterSchema,
+  taskCompletionSchema,
 } from '../src/validation';
 
 function validUUID(): string {
@@ -347,6 +348,14 @@ describe('Validation Schemas', () => {
     it('accepts clearing assignee', () => {
       const result = updateTaskSchema.safeParse({ assigneeId: null });
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('taskCompletionSchema', () => {
+    it('accepts the supported completion outcomes and rejects unknown ones', () => {
+      expect(taskCompletionSchema.parse({ outcome: 'confirmed' })).toEqual({ outcome: 'confirmed' });
+      expect(taskCompletionSchema.parse({ outcome: 'not_yet' })).toEqual({ outcome: 'not_yet' });
+      expect(() => taskCompletionSchema.parse({ outcome: 'sent' })).toThrow();
     });
   });
 

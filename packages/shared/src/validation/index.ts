@@ -7,7 +7,14 @@
  */
 
 import { z } from 'zod';
-import { TaskStatus, TaskPriority, DependencyType, TriggerEvent, TenantRole } from '../enums';
+import {
+  HandoffStatus,
+  TaskStatus,
+  TaskPriority,
+  DependencyType,
+  TriggerEvent,
+  TenantRole,
+} from '../enums';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -203,6 +210,7 @@ export const createTaskSchema = taskLocationInputSchema.and(
     estimatedHours: z.number().nonnegative().optional(),
     startDate: isoDate.optional(),
     dueDate: isoDate.optional(),
+    handoffRequired: z.boolean().optional(),
     visibility: z.enum(['global', 'department']).optional().default('department'),
     customFields: z.record(z.unknown()).optional(),
   }),
@@ -220,6 +228,7 @@ export const updateTaskSchema = z
     actualHours: z.number().nonnegative().optional(),
     startDate: isoDate.nullable().optional(),
     dueDate: isoDate.nullable().optional(),
+    handoffRequired: z.boolean().optional(),
     visibility: z.enum(['global', 'department']).optional(),
     sortOrder: z.number().int().optional(),
     customFields: z.record(z.unknown()).optional(),
@@ -237,6 +246,7 @@ export const taskFilterSchema = z.object({
     (value) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value),
     z.array(z.nativeEnum(TaskPriority)).optional(),
   ),
+  handoffStatus: z.nativeEnum(HandoffStatus).optional(),
   search: z.string().max(200).optional(),
   dueDateBefore: isoDate.optional(),
   dueDateAfter: isoDate.optional(),
@@ -250,6 +260,31 @@ export const bulkTaskUpdateSchema = z.object({
   taskIds: z.array(uuidField).min(1).max(100),
   updates: updateTaskSchema,
 });
+
+export const taskCompletionSchema = z.object({
+  outcome: z.enum(['confirmed', 'not_yet']),
+});
+
+export const bulkTaskCompletionSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        taskId: uuidField,
+        outcome: z.enum(['confirmed', 'not_yet']),
+      }),
+    )
+    .min(1)
+    .max(100),
+});
+
+export const dashboardTaskBucketSchema = z.enum([
+  'active',
+  'completed',
+  'overdue',
+  'blocked',
+  'unassigned',
+  'ready_for_handoff',
+]);
 
 // ── Dependencies ───────────────────────────────────────────────
 
@@ -420,6 +455,8 @@ export type CreateTaskInput = z.input<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type TaskFilterInput = z.infer<typeof taskFilterSchema>;
 export type BulkTaskUpdateInput = z.infer<typeof bulkTaskUpdateSchema>;
+export type TaskCompletionInput = z.infer<typeof taskCompletionSchema>;
+export type BulkTaskCompletionInput = z.infer<typeof bulkTaskCompletionSchema>;
 export type CreateDependencyInput = z.infer<typeof createDependencySchema>;
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 export type CreateTimeEntryInput = z.infer<typeof createTimeEntrySchema>;
