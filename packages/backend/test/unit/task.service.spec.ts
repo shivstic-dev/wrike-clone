@@ -8,6 +8,8 @@ import { DATABASE_PROVIDER } from '../../src/database/database.module';
 import { tenantContext } from '../../src/common/tenant-context';
 import { DepartmentAccessService } from '../../src/rbac/department-access.service';
 import { TaskLocationService } from '../../src/task/task-location.service';
+import { TaskCompletionService } from '../../src/task/task-completion.service';
+import { TaskStatus } from '@wrike-clone/shared';
 
 const noop = () => {};
 
@@ -61,6 +63,7 @@ describe('TaskService', () => {
     writeHomeLink: jest.fn(),
     move: jest.fn(),
   };
+  const taskCompletion = { reopenInTransaction: jest.fn() };
 
   beforeEach(async () => {
     qb = createQb();
@@ -85,6 +88,7 @@ describe('TaskService', () => {
         { provide: DATABASE_PROVIDER, useValue: mockDb },
         { provide: DepartmentAccessService, useValue: departmentAccess },
         { provide: TaskLocationService, useValue: taskLocations },
+        { provide: TaskCompletionService, useValue: taskCompletion },
       ],
     }).compile();
 
@@ -145,6 +149,17 @@ describe('TaskService', () => {
       expect(result.meta.total).toBe(0);
     });
 
+    it('filters ready-for-handoff tasks inside the current tenant query', async () => {
+      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      qb.first.mockResolvedValueOnce({ count: '0' });
+      qb.offset.mockResolvedValue([]);
+
+      await service.findAll({ page: 1, perPage: 25, handoffStatus: 'ready' as any });
+
+      expect(qb.where).toHaveBeenCalledWith('tasks.tenant_id', 't1');
+      expect(qb.andWhere).toHaveBeenCalledWith('tasks.handoff_status', 'ready');
+    });
+
     it('hydrates canonical home and project metadata and filters only the home folder', async () => {
       tenantContext.enterWith({
         tenantId: 't1',
@@ -167,6 +182,7 @@ describe('TaskService', () => {
         'home_folder.name as folder_name',
         'task_project.name as project_name',
         'task_project.is_system as is_system_project',
+        expect.anything(),
         expect.anything(),
       );
     });
@@ -227,11 +243,52 @@ describe('TaskService', () => {
         'home_folder.name as folder_name',
         'task_project.name as project_name',
         'task_project.is_system as is_system_project',
+        expect.anything(),
       );
     });
   });
 
   describe('create', () => {
+    it('creates a task pending handoff with its creator as owner by default', async () => {
+      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      qb.returning.mockResolvedValue([{ id: 'task-new', title: 'Internal check', status: 'todo' }]);
+
+      await service.create({ projectId: 'proj-1', title: 'Internal check' });
+
+      expect(qb.insert).toHaveBeenCalledWith(expect.objectContaining({
+        handoff_required: true,
+        handoff_status: 'pending',
+        handoff_owner_id: 'u1',
+      }));
+    });
+
+    it('allows an explicitly not-required task to start completed', async () => {
+      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      qb.returning.mockResolvedValue([{ id: 'task-new', title: 'Internal check', status: 'completed' }]);
+
+      await expect(service.create({
+        projectId: 'proj-1',
+        title: 'Internal check',
+        handoffRequired: false,
+        status: TaskStatus.COMPLETED,
+      })).resolves.toMatchObject({ status: 'completed' });
+
+      expect(qb.insert).toHaveBeenCalledWith(expect.objectContaining({
+        handoff_required: false,
+        handoff_status: 'not_required',
+        completed_at: expect.any(Date),
+      }));
+    });
+
+    it('keeps the creator as handoff owner when self-assigning during creation', async () => {
+      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      qb.first.mockResolvedValue({ user_id: 'u1' });
+      qb.returning.mockResolvedValue([{ id: 'task-new', title: 'Internal check', assignee_id: 'u1' }]);
+
+      await service.create({ projectId: 'proj-1', title: 'Internal check', assigneeId: 'u1' });
+
+      expect(qb.insert).toHaveBeenCalledWith(expect.objectContaining({ handoff_owner_id: 'u1' }));
+    });
     it('keeps project-only creation routed through canonical location resolution', async () => {
       tenantContext.enterWith({
         tenantId: 't1',
@@ -339,6 +396,63 @@ describe('TaskService', () => {
   });
 
   describe('update', () => {
+    it('rejects generic completion until final handoff is confirmed', async () => {
+      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      qb.first.mockResolvedValue({ id: 'task-1', status: TaskStatus.IN_PROGRESS, tenant_id: 't1' });
+
+      await expect(service.update('task-1', { status: TaskStatus.COMPLETED })).rejects.toMatchObject({
+        response: { code: 'HANDOFF_CONFIRMATION_REQUIRED' },
+      });
+    });
+
+    it('records the current actor as owner when assignments change', async () => {
+      tenantContext.enterWith({ tenantId: 't1', userId: 'manager-1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      qb.first.mockResolvedValue({
+        id: 'task-1',
+        status: TaskStatus.TODO,
+        title: 'Old',
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        assignee_id: 'u1',
+      });
+      qb.then = (resolve: any) => resolve([{ user_id: 'u1' }]);
+      qb.catch = noop;
+      qb.returning.mockResolvedValue([{ id: 'task-1', assignee_id: 'u2' }]);
+
+      await service.update('task-1', { assigneeIds: ['u2'] });
+
+      expect(qb.update).toHaveBeenCalledWith(expect.objectContaining({
+        assignee_id: 'u2',
+        handoff_owner_id: 'manager-1',
+      }));
+    });
+
+    it('does not change the owner for a no-op assignment', async () => {
+      tenantContext.enterWith({ tenantId: 't1', userId: 'manager-1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      qb.first.mockResolvedValue({
+        id: 'task-1', status: TaskStatus.TODO, title: 'Same', tenant_id: 't1', department_id: 'dept-1', assignee_id: 'u1',
+      });
+      qb.then = (resolve: any) => resolve([{ user_id: 'u1' }]);
+      qb.catch = noop;
+
+      await service.update('task-1', { assigneeIds: ['u1'] });
+
+      expect(qb.update).not.toHaveBeenCalled();
+    });
+
+    it('clears confirmation through the completion service when reopening', async () => {
+      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      const completed = { id: 'task-1', status: TaskStatus.COMPLETED, tenant_id: 't1', department_id: 'dept-1', assignee_id: 'u1', handoff_required: true };
+      qb.first.mockResolvedValue(completed);
+      taskCompletion.reopenInTransaction.mockResolvedValue({ ...completed, status: TaskStatus.IN_PROGRESS, handoff_status: 'pending', handoff_confirmed_by: null, handoff_confirmed_at: null });
+      qb.then = (resolve: any) => resolve([]);
+      qb.catch = noop;
+
+      const result = await service.update('task-1', { status: TaskStatus.IN_PROGRESS });
+
+      expect(taskCompletion.reopenInTransaction).toHaveBeenCalledWith(expect.anything(), completed, TaskStatus.IN_PROGRESS);
+      expect(result).toMatchObject({ status: TaskStatus.IN_PROGRESS, handoff_status: 'pending', handoff_confirmed_by: null, handoff_confirmed_at: null });
+    });
     it('updates task with valid changes', async () => {
       tenantContext.enterWith({
         tenantId: 't1',
@@ -376,6 +490,28 @@ describe('TaskService', () => {
   });
 
   describe('bulkUpdate', () => {
+    it('rejects generic bulk completion until final handoff is confirmed', async () => {
+      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+
+      await expect(service.bulkUpdate({ taskIds: ['task-1'], updates: { status: TaskStatus.COMPLETED } })).rejects.toMatchObject({
+        response: { code: 'HANDOFF_CONFIRMATION_REQUIRED' },
+      });
+    });
+
+    it('keeps the handoff owner when bulk assignment only removes people', async () => {
+      tenantContext.enterWith({ tenantId: 't1', userId: 'manager-1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      qb._data = [{
+        id: 'task-1', title: 'A', status: TaskStatus.TODO, tenant_id: 't1', department_id: 'dept-1', assignee_id: 'u1',
+      }];
+      qb.then = (resolve: any) => resolve(qb._data);
+      qb.catch = noop;
+      qb.returning.mockResolvedValue([{ id: 'task-1', assignee_id: null }]);
+
+      await service.bulkUpdate({ taskIds: ['task-1'], updates: { assigneeIds: [] } });
+
+      expect(qb.update.mock.calls.some(([updates]: [Record<string, unknown>]) => 'handoff_owner_id' in updates)).toBe(false);
+    });
+
     it('updates multiple tasks', async () => {
       tenantContext.enterWith({
         tenantId: 't1',
@@ -405,13 +541,13 @@ describe('TaskService', () => {
       qb.then = (resolve: any) => resolve(qb._data);
       qb.catch = noop;
       qb.returning.mockResolvedValueOnce([
-        { id: 'task-1', status: 'completed' },
-        { id: 'task-2', status: 'completed' },
+        { id: 'task-1', status: 'in_progress' },
+        { id: 'task-2', status: 'in_progress' },
       ]);
 
       const results = await service.bulkUpdate({
         taskIds: ['task-1', 'task-2'],
-        updates: { status: 'completed' as any },
+        updates: { status: 'in_progress' as any },
       });
       expect(results).toHaveLength(2);
     });

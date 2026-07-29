@@ -17,6 +17,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { TaskService } from './task.service';
+import { TaskCompletionService } from './task-completion.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -30,12 +31,17 @@ import {
   createCommentSchema,
   addTaskAssigneeSchema,
   moveTaskLocationSchema,
+  bulkTaskCompletionSchema,
+  taskCompletionSchema,
 } from '@wrike-clone/shared';
 
 @Controller('tasks')
 @UseGuards(AuthGuard, RolesGuard)
 export class TaskController {
-  constructor(private readonly taskService: TaskService) {}
+  constructor(
+    private readonly taskService: TaskService,
+    private readonly taskCompletion: TaskCompletionService,
+  ) {}
 
   @Get()
   @Permissions('task:read')
@@ -52,14 +58,14 @@ export class TaskController {
   }
 
   @Post(':id/assignees')
-  @Permissions('task:read')
+  @Permissions('task:assign')
   async addAssignee(@Param('id') id: string, @Body() body: unknown) {
     const input = addTaskAssigneeSchema.parse(body);
     return this.taskService.addAssignee(id, input.userId);
   }
 
   @Delete(':id/assignees/:userId')
-  @Permissions('task:read')
+  @Permissions('task:assign')
   async removeAssignee(@Param('id') id: string, @Param('userId') userId: string) {
     return this.taskService.removeAssignee(id, userId);
   }
@@ -80,6 +86,18 @@ export class TaskController {
     return this.taskService.addComment(input);
   }
 
+  @Post('bulk-completion')
+  @Permissions('task:status:update')
+  async completeMany(@Body() body: unknown) {
+    return this.taskCompletion.completeMany(bulkTaskCompletionSchema.parse(body));
+  }
+
+  @Post(':taskId/completion')
+  @Permissions('task:status:update')
+  async complete(@Param('taskId') taskId: string, @Body() body: unknown) {
+    return this.taskCompletion.complete(taskId, taskCompletionSchema.parse(body));
+  }
+
   @Get(':id')
   @Permissions('task:read')
   async findOne(@Param('id') id: string) {
@@ -87,48 +105,48 @@ export class TaskController {
   }
 
   @Post()
-  @Permissions('task:read')
+  @Permissions('task:create')
   async create(@Body() body: unknown) {
     const input = createTaskSchema.parse(body);
     return this.taskService.create(input);
   }
 
   @Patch(':id')
-  @Permissions('task:read')
+  @Permissions('task:status:update')
   async update(@Param('id') id: string, @Body() body: unknown) {
     const input = updateTaskSchema.parse(body);
     return this.taskService.update(id, input);
   }
 
   @Patch(':taskId/location')
-  @Permissions('task:read')
+  @Permissions('task:write')
   async moveLocation(@Param('taskId') taskId: string, @Body() body: unknown) {
     return this.taskService.moveLocation(taskId, moveTaskLocationSchema.parse(body));
   }
 
   @Delete(':id')
-  @Permissions('task:read')
+  @Permissions('task:delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string) {
     await this.taskService.remove(id);
   }
 
   @Post('bulk-update')
-  @Permissions('task:read')
+  @Permissions('task:status:update')
   async bulkUpdate(@Body() body: unknown) {
     const input = bulkTaskUpdateSchema.parse(body);
     return this.taskService.bulkUpdate(input);
   }
 
   @Post('dependencies')
-  @Permissions('task:read')
+  @Permissions('task:write')
   async createDependency(@Body() body: unknown) {
     const input = createDependencySchema.parse(body);
     return this.taskService.createDependency(input);
   }
 
   @Delete('dependencies/:id')
-  @Permissions('task:read')
+  @Permissions('task:write')
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeDependency(@Param('id') id: string) {
     await this.taskService.removeDependency(id);
