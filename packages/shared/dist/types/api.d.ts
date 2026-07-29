@@ -5,8 +5,8 @@
  * between backend and frontend — if it changes here, both sides fail
  * to compile until they agree.
  */
-import type { Tenant, User, TenantMembership, AutomationRule, Notification } from './domain';
-import type { TaskStatus, TaskPriority, SortDirection } from '../enums';
+import type { Task, Tenant, User, TenantMembership, AutomationRule, Notification } from './domain';
+import type { HandoffStatus, TaskStatus, TaskPriority, SortDirection } from '../enums';
 export interface PaginationParams {
     page?: number;
     perPage?: number;
@@ -128,6 +128,7 @@ export interface CreateTaskRequest {
     estimatedHours?: number;
     startDate?: string;
     dueDate?: string;
+    handoffRequired?: boolean;
     visibility?: 'global' | 'department';
     customFields?: Record<string, unknown>;
 }
@@ -155,6 +156,7 @@ export interface UpdateTaskRequest {
     actualHours?: number;
     startDate?: string;
     dueDate?: string;
+    handoffRequired?: boolean;
     visibility?: 'global' | 'department';
     sortOrder?: number;
     customFields?: Record<string, unknown>;
@@ -165,6 +167,7 @@ export interface TaskFilterParams extends PaginationParams {
     assigneeId?: string;
     status?: TaskStatus[];
     priority?: TaskPriority[];
+    handoffStatus?: HandoffStatus;
     search?: string;
     dueDateBefore?: string;
     dueDateAfter?: string;
@@ -184,6 +187,46 @@ export interface DepartmentReportFilter {
 export interface BulkTaskUpdateRequest {
     taskIds: string[];
     updates: UpdateTaskRequest;
+}
+export type TaskCompletionOutcome = 'confirmed' | 'not_yet';
+export interface TaskCompletionRequest {
+    outcome: TaskCompletionOutcome;
+}
+export interface BulkTaskCompletionRequest {
+    items: Array<{
+        taskId: string;
+        outcome: TaskCompletionOutcome;
+    }>;
+}
+export interface BulkTaskCompletionResult {
+    data: Task[];
+    errors: Array<{
+        taskId: string;
+        code: 'FORBIDDEN' | 'NOT_FOUND' | 'HANDOFF_CONFIRMATION_REQUIRED';
+        message: string;
+    }>;
+}
+export interface DashboardTaskSummary {
+    id: string;
+    title: string;
+    projectId: string;
+    projectName: string | null;
+    departmentId: string;
+    status: TaskStatus;
+    handoffStatus: HandoffStatus;
+    handoffOwner: Pick<User, 'id' | 'displayName' | 'email'> | null;
+    assignees: Array<{
+        userId: string;
+        name: string;
+    }>;
+    dueDate: string | null;
+    handoffReadyAt: string | null;
+}
+export type DashboardTaskBucket = 'active' | 'completed' | 'overdue' | 'blocked' | 'unassigned' | 'ready_for_handoff';
+export interface DashboardTaskListResponse {
+    generatedAt: string;
+    bucket: DashboardTaskBucket;
+    data: DashboardTaskSummary[];
 }
 export interface CreateDependencyRequest {
     taskId: string;
@@ -238,6 +281,7 @@ export interface DashboardOverview {
         overdue: number;
         blocked: number;
         unassigned: number;
+        readyForHandoff: number;
     };
     comparison: {
         completedPercentChange: number | null;

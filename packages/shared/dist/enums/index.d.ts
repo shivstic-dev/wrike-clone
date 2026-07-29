@@ -54,6 +54,13 @@ export declare enum TaskStatus {
     COMPLETED = "completed",
     BLOCKED = "blocked"
 }
+/** Final-handoff state for a task that requires delivery confirmation. */
+export declare enum HandoffStatus {
+    PENDING = "pending",
+    READY = "ready",
+    CONFIRMED = "confirmed",
+    NOT_REQUIRED = "not_required"
+}
 /** Priority levels for tasks. */
 export declare enum TaskPriority {
     LOW = "low",
