@@ -10,6 +10,7 @@ import type {
   TaskPriority,
   TaskStatus,
   HandoffStatus,
+  DependencyType,
   TenantRole,
   PlanTier,
   FileCategory,
@@ -172,7 +173,7 @@ export interface TaskDependency {
   id: string;
   taskId: string; // the task that depends
   dependsOnTaskId: string; // the task it depends on
-  dependencyType: string;
+  dependencyType: DependencyType;
   lagDays: number;
 }
 

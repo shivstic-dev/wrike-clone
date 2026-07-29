@@ -307,7 +307,54 @@ export const createDependencySchema = z.object({
   taskId: uuidField,
   dependsOnTaskId: uuidField,
   dependencyType: z.nativeEnum(DependencyType),
-  lagDays: z.number().int().nonnegative().optional().default(0),
+  lagDays: z.number().int().min(0).max(3650).optional().default(0),
+});
+
+const MAX_TIMELINE_RANGE_MS = 730 * 24 * 60 * 60 * 1000;
+
+export const timelineQuerySchema = z
+  .object({
+    from: isoDate,
+    to: isoDate,
+    departmentId: uuidField.optional(),
+    projectId: uuidField.optional(),
+    assigneeId: uuidField.optional(),
+    status: z.array(z.nativeEnum(TaskStatus)).optional(),
+    cursor: z.string().min(1).optional(),
+    perPage: z.coerce.number().int().min(1).max(500).optional(),
+    includeCriticalPath: z.coerce.boolean().optional(),
+  })
+  .refine(
+    (value) => new Date(value.from).getTime() <= new Date(value.to).getTime(),
+    { message: 'from must be before or equal to to', path: ['to'] },
+  )
+  .refine(
+    (value) => new Date(value.to).getTime() - new Date(value.from).getTime() <= MAX_TIMELINE_RANGE_MS,
+    { message: 'timeline range must not exceed 730 days', path: ['to'] },
+  );
+
+export const updateTaskScheduleSchema = z
+  .object({
+    startDate: isoDate.nullable(),
+    dueDate: isoDate.nullable(),
+    expectedUpdatedAt: isoDate,
+  })
+  .refine(
+    (value) =>
+      (value.startDate === null && value.dueDate === null) ||
+      (value.startDate !== null && value.dueDate !== null),
+    { message: 'startDate and dueDate must be scheduled together' },
+  )
+  .refine(
+    (value) =>
+      value.startDate === null ||
+      new Date(value.startDate).getTime() <= new Date(value.dueDate!).getTime(),
+    { message: 'startDate must not be after dueDate' },
+  );
+
+export const updateDependencySchema = z.object({
+  dependencyType: z.nativeEnum(DependencyType),
+  lagDays: z.number().int().min(0).max(3650),
 });
 
 // ── Comments ───────────────────────────────────────────────────
@@ -486,6 +533,9 @@ export type BulkTaskUpdateInput = z.infer<typeof bulkTaskUpdateSchema>;
 export type TaskCompletionInput = z.infer<typeof taskCompletionSchema>;
 export type BulkTaskCompletionInput = z.infer<typeof bulkTaskCompletionSchema>;
 export type CreateDependencyInput = z.infer<typeof createDependencySchema>;
+export type TimelineQueryInput = z.infer<typeof timelineQuerySchema>;
+export type UpdateTaskScheduleInput = z.infer<typeof updateTaskScheduleSchema>;
+export type UpdateDependencyInput = z.infer<typeof updateDependencySchema>;
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 export type CreateTimeEntryInput = z.infer<typeof createTimeEntrySchema>;
 export type CreateAutomationRuleInput = z.infer<typeof createAutomationRuleSchema>;

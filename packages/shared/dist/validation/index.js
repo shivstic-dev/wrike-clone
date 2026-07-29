@@ -7,7 +7,7 @@
  * frontend (form validation), so rules never diverge.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.dashboardTasksQuerySchema = exports.dashboardOverviewQuerySchema = exports.departmentReportFilterSchema = exports.paginationSchema = exports.addTaskAssigneeSchema = exports.changeDepartmentMemberRoleSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.createDependencySchema = exports.dashboardTaskBucketSchema = exports.bulkTaskCompletionSchema = exports.BULK_TASK_COMPLETION_DUPLICATE_MESSAGE = exports.taskCompletionSchema = exports.bulkTaskUpdateSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.moveTaskLocationSchema = exports.taskLocationInputSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
+exports.dashboardTasksQuerySchema = exports.dashboardOverviewQuerySchema = exports.departmentReportFilterSchema = exports.paginationSchema = exports.addTaskAssigneeSchema = exports.changeDepartmentMemberRoleSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.updateDependencySchema = exports.updateTaskScheduleSchema = exports.timelineQuerySchema = exports.createDependencySchema = exports.dashboardTaskBucketSchema = exports.bulkTaskCompletionSchema = exports.BULK_TASK_COMPLETION_DUPLICATE_MESSAGE = exports.taskCompletionSchema = exports.bulkTaskUpdateSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.moveTaskLocationSchema = exports.taskLocationInputSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
 const zod_1 = require("zod");
 const enums_1 = require("../enums");
 // ── Helpers ────────────────────────────────────────────────────
@@ -247,7 +247,36 @@ exports.createDependencySchema = zod_1.z.object({
     taskId: exports.uuidField,
     dependsOnTaskId: exports.uuidField,
     dependencyType: zod_1.z.nativeEnum(enums_1.DependencyType),
-    lagDays: zod_1.z.number().int().nonnegative().optional().default(0),
+    lagDays: zod_1.z.number().int().min(0).max(3650).optional().default(0),
+});
+const MAX_TIMELINE_RANGE_MS = 730 * 24 * 60 * 60 * 1000;
+exports.timelineQuerySchema = zod_1.z
+    .object({
+    from: exports.isoDate,
+    to: exports.isoDate,
+    departmentId: exports.uuidField.optional(),
+    projectId: exports.uuidField.optional(),
+    assigneeId: exports.uuidField.optional(),
+    status: zod_1.z.array(zod_1.z.nativeEnum(enums_1.TaskStatus)).optional(),
+    cursor: zod_1.z.string().min(1).optional(),
+    perPage: zod_1.z.coerce.number().int().min(1).max(500).optional(),
+    includeCriticalPath: zod_1.z.coerce.boolean().optional(),
+})
+    .refine((value) => new Date(value.from).getTime() <= new Date(value.to).getTime(), { message: 'from must be before or equal to to', path: ['to'] })
+    .refine((value) => new Date(value.to).getTime() - new Date(value.from).getTime() <= MAX_TIMELINE_RANGE_MS, { message: 'timeline range must not exceed 730 days', path: ['to'] });
+exports.updateTaskScheduleSchema = zod_1.z
+    .object({
+    startDate: exports.isoDate.nullable(),
+    dueDate: exports.isoDate.nullable(),
+    expectedUpdatedAt: exports.isoDate,
+})
+    .refine((value) => (value.startDate === null && value.dueDate === null) ||
+    (value.startDate !== null && value.dueDate !== null), { message: 'startDate and dueDate must be scheduled together' })
+    .refine((value) => value.startDate === null ||
+    new Date(value.startDate).getTime() <= new Date(value.dueDate).getTime(), { message: 'startDate must not be after dueDate' });
+exports.updateDependencySchema = zod_1.z.object({
+    dependencyType: zod_1.z.nativeEnum(enums_1.DependencyType),
+    lagDays: zod_1.z.number().int().min(0).max(3650),
 });
 // ── Comments ───────────────────────────────────────────────────
 exports.createCommentSchema = zod_1.z.object({

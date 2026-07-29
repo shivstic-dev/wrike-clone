@@ -5,7 +5,7 @@
  * these. Backend services and frontend views share the same definitions
  * so API contracts are a single source of truth.
  */
-import type { TaskPriority, TaskStatus, HandoffStatus, TenantRole, PlanTier, FileCategory } from '../enums';
+import type { TaskPriority, TaskStatus, HandoffStatus, DependencyType, TenantRole, PlanTier, FileCategory } from '../enums';
 export type Timestamp = string;
 /** Base fields every database row carries. */
 export interface BaseEntity {
@@ -141,7 +141,7 @@ export interface TaskDependency {
     id: string;
     taskId: string;
     dependsOnTaskId: string;
-    dependencyType: string;
+    dependencyType: DependencyType;
     lagDays: number;
 }
 export interface TaskAssignee {

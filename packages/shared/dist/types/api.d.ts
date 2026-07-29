@@ -5,8 +5,8 @@
  * between backend and frontend — if it changes here, both sides fail
  * to compile until they agree.
  */
-import type { Task, Tenant, User, TenantMembership, AutomationRule, Notification } from './domain';
-import type { HandoffStatus, TaskStatus, TaskPriority, SortDirection } from '../enums';
+import type { Task, Tenant, User, TenantMembership, TaskDependency, AutomationRule, Notification } from './domain';
+import type { DependencyType, HandoffStatus, TaskStatus, TaskPriority, SortDirection } from '../enums';
 export interface PaginationParams {
     page?: number;
     perPage?: number;
@@ -187,6 +187,50 @@ export interface DepartmentReportFilter {
 export interface BulkTaskUpdateRequest {
     taskIds: string[];
     updates: UpdateTaskRequest;
+}
+export interface TimelineQuery {
+    from: string;
+    to: string;
+    departmentId?: string;
+    projectId?: string;
+    assigneeId?: string;
+    status?: TaskStatus[];
+    cursor?: string;
+    perPage?: number;
+    includeCriticalPath?: boolean;
+}
+export interface TimelineTask extends Task {
+    capabilities: {
+        canEditSchedule: boolean;
+        canManageDependencies: boolean;
+    };
+    isCritical: boolean;
+}
+export interface TimelineResponse {
+    tasks: TimelineTask[];
+    unscheduled: TimelineTask[];
+    dependencies: TaskDependency[];
+    meta: {
+        from: string;
+        to: string;
+        nextCursor: string | null;
+    };
+}
+export type TimelineScope = {
+    kind: 'dashboard';
+    departmentId?: string;
+} | {
+    kind: 'project';
+    projectId: string;
+};
+export interface UpdateTaskScheduleRequest {
+    startDate: string | null;
+    dueDate: string | null;
+    expectedUpdatedAt: string;
+}
+export interface UpdateDependencyRequest {
+    dependencyType: DependencyType;
+    lagDays: number;
 }
 export type TaskCompletionOutcome = 'confirmed' | 'not_yet';
 export interface TaskCompletionRequest {

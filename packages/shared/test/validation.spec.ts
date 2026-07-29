@@ -25,6 +25,9 @@ import {
   departmentReportFilterSchema,
   taskCompletionSchema,
   bulkTaskCompletionSchema,
+  timelineQuerySchema,
+  updateDependencySchema,
+  updateTaskScheduleSchema,
 } from '../src/validation';
 
 function validUUID(): string {
@@ -447,6 +450,39 @@ describe('Validation Schemas', () => {
         dependencyType: 'finish_to_start',
       });
       expect(result.lagDays).toBe(0);
+    });
+  });
+
+  describe('timeline schemas', () => {
+    it('rejects a reversed timeline range and a page size above 500', () => {
+      expect(() => timelineQuerySchema.parse({
+        from: '2026-08-02T00:00:00.000Z',
+        to: '2026-08-01T00:00:00.000Z',
+      })).toThrow();
+      expect(() => timelineQuerySchema.parse({
+        from: '2026-08-01T00:00:00.000Z',
+        to: '2026-08-02T00:00:00.000Z',
+        perPage: 501,
+      })).toThrow();
+    });
+
+    it('requires schedules to be entirely set or entirely cleared', () => {
+      expect(updateTaskScheduleSchema.safeParse({
+        startDate: null,
+        dueDate: '2026-08-02T00:00:00.000Z',
+        expectedUpdatedAt: '2026-08-01T00:00:00.000Z',
+      }).success).toBe(false);
+    });
+
+    it('limits timeline dependency lag and types', () => {
+      expect(updateDependencySchema.safeParse({
+        dependencyType: 'finish_to_start',
+        lagDays: 3650,
+      }).success).toBe(true);
+      expect(updateDependencySchema.safeParse({
+        dependencyType: 'finish_to_start',
+        lagDays: 3651,
+      }).success).toBe(false);
     });
   });
 
