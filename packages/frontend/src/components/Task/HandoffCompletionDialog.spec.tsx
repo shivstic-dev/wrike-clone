@@ -376,7 +376,8 @@ describe('useTaskCompletionFlow', () => {
     act(() => {
       result = requestCompletion?.(task);
     });
-    if (!result || !resolveMutation) throw new Error('Completion request was not created');
+    const completeMutation = resolveMutation;
+    if (!result || !completeMutation) throw new Error('Completion request was not created');
     act(() => {
       getButton('Yes, handoff completed').click();
       getButton('Yes, handoff completed').click();
@@ -384,7 +385,7 @@ describe('useTaskCompletionFlow', () => {
 
     expect(completionMutation.mutateAsync).toHaveBeenCalledTimes(1);
     await act(async () => {
-      resolveMutation(task);
+      completeMutation(task);
       await result;
     });
     await expect(result).resolves.toEqual(task);
