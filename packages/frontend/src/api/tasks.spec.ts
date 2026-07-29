@@ -4,13 +4,20 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TaskPriority, TaskStatus, type Task } from '@wrike-clone/shared';
+import {
+  TaskPriority,
+  TaskStatus,
+  type Task,
+  type TaskCompletionOutcome,
+} from '@wrike-clone/shared';
 import {
   buildTaskSearchParams,
   invalidateTaskDependentQueries,
   taskDependentQueryKeys,
   taskKeys,
   useAddTaskAssignee,
+  useBulkCompleteTasks,
+  useCompleteTask,
   useCreateTask,
   useDeleteTask,
   useRemoveTaskAssignee,
@@ -33,6 +40,9 @@ const cachedTaskDependentKeys = [
   ['reports', 'cached'],
   ['workspaces', 'cached'],
   ['folders', 'cached'],
+  ['notifications', 'cached'],
+  ['dashboard', 'cached'],
+  ['timeline', 'cached'],
 ] as const;
 
 const returnedTask: Task = {
@@ -50,6 +60,13 @@ const returnedTask: Task = {
   title: 'Current task',
   description: null,
   status: TaskStatus.TODO,
+  handoffRequired: true,
+  handoffStatus: 'pending' as Task['handoffStatus'],
+  handoffOwnerId: 'creator-1',
+  handoffOwner: null,
+  handoffReadyAt: null,
+  handoffConfirmedBy: null,
+  handoffConfirmedAt: null,
   priority: TaskPriority.MEDIUM,
   estimatedHours: null,
   actualHours: null,
@@ -189,6 +206,9 @@ describe('task API contract helpers', () => {
       ['reports'],
       ['workspaces'],
       ['folders'],
+      ['notifications'],
+      ['dashboard'],
+      ['timeline'],
     ]);
   });
 
@@ -255,6 +275,40 @@ describe('task API contract helpers', () => {
 
     await mutate({ taskId: returnedTask.id, userId: 'user-1' });
 
+    expectTaskDependentCachesInvalidated(queryClient);
+    expect(queryClient.getQueryData(taskKeys.detail(returnedTask.id))).toEqual(returnedTask);
+  });
+
+  it('sends the selected handoff outcome and refreshes completion-dependent views', async () => {
+    apiMocks.post.mockResolvedValue({ data: returnedTask });
+    const queryClient = createTaskMutationQueryClient();
+    queryClient.setQueryData(taskKeys.detail(returnedTask.id), { title: 'Old task' });
+    const mutate = mountMutation<{
+      taskId: string;
+      outcome: TaskCompletionOutcome;
+    }>(queryClient, useCompleteTask);
+
+    await mutate({ taskId: 'task-1', outcome: 'not_yet' });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/tasks/task-1/completion', {
+      outcome: 'not_yet',
+    });
+    expectTaskDependentCachesInvalidated(queryClient);
+    expect(queryClient.getQueryData(taskKeys.detail(returnedTask.id))).toEqual(returnedTask);
+  });
+
+  it('submits every selected task through the bulk completion endpoint', async () => {
+    apiMocks.post.mockResolvedValue({ data: { data: [returnedTask], errors: [] } });
+    const queryClient = createTaskMutationQueryClient();
+    const mutate = mountMutation<{
+      items: Array<{ taskId: string; outcome: TaskCompletionOutcome }>;
+    }>(queryClient, useBulkCompleteTasks);
+
+    await mutate({ items: [{ taskId: 'task-1', outcome: 'confirmed' }] });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/tasks/bulk-completion', {
+      items: [{ taskId: 'task-1', outcome: 'confirmed' }],
+    });
     expectTaskDependentCachesInvalidated(queryClient);
     expect(queryClient.getQueryData(taskKeys.detail(returnedTask.id))).toEqual(returnedTask);
   });

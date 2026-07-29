@@ -11,6 +11,8 @@ import type {
   CreateTaskRequest,
   UpdateTaskRequest,
   PaginatedResponse,
+  BulkTaskCompletionResult,
+  TaskCompletionOutcome,
 } from '@wrike-clone/shared';
 
 // ---- Query key factory ----
@@ -29,6 +31,9 @@ export const taskDependentQueryKeys = [
   ['reports'],
   ['workspaces'],
   ['folders'],
+  ['notifications'],
+  ['dashboard'],
+  ['timeline'],
 ] as const;
 
 export function invalidateTaskDependentQueries(queryClient: QueryClient): void {
@@ -68,6 +73,7 @@ export function buildTaskSearchParams(filters: TaskFilterParams): URLSearchParam
   if (filters.assigneeId) params.set('assigneeId', filters.assigneeId);
   if (filters.status?.length) params.set('status', filters.status.join(','));
   if (filters.priority?.length) params.set('priority', filters.priority.join(','));
+  if (filters.handoffStatus) params.set('handoffStatus', filters.handoffStatus);
   if (filters.search) params.set('search', filters.search);
   if (filters.dueDateBefore) params.set('dueDateBefore', filters.dueDateBefore);
   if (filters.dueDateAfter) params.set('dueDateAfter', filters.dueDateAfter);
@@ -181,6 +187,50 @@ export function useUpdateTask() {
     onSuccess: (result) => {
       invalidateTaskDependentQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(result.id) });
+    },
+  });
+}
+
+export function useCompleteTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      outcome,
+    }: {
+      taskId: string;
+      outcome: TaskCompletionOutcome;
+    }) => {
+      const { data } = await apiClient.post<Task>(`/tasks/${taskId}/completion`, { outcome });
+      return data;
+    },
+    onSuccess: (task) => {
+      queryClient.setQueryData(taskKeys.detail(task.id), task);
+      invalidateTaskDependentQueries(queryClient);
+    },
+  });
+}
+
+export function useBulkCompleteTasks() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      items,
+    }: {
+      items: Array<{ taskId: string; outcome: TaskCompletionOutcome }>;
+    }) => {
+      const { data } = await apiClient.post<BulkTaskCompletionResult>('/tasks/bulk-completion', {
+        items,
+      });
+      return data;
+    },
+    onSuccess: (result) => {
+      for (const task of result.data) {
+        queryClient.setQueryData(taskKeys.detail(task.id), task);
+      }
+      invalidateTaskDependentQueries(queryClient);
     },
   });
 }
