@@ -12,6 +12,20 @@ OR NOT EXISTS (
   SELECT 1 FROM tasks predecessor_task WHERE predecessor_task.id = td.depends_on_task_id
 );
 
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM task_dependencies td
+    JOIN tasks dependent_task ON dependent_task.id = td.task_id
+    JOIN tasks predecessor_task ON predecessor_task.id = td.depends_on_task_id
+    WHERE predecessor_task.tenant_id IS DISTINCT FROM dependent_task.tenant_id
+  ) THEN
+    RAISE EXCEPTION 'task_dependencies contains cross-tenant dependency edges';
+  END IF;
+END;
+$$;
+
 UPDATE task_dependencies td
 SET tenant_id = t.tenant_id
 FROM tasks t
@@ -32,12 +46,16 @@ BEGIN
   IF EXISTS (
     SELECT 1
     FROM task_dependencies
-    WHERE dependency_type NOT IN (
-      'finish_to_start', 'start_to_start', 'finish_to_finish', 'start_to_finish'
-    )
+    WHERE dependency_type IS NULL
+       OR dependency_type NOT IN (
+         'finish_to_start', 'start_to_start', 'finish_to_finish', 'start_to_finish'
+       )
   ) THEN
-    RAISE EXCEPTION 'task_dependencies contains an unsupported dependency_type';
+    RAISE EXCEPTION 'task_dependencies contains a NULL or unsupported dependency_type';
   END IF;
+
+  ALTER TABLE task_dependencies
+    ALTER COLUMN dependency_type SET NOT NULL;
 
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'task_dependencies_dependency_type_check'
@@ -77,15 +95,8 @@ export async function up(knex: Knex): Promise<void> {
   await knex.raw(timelineIntegritySql);
 }
 
-export async function down(knex: Knex): Promise<void> {
-  await knex.raw(`
-DROP INDEX IF EXISTS idx_tasks_tenant_timeline_dates;
-DROP INDEX IF EXISTS idx_task_dependencies_tenant_predecessor;
-DROP INDEX IF EXISTS idx_task_dependencies_tenant_task;
-DROP INDEX IF EXISTS ux_task_dependencies_edge;
-
-ALTER TABLE task_dependencies
-  DROP CONSTRAINT IF EXISTS task_dependencies_lag_days_check,
-  DROP CONSTRAINT IF EXISTS task_dependencies_dependency_type_check;
-`);
-}
+/**
+ * Supabase owns the shared production schema, so rolling back this Knex
+ * history entry must not remove shared objects or cause migration-history drift.
+ */
+export async function down(_knex: Knex): Promise<void> {}
