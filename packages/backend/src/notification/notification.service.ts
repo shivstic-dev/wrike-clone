@@ -53,9 +53,12 @@ export class NotificationService {
     };
   }
 
-  async create(input: CreateNotificationInput) {
+  async create(
+    input: CreateNotificationInput,
+    executor: Knex | Knex.Transaction = this.db,
+  ) {
     const ctx = requireTenantContext();
-    const [notification] = await this.db('notifications')
+    const [notification] = await executor('notifications')
       .insert({
         id: uuidv4(),
         tenant_id: ctx.tenantId,
