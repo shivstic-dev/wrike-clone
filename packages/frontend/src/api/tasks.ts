@@ -36,6 +36,14 @@ export const taskDependentQueryKeys = [
   ['timeline'],
 ] as const;
 
+/** Views whose dates can change when a task schedule is moved on the timeline. */
+export const scheduleDependentQueryKeys = [
+  ['tasks'],
+  ['dashboard'],
+  ['calendar'],
+  ['projects'],
+] as const;
+
 export function invalidateTaskDependentQueries(queryClient: QueryClient): void {
   for (const queryKey of taskDependentQueryKeys) {
     queryClient.invalidateQueries({ queryKey });
