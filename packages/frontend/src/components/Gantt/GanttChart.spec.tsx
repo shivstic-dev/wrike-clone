@@ -12,6 +12,7 @@ import {
   type TimelineTask,
 } from '@wrike-clone/shared';
 import { GanttChart } from './GanttChart';
+import type { TimelineZoom } from './timeline-scale';
 
 function timelineTask(overrides: Partial<TimelineTask> = {}): TimelineTask {
   return {
@@ -96,6 +97,12 @@ function renderChart(data: TimelineResponse, props: Partial<ComponentProps<typeo
     );
   });
   return { onScheduleChange, onOpenTask };
+}
+
+function pointer(target: Element, type: string, init: { pointerId: number; clientX: number; pointerType?: string }) {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.assign(event, { pointerId: init.pointerId, clientX: init.clientX, pointerType: init.pointerType ?? 'mouse' });
+  target.dispatchEvent(event);
 }
 
 beforeEach(() => {
@@ -253,5 +260,130 @@ describe('GanttChart renderer', () => {
       expect.objectContaining({ id: 'task-1' }),
       { startDate: '2026-07-03', dueDate: '2026-07-04' },
     );
+  });
+
+  it('moves a bar by snapped day increments and commits once on pointer release', () => {
+    const task = timelineTask();
+    const { onScheduleChange } = renderChart(response([task]));
+    const bar = container.querySelector<HTMLElement>('[data-gantt-bar="task-1"]');
+
+    act(() => {
+      if (!bar) return;
+      pointer(bar, 'pointerdown', { pointerId: 1, clientX: 100 });
+      pointer(bar, 'pointermove', { pointerId: 1, clientX: 140 });
+      pointer(bar, 'pointerup', { pointerId: 1, clientX: 140 });
+    });
+
+    expect(onScheduleChange).toHaveBeenCalledTimes(1);
+    expect(onScheduleChange).toHaveBeenCalledWith(task, {
+      startDate: '2026-07-03',
+      dueDate: '2026-07-05',
+    });
+  });
+
+  it('resizes both bar edges without allowing the start to pass the due date', () => {
+    const task = timelineTask();
+    const { onScheduleChange } = renderChart(response([task]));
+    const startHandle = container.querySelector<HTMLElement>('[data-resize-start-handle]');
+    const endHandle = container.querySelector<HTMLElement>('[data-resize-end-handle]');
+
+    act(() => {
+      if (!startHandle || !endHandle) return;
+      pointer(startHandle, 'pointerdown', { pointerId: 2, clientX: 100 });
+      pointer(startHandle, 'pointerup', { pointerId: 2, clientX: 140 });
+      pointer(endHandle, 'pointerdown', { pointerId: 3, clientX: 140 });
+      pointer(endHandle, 'pointerup', { pointerId: 3, clientX: 100 });
+    });
+
+    expect(onScheduleChange).toHaveBeenNthCalledWith(1, task, {
+      startDate: '2026-07-03', dueDate: '2026-07-04',
+    });
+    expect(onScheduleChange).toHaveBeenNthCalledWith(2, task, {
+      startDate: '2026-07-02', dueDate: '2026-07-03',
+    });
+  });
+
+  it.each<[TimelineZoom, number]>([
+    ['week', 14],
+    ['month', 4],
+  ])('snaps %s timeline movements to its calendar unit', (zoom, movement) => {
+    const task = timelineTask();
+    const { onScheduleChange } = renderChart(response([task]), { zoom });
+    const bar = container.querySelector<HTMLElement>('[data-gantt-bar="task-1"]');
+
+    act(() => {
+      if (!bar) return;
+      pointer(bar, 'pointerdown', { pointerId: 4, clientX: 100, pointerType: 'touch' });
+      pointer(bar, 'pointermove', { pointerId: 4, clientX: 100 + movement, pointerType: 'touch' });
+      pointer(bar, 'pointerup', { pointerId: 4, clientX: 100 + movement, pointerType: 'touch' });
+    });
+
+    expect(onScheduleChange).toHaveBeenCalledWith(task, expect.objectContaining({
+      startDate: '2026-07-03',
+    }));
+  });
+
+  it('continues a captured drag outside the chart and Escape cancels without a request', () => {
+    const task = timelineTask();
+    const { onScheduleChange } = renderChart(response([task]));
+    const bar = container.querySelector<HTMLElement>('[data-gantt-bar="task-1"]');
+    const chart = container.querySelector<HTMLElement>('.gantt-viewport');
+
+    act(() => {
+      if (!bar || !chart) return;
+      pointer(bar, 'pointerdown', { pointerId: 5, clientX: 100 });
+      pointer(chart, 'pointermove', { pointerId: 5, clientX: 140 });
+      pointer(chart, 'pointerup', { pointerId: 5, clientX: 140 });
+    });
+    expect(onScheduleChange).toHaveBeenLastCalledWith(task, { startDate: '2026-07-03', dueDate: '2026-07-05' });
+
+    act(() => {
+      if (!bar || !chart) return;
+      pointer(bar, 'pointerdown', { pointerId: 6, clientX: 100 });
+      pointer(chart, 'pointermove', { pointerId: 6, clientX: 140 });
+      chart.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      pointer(chart, 'pointerup', { pointerId: 6, clientX: 140 });
+    });
+    expect(onScheduleChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides every scheduling and dependency write control from forbidden rows', () => {
+    renderChart(response([timelineTask({ capabilities: { canEditSchedule: false, canManageDependencies: false } })]), {
+      onCreateDependency: vi.fn(), onDeleteDependency: vi.fn(),
+    });
+
+    expect(container.querySelector('[data-gantt-bar]')?.getAttribute('data-can-schedule')).toBe('false');
+    expect(container.querySelector('[data-resize-start-handle]')).toBeNull();
+    expect(container.querySelector('[data-resize-end-handle]')).toBeNull();
+    expect([...container.querySelectorAll('button')].some((button) => button.textContent === 'Add dependency')).toBe(false);
+  });
+
+  it('creates an accessible dependency and removes it from the adjacent dependency list', () => {
+    const predecessor = timelineTask();
+    const dependent = timelineTask({ id: 'task-2', title: 'Deliver final artwork', startDate: '2026-07-07', dueDate: '2026-07-09' });
+    const dependency = {
+      id: 'dependency-1', taskId: dependent.id, dependsOnTaskId: predecessor.id,
+      dependencyType: DependencyType.FINISH_TO_START, lagDays: 0,
+    };
+    const onCreateDependency = vi.fn();
+    const onDeleteDependency = vi.fn();
+    renderChart(response([predecessor, dependent], [], [dependency]), { onCreateDependency, onDeleteDependency });
+
+    const add = container.querySelector<HTMLButtonElement>('[aria-label="Add a dependency to Deliver final artwork"]');
+    act(() => add?.click());
+    const select = container.querySelector<HTMLSelectElement>('select[aria-label="Predecessor"]');
+    const form = container.querySelector<HTMLFormElement>('form[aria-label="Add dependency"]');
+    act(() => {
+      if (select) select.value = predecessor.id;
+      form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(onCreateDependency).toHaveBeenCalledWith({
+      dependsOnTaskId: predecessor.id, taskId: dependent.id,
+      dependencyType: DependencyType.FINISH_TO_START, lagDays: 0,
+    });
+
+    const remove = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Remove dependency');
+    act(() => remove?.click());
+    expect(onDeleteDependency).toHaveBeenCalledWith('dependency-1');
   });
 });
