@@ -1,336 +1,529 @@
-/**
- * Interactive Gantt Chart component.
- * Displays tasks as horizontal bars on a timeline with dependency arrows.
- * Supports drag-and-drop for date adjustments via onTaskUpdate callback.
- */
-import { useMemo, useRef, useState, useCallback } from 'react';
-import { clsx } from 'clsx';
 import {
-  format,
-  addDays,
-  differenceInDays,
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
-  min as dateMin,
-  max as dateMax,
-  parseISO,
-} from 'date-fns';
-import type { Task } from '@wrike-clone/shared';
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
+import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
+import type {
+  CreateDependencyRequest,
+  TaskDependency,
+  TimelineResponse,
+  TimelineTask,
+} from '@wrike-clone/shared';
+import { createTimelineScale, type TimelineZoom } from './timeline-scale';
+import { dependencyPath } from './dependency-path';
+import { UnscheduledTasksPanel } from './UnscheduledTasksPanel';
 
-interface GanttChartProps {
-  tasks: Task[];
-  dependencies?: Array<{ taskId: string; dependsOnTaskId: string; dependencyType: string }>;
-  onTaskUpdate?: (taskId: string, updates: Partial<Task>) => void;
+export interface GanttChartProps {
+  data: TimelineResponse;
+  zoom: TimelineZoom;
+  selectedTaskId?: string;
+  onScheduleChange(task: TimelineTask, next: { startDate: string; dueDate: string }): void;
+  onOpenTask(taskId: string): void;
+  onCreateDependency?(input: CreateDependencyRequest): void;
+  onDeleteDependency?(dependencyId: string): void;
 }
 
-const ROW_HEIGHT = 44;
-const HEADER_HEIGHT = 60;
-const LABEL_WIDTH = 280;
-const DAY_WIDTH = 32;
-const BAR_HEIGHT = 26;
+const ROW_HEIGHT = 64;
+const HEADER_HEIGHT = 64;
+const LABEL_WIDTH = 296;
+const BAR_HEIGHT = 30;
+const DAY_MS = 86_400_000;
 
-export function GanttChart({ tasks, dependencies = [], onTaskUpdate }: GanttChartProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [draggingBar, setDraggingBar] = useState<{
-    taskId: string;
-    startX: number;
-    originalStartDays: number;
-  } | null>(null);
-  const [tooltipTask, setTooltipTask] = useState<string | null>(null);
+type DragMode = 'move' | 'resize';
+interface DragState {
+  task: TimelineTask;
+  mode: DragMode;
+  startX: number;
+}
 
-  // Calculate date range covering all tasks
-  const { startDate, dayCount, days } = useMemo(() => {
-    if (tasks.length === 0) {
-      const now = new Date();
-      const start = startOfWeek(now, { weekStartsOn: 1 });
-      const end = endOfWeek(now, { weekStartsOn: 1 });
-      const days = eachDayOfInterval({ start, end });
-      return { startDate: start, endDate: end, dayCount: days.length, days };
-    }
+function dateOnly(value: string | null): string {
+  return value?.slice(0, 10) ?? '';
+}
 
-    const dates = tasks.flatMap((t) => {
-      const d: Date[] = [];
-      if (t.startDate) d.push(new Date(t.startDate));
-      if (t.dueDate) d.push(new Date(t.dueDate));
-      return d;
-    });
+function addUtcDays(value: string, days: number): string {
+  const date = new Date(`${dateOnly(value)}T00:00:00.000Z`);
+  return new Date(date.getTime() + days * DAY_MS).toISOString().slice(0, 10);
+}
 
-    const min = dates.length > 0 ? dateMin(dates) : new Date();
-    const max = dates.length > 0 ? dateMax(dates) : new Date();
+function readableStatus(status: string): string {
+  return status.replaceAll('_', ' ').replace(/^\w/, (letter) => letter.toUpperCase());
+}
 
-    // Add 7 days padding on each side
-    const start = startOfWeek(addDays(min, -7), { weekStartsOn: 1 });
-    const end = endOfWeek(addDays(max, 7), { weekStartsOn: 1 });
-    const days = eachDayOfInterval({ start, end });
+function assigneeNames(task: TimelineTask): string {
+  const names = task.assignees
+    ?.map((assignee) => assignee.displayName || assignee.email)
+    .filter((name): name is string => Boolean(name));
+  return names?.length ? names.join(', ') : 'Unassigned';
+}
 
-    return { startDate: start, endDate: end, dayCount: days.length, days };
-  }, [tasks]);
+function isOverdue(task: TimelineTask, today: string): boolean {
+  return Boolean(task.dueDate && dateOnly(task.dueDate) < today && task.status !== 'completed');
+}
 
-  const today = new Date();
-  const todayOffset = differenceInDays(today, startDate);
-  const timelineWidth = dayCount * DAY_WIDTH;
+function fallbackVirtualItems(count: number): VirtualItem[] {
+  return Array.from({ length: count }, (_, index) => ({
+    key: index,
+    index,
+    start: index * ROW_HEIGHT,
+    end: (index + 1) * ROW_HEIGHT,
+    size: ROW_HEIGHT,
+    lane: 0,
+  }));
+}
 
-  // Calculate bar position from task dates
-  const getBarPosition = useCallback(
-    (task: Task) => {
-      const taskStart = task.startDate ? parseISO(task.startDate) : null;
-      const taskEnd = task.dueDate ? parseISO(task.dueDate) : null;
-      const left = taskStart ? Math.max(0, differenceInDays(taskStart, startDate) * DAY_WIDTH) : 0;
-      const width =
-        taskStart && taskEnd
-          ? Math.max(DAY_WIDTH, differenceInDays(taskEnd, taskStart) * DAY_WIDTH + DAY_WIDTH)
-          : DAY_WIDTH * 2;
-      return { left, width, taskStart, taskEnd };
-    },
-    [startDate, DAY_WIDTH],
-  );
-
-  // Handle mouse down on a task bar to start drag
-  const handleBarMouseDown = useCallback(
-    (e: React.MouseEvent, task: Task) => {
-      if (!onTaskUpdate) return;
-      e.preventDefault();
-      const pos = getBarPosition(task);
-      setDraggingBar({
-        taskId: task.id,
-        startX: e.clientX,
-        originalStartDays: task.startDate
-          ? differenceInDays(parseISO(task.startDate), startDate)
-          : 0,
-      });
-    },
-    [onTaskUpdate, getBarPosition, startDate],
-  );
-
-  // Handle mouse move during drag
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (!draggingBar) return;
-      const deltaX = e.clientX - draggingBar.startX;
-      const dayDelta = Math.round(deltaX / DAY_WIDTH);
-      // Visual feedback handled by inline style
-    },
-    [draggingBar, DAY_WIDTH],
-  );
-
-  // Handle mouse up to finalize drag
-  const handleMouseUp = useCallback(
-    (e: MouseEvent) => {
-      if (!draggingBar || !onTaskUpdate) return;
-      const deltaX = e.clientX - draggingBar.startX;
-      const dayDelta = Math.round(deltaX / DAY_WIDTH);
-
-      if (dayDelta !== 0) {
-        const task = tasks.find((t) => t.id === draggingBar.taskId);
-        if (task) {
-          const newStart = task.startDate
-            ? addDays(parseISO(task.startDate), dayDelta).toISOString()
-            : undefined;
-          const newEnd = task.dueDate
-            ? addDays(parseISO(task.dueDate), dayDelta).toISOString()
-            : undefined;
-          onTaskUpdate(draggingBar.taskId, {
-            startDate: newStart as any,
-            dueDate: newEnd as any,
-          });
-        }
-      }
-      setDraggingBar(null);
-    },
-    [draggingBar, onTaskUpdate, DAY_WIDTH, tasks, startDate],
-  );
-
-  // Attach global mouse move/up handlers during drag
-  const handleBarMouseDownRef = useRef(handleBarMouseDown);
-  handleBarMouseDownRef.current = handleBarMouseDown;
-
-  if (tasks.length === 0) {
-    return (
-      <div className="flex h-48 items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white">
-        <p className="text-sm text-slate-400">
-          No tasks to display on timeline. Create tasks with start and due dates.
-        </p>
-      </div>
-    );
-  }
-
+function Header({ scale }: { scale: ReturnType<typeof createTimelineScale> }) {
   return (
-    <div
-      className="overflow-hidden rounded-xl border border-slate-200 bg-white"
-      onMouseMove={handleMouseMove as any}
-      onMouseUp={handleMouseUp as any}
-      onMouseLeave={() => setDraggingBar(null)}
-    >
-      <div className="flex">
-        {/* Task labels */}
-        <div className="shrink-0 border-r border-slate-200" style={{ width: LABEL_WIDTH }}>
-          <div
-            className="flex items-center border-b border-slate-200 bg-slate-50 px-4 text-xs font-semibold uppercase text-slate-500"
-            style={{ height: HEADER_HEIGHT }}
-          >
-            Tasks ({tasks.length})
+    <div className="gantt-header" style={{ height: HEADER_HEIGHT }}>
+      <div className="gantt-header__identity" style={{ width: LABEL_WIDTH }}>
+        <span>Work item</span>
+        <small>Schedule and handoff state</small>
+      </div>
+      <div className="gantt-header__dates" style={{ width: scale.totalWidth }}>
+        {scale.headerCells.map((cell) => (
+          <div key={`${cell.start}-${cell.end}`} style={{ width: cell.width }}>
+            <span>{cell.label}</span>
           </div>
-          <div>
-            {tasks.map((task) => {
-              const pos = getBarPosition(task);
-              return (
-                <div
-                  key={task.id}
-                  className="flex items-center justify-between border-b border-slate-100 px-4 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                  style={{ height: ROW_HEIGHT }}
-                  onMouseEnter={() => setTooltipTask(task.id)}
-                  onMouseLeave={() => setTooltipTask(null)}
-                >
-                  <span className="truncate flex-1">{task.title}</span>
-                  {tooltipTask === task.id && pos.taskStart && (
-                    <span className="ml-2 shrink-0 text-[10px] text-slate-400">
-                      {format(pos.taskStart, 'MMM d')} -{' '}
-                      {pos.taskEnd ? format(pos.taskEnd, 'MMM d') : '?'}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Timeline */}
-        <div className="flex-1 overflow-x-auto" ref={scrollRef}>
-          {/* Header days */}
-          <div
-            className="flex border-b border-slate-200 bg-slate-50"
-            style={{ height: HEADER_HEIGHT, minWidth: timelineWidth }}
-          >
-            {days.map((day, i) => (
-              <div
-                key={i}
-                className={clsx(
-                  'flex shrink-0 items-center justify-center border-r border-slate-100 text-xs',
-                  day.getDay() === 0 || day.getDay() === 6 ? 'bg-slate-100/50' : '',
-                  format(day, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
-                    ? 'bg-primary-50 font-bold text-primary-600'
-                    : 'text-slate-500',
-                )}
-                style={{ width: DAY_WIDTH }}
-              >
-                <div className="flex flex-col items-center leading-tight">
-                  <span className="font-medium">{format(day, 'd')}</span>
-                  <span className="text-[10px] text-slate-400">{format(day, 'EEE')}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Task bars area */}
-          <div
-            className="relative"
-            style={{ minWidth: timelineWidth, height: tasks.length * ROW_HEIGHT }}
-          >
-            {/* Vertical grid lines and weekend shading */}
-            {days.map((day, i) => (
-              <div
-                key={i}
-                className={clsx(
-                  'absolute top-0 h-full border-r border-slate-100',
-                  format(day, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
-                    ? 'bg-primary-100/20'
-                    : '',
-                )}
-                style={{ left: i * DAY_WIDTH, width: DAY_WIDTH }}
-              />
-            ))}
-
-            {/* Today vertical line */}
-            {todayOffset >= 0 && todayOffset < dayCount && (
-              <div
-                className="absolute top-0 h-full w-0.5 bg-primary-500 z-20 pointer-events-none"
-                style={{ left: todayOffset * DAY_WIDTH }}
-              />
-            )}
-
-            {/* Dependency arrows (SVG) */}
-            <svg
-              className="absolute top-0 left-0 pointer-events-none z-10"
-              style={{ width: timelineWidth, height: tasks.length * ROW_HEIGHT }}
-            >
-              <defs>
-                <marker
-                  id="arrowhead"
-                  markerWidth="8"
-                  markerHeight="6"
-                  refX="8"
-                  refY="3"
-                  orient="auto"
-                >
-                  <polygon points="0 0, 8 3, 0 6" fill="#94a3b8" />
-                </marker>
-              </defs>
-              {dependencies.map((dep, i) => {
-                const fromTask = tasks.find((t) => t.id === dep.dependsOnTaskId);
-                const toTask = tasks.find((t) => t.id === dep.taskId);
-                if (!fromTask || !toTask) return null;
-
-                const fromIndex = tasks.indexOf(fromTask);
-                const toIndex = tasks.indexOf(toTask);
-                const fromPos = getBarPosition(fromTask);
-                const toPos = getBarPosition(toTask);
-                const fromEnd = fromPos.left + fromPos.width;
-                const toStart = toPos.left;
-
-                return (
-                  <line
-                    key={i}
-                    x1={fromEnd}
-                    y1={fromIndex * ROW_HEIGHT + ROW_HEIGHT / 2}
-                    x2={toStart}
-                    y2={toIndex * ROW_HEIGHT + ROW_HEIGHT / 2}
-                    stroke="#94a3b8"
-                    strokeWidth={1.5}
-                    strokeDasharray={dep.dependencyType === 'start_to_start' ? '4 2' : 'none'}
-                    markerEnd="url(#arrowhead)"
-                  />
-                );
-              })}
-            </svg>
-
-            {/* Task bars (draggable) */}
-            {tasks.map((task, index) => {
-              const pos = getBarPosition(task);
-              const isDragging = draggingBar?.taskId === task.id;
-
-              return (
-                <div
-                  key={task.id}
-                  className={clsx(
-                    'absolute flex items-center rounded-full px-2.5 text-xs font-medium text-white select-none',
-                    'transition-shadow hover:shadow-md hover:z-30',
-                    isDragging ? 'z-40 shadow-lg opacity-80 cursor-grabbing' : 'cursor-grab',
-                    task.status === 'completed'
-                      ? 'bg-green-500'
-                      : task.status === 'in_progress'
-                        ? 'bg-blue-500'
-                        : task.status === 'blocked'
-                          ? 'bg-red-400'
-                          : 'bg-slate-400',
-                  )}
-                  style={{
-                    left: Math.max(0, pos.left + (isDragging ? 0 : 0)),
-                    top: index * ROW_HEIGHT + (ROW_HEIGHT - BAR_HEIGHT) / 2,
-                    width: Math.min(pos.width, timelineWidth - Math.max(0, pos.left)),
-                    height: BAR_HEIGHT,
-                    transition: isDragging ? 'none' : 'box-shadow 150ms',
-                  }}
-                  onMouseDown={(e) => handleBarMouseDownRef.current(e, task)}
-                  title={`${task.title}: ${pos.taskStart ? format(pos.taskStart, 'MMM d') : '?'} - ${pos.taskEnd ? format(pos.taskEnd, 'MMM d') : '?'}`}
-                >
-                  <span className="truncate">{task.title}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        ))}
       </div>
     </div>
+  );
+}
+
+function TaskSignals({ task, today }: { task: TimelineTask; today: string }) {
+  return (
+    <span className="gantt-signals">
+      {task.isCritical && <span className="gantt-signal gantt-signal--critical">Critical path</span>}
+      {isOverdue(task, today) && <span className="gantt-signal gantt-signal--overdue">Overdue</span>}
+      {task.handoffStatus === 'ready' && <span className="gantt-signal gantt-signal--handoff">Ready for handoff</span>}
+    </span>
+  );
+}
+
+function AccessibleTable({
+  tasks,
+  today,
+  onOpenTask,
+  onScheduleChange,
+}: {
+  tasks: TimelineTask[];
+  today: string;
+  onOpenTask(taskId: string): void;
+  onScheduleChange(task: TimelineTask, next: { startDate: string; dueDate: string }): void;
+}) {
+  const updateDate = (task: TimelineTask, field: 'startDate' | 'dueDate', value: string) => {
+    const startDate = field === 'startDate' ? value : dateOnly(task.startDate);
+    const dueDate = field === 'dueDate' ? value : dateOnly(task.dueDate);
+    if (startDate && dueDate && dueDate >= startDate) {
+      onScheduleChange(task, { startDate, dueDate });
+    }
+  };
+
+  return (
+    <div className="gantt-table-wrap">
+      <table className="gantt-table">
+        <caption>Timeline tasks and schedule details</caption>
+        <thead>
+          <tr>
+            <th scope="col">Task</th>
+            <th scope="col">Project</th>
+            <th scope="col">Start</th>
+            <th scope="col">Due</th>
+            <th scope="col">Status</th>
+            <th scope="col">Owner / assignees</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map((task) => (
+            <tr key={task.id}>
+              <th scope="row">
+                <button type="button" onClick={() => onOpenTask(task.id)}>{task.title}</button>
+                <TaskSignals task={task} today={today} />
+              </th>
+              <td>{task.projectName || 'No project'}</td>
+              <td>
+                {task.capabilities.canEditSchedule ? (
+                  <input
+                    type="date"
+                    aria-label={`Start date for ${task.title}`}
+                    value={dateOnly(task.startDate)}
+                    max={dateOnly(task.dueDate) || undefined}
+                    onChange={(event) => updateDate(task, 'startDate', event.target.value)}
+                  />
+                ) : dateOnly(task.startDate) || 'Not scheduled'}
+              </td>
+              <td>
+                {task.capabilities.canEditSchedule ? (
+                  <input
+                    type="date"
+                    aria-label={`Due date for ${task.title}`}
+                    value={dateOnly(task.dueDate)}
+                    min={dateOnly(task.startDate) || undefined}
+                    onChange={(event) => updateDate(task, 'dueDate', event.target.value)}
+                  />
+                ) : dateOnly(task.dueDate) || 'Not scheduled'}
+              </td>
+              <td>{readableStatus(task.status)}</td>
+              <td>
+                {task.handoffOwner?.displayName || task.handoffOwner?.email || 'No owner'}
+                <small>{assigneeNames(task)}</small>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function GanttChart({
+  data,
+  zoom,
+  selectedTaskId,
+  onScheduleChange,
+  onOpenTask,
+  onCreateDependency,
+  onDeleteDependency,
+}: GanttChartProps) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const markerId = `gantt-arrow-${useId().replaceAll(':', '')}`;
+  const [view, setView] = useState<'chart' | 'table'>('chart');
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const [dependencySourceId, setDependencySourceId] = useState<string | null>(null);
+  const scale = useMemo(
+    () => createTimelineScale({ from: data.meta.from, to: data.meta.to, zoom }),
+    [data.meta.from, data.meta.to, zoom],
+  );
+  const scheduled = useMemo(
+    () => data.tasks.filter((task) => task.startDate && task.dueDate),
+    [data.tasks],
+  );
+  const unscheduled = useMemo(() => {
+    const byId = new Map(data.unscheduled.map((task) => [task.id, task]));
+    for (const task of data.tasks) {
+      if (!task.startDate || !task.dueDate) byId.set(task.id, task);
+    }
+    return [...byId.values()];
+  }, [data.tasks, data.unscheduled]);
+  const allTasks = useMemo(() => [...scheduled, ...unscheduled], [scheduled, unscheduled]);
+  const today = new Date().toISOString().slice(0, 10);
+  const todayInsideRange = today >= data.meta.from && today <= data.meta.to;
+  const bodyHeight = scheduled.length * ROW_HEIGHT;
+
+  const rowVirtualizer = useVirtualizer({
+    count: scheduled.length,
+    getScrollElement: () => viewportRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 8,
+  });
+  const measuredItems = rowVirtualizer.getVirtualItems();
+  const virtualItems = measuredItems.length ? measuredItems : fallbackVirtualItems(scheduled.length);
+  const totalHeight = Math.max(rowVirtualizer.getTotalSize(), bodyHeight);
+
+  const beginDrag = useCallback((
+    event: ReactPointerEvent<HTMLButtonElement>,
+    task: TimelineTask,
+    mode: DragMode,
+  ) => {
+    if (!task.capabilities.canEditSchedule) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setDrag({ task, mode, startX: event.clientX });
+  }, []);
+
+  useEffect(() => {
+    if (!drag) return undefined;
+    const finish = (event: PointerEvent) => {
+      const snappedPixels = scale.snapDelta(event.clientX - drag.startX);
+      const dayDelta = Math.round(snappedPixels / scale.columnWidth);
+      if (dayDelta !== 0 && drag.task.startDate && drag.task.dueDate) {
+        const startDate = dateOnly(drag.task.startDate);
+        const dueDate = dateOnly(drag.task.dueDate);
+        const next = drag.mode === 'move'
+          ? { startDate: addUtcDays(startDate, dayDelta), dueDate: addUtcDays(dueDate, dayDelta) }
+          : { startDate, dueDate: addUtcDays(dueDate, dayDelta) };
+        if (next.dueDate >= next.startDate) onScheduleChange(drag.task, next);
+      }
+      setDrag(null);
+    };
+    window.addEventListener('pointerup', finish, { once: true });
+    return () => window.removeEventListener('pointerup', finish);
+  }, [drag, onScheduleChange, scale]);
+
+  const openWithKeyboard = (event: KeyboardEvent<HTMLElement>, taskId: string) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      onOpenTask(taskId);
+    }
+  };
+
+  const boundsByTask = useMemo(() => new Map(scheduled.map((task, index) => {
+    const left = scale.dateToX(dateOnly(task.startDate));
+    const width = Math.max(
+      scale.columnWidth,
+      scale.dateToX(dateOnly(task.dueDate)) - left + scale.columnWidth,
+    );
+    return [task.id, { left, right: left + width, y: index * ROW_HEIGHT + ROW_HEIGHT / 2 }];
+  })), [scale, scheduled]);
+
+  const renderDependency = (dependency: TaskDependency) => {
+    const predecessor = boundsByTask.get(dependency.dependsOnTaskId);
+    const dependent = boundsByTask.get(dependency.taskId);
+    if (!predecessor || !dependent) return null;
+    const geometry = dependencyPath(dependency.dependencyType, predecessor, dependent);
+    const dependentTask = scheduled.find((task) => task.id === dependency.taskId);
+    const canDelete = Boolean(onDeleteDependency && dependentTask?.capabilities.canManageDependencies);
+    const label = `${readableStatus(dependency.dependencyType)} dependency${dependency.lagDays ? `, ${dependency.lagDays} day lag` : ''}`;
+    const middle = geometry.points[Math.floor(geometry.points.length / 2)] ?? {
+      x: geometry.anchors.toX,
+      y: dependent.y,
+    };
+
+    return (
+      <g key={dependency.id}>
+        <path
+          d={geometry.path}
+          className="gantt-dependency"
+          markerEnd={`url(#${markerId})`}
+          data-dependency-type={dependency.dependencyType}
+          data-from-x={geometry.anchors.fromX}
+          data-to-x={geometry.anchors.toX}
+          aria-label={canDelete ? `${label}; press Delete to remove` : label}
+          role={canDelete ? 'button' : 'img'}
+          tabIndex={canDelete ? 0 : undefined}
+          onKeyDown={(event) => {
+            if (canDelete && (event.key === 'Delete' || event.key === 'Backspace')) {
+              event.preventDefault();
+              onDeleteDependency?.(dependency.id);
+            }
+          }}
+        >
+          <title>{label}</title>
+        </path>
+        {dependency.lagDays !== 0 && (
+          <text x={middle.x + 5} y={middle.y - 7} className="gantt-dependency__lag">
+            {dependency.lagDays > 0 ? '+' : ''}{dependency.lagDays}d
+          </text>
+        )}
+      </g>
+    );
+  };
+
+  return (
+    <section className="gantt-shell" aria-label="Operations timeline">
+      <div className="gantt-view-switch" role="group" aria-label="Timeline view">
+        <span>{scheduled.length} scheduled · {unscheduled.length} unscheduled</span>
+        <button
+          type="button"
+          aria-pressed={view === 'table'}
+          onClick={() => setView((current) => current === 'chart' ? 'table' : 'chart')}
+        >
+          {view === 'chart' ? 'View as table' : 'View as chart'}
+        </button>
+      </div>
+
+      {view === 'table' ? (
+        <AccessibleTable
+          tasks={allTasks}
+          today={today}
+          onOpenTask={onOpenTask}
+          onScheduleChange={onScheduleChange}
+        />
+      ) : (
+        <div
+          ref={viewportRef}
+          className="gantt-viewport"
+          tabIndex={0}
+          aria-label="Scrollable timeline chart"
+        >
+          <div className="gantt-canvas" style={{ width: LABEL_WIDTH + scale.totalWidth }}>
+            <Header scale={scale} />
+            <div
+              className="gantt-body"
+              style={{ height: totalHeight, minHeight: scheduled.length ? undefined : ROW_HEIGHT }}
+            >
+              <div
+                className="gantt-grid"
+                aria-hidden="true"
+                style={{
+                  left: LABEL_WIDTH,
+                  width: scale.totalWidth,
+                  backgroundSize: `${scale.columnWidth}px ${ROW_HEIGHT}px`,
+                }}
+              />
+              {todayInsideRange && (
+                <div
+                  className="gantt-today"
+                  data-today-line
+                  aria-label={`Today, ${today}`}
+                  style={{ left: LABEL_WIDTH + scale.dateToX(today) + scale.columnWidth / 2 }}
+                >
+                  <span>Today</span>
+                </div>
+              )}
+
+              <svg
+                className="gantt-dependencies"
+                aria-label="Task dependencies"
+                style={{ left: LABEL_WIDTH, width: scale.totalWidth, height: totalHeight }}
+              >
+                <defs>
+                  <marker
+                    id={markerId}
+                    markerWidth="9"
+                    markerHeight="8"
+                    refX="8"
+                    refY="4"
+                    orient="auto"
+                  >
+                    <path d="M 0 0 L 9 4 L 0 8 z" />
+                  </marker>
+                </defs>
+                {data.dependencies.map(renderDependency)}
+              </svg>
+
+              {virtualItems.map((virtualRow) => {
+                const task = scheduled[virtualRow.index];
+                if (!task) return null;
+                const bounds = boundsByTask.get(task.id);
+                if (!bounds) return null;
+                const width = bounds.right - bounds.left;
+                const milestone = dateOnly(task.startDate) === dateOnly(task.dueDate);
+                const selected = selectedTaskId === task.id;
+                const sourceTask = dependencySourceId
+                  ? scheduled.find((candidate) => candidate.id === dependencySourceId)
+                  : undefined;
+
+                return (
+                  <div
+                    key={task.id}
+                    className="gantt-row"
+                    data-gantt-row={task.id}
+                    style={{ height: virtualRow.size, transform: `translateY(${virtualRow.start}px)` }}
+                    tabIndex={0}
+                    aria-label={`Open ${task.title}`}
+                    onKeyDown={(event) => openWithKeyboard(event, task.id)}
+                  >
+                    <div
+                      className={`gantt-row__identity${selected ? ' gantt-row__identity--selected' : ''}`}
+                      style={{ width: LABEL_WIDTH }}
+                    >
+                      <button type="button" onClick={() => onOpenTask(task.id)}>
+                        <strong>{task.title}</strong>
+                        <span>{readableStatus(task.status)} · {dateOnly(task.startDate)}–{dateOnly(task.dueDate)}</span>
+                      </button>
+                      <TaskSignals task={task} today={today} />
+                      {onCreateDependency && task.capabilities.canManageDependencies && (
+                        dependencySourceId && dependencySourceId !== task.id ? (
+                          <button
+                            type="button"
+                            className="gantt-row__link-action"
+                            aria-label={`Make ${sourceTask?.title || 'selected task'} a predecessor of ${task.title}`}
+                            onClick={() => {
+                              onCreateDependency({
+                                dependsOnTaskId: dependencySourceId,
+                                taskId: task.id,
+                                dependencyType: 'finish_to_start',
+                                lagDays: 0,
+                              });
+                              setDependencySourceId(null);
+                            }}
+                          >
+                            Link here
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="gantt-row__link-action"
+                            aria-label={`Start dependency from ${task.title}`}
+                            aria-pressed={dependencySourceId === task.id}
+                            onClick={() => setDependencySourceId(
+                              dependencySourceId === task.id ? null : task.id,
+                            )}
+                          >
+                            {dependencySourceId === task.id ? 'Cancel link' : 'Link'}
+                          </button>
+                        )
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      data-gantt-bar={task.id}
+                      className={[
+                        'gantt-bar',
+                        milestone ? 'gantt-bar--milestone' : '',
+                        task.isCritical ? 'gantt-bar--critical' : '',
+                        isOverdue(task, today) ? 'gantt-bar--overdue' : '',
+                        selected ? 'gantt-bar--selected' : '',
+                      ].filter(Boolean).join(' ')}
+                      style={{
+                        left: LABEL_WIDTH + bounds.left,
+                        top: (ROW_HEIGHT - BAR_HEIGHT) / 2,
+                        width,
+                        height: BAR_HEIGHT,
+                      }}
+                      aria-label={[
+                        task.title,
+                        milestone ? `milestone on ${dateOnly(task.startDate)}` : `${dateOnly(task.startDate)} to ${dateOnly(task.dueDate)}`,
+                        task.isCritical ? 'Critical path' : '',
+                        isOverdue(task, today) ? 'Overdue' : '',
+                        task.handoffStatus === 'ready' ? 'Ready for handoff' : '',
+                      ].filter(Boolean).join(', ')}
+                      onClick={() => onOpenTask(task.id)}
+                    >
+                      {milestone ? (
+                        <span data-gantt-milestone className="gantt-milestone" aria-hidden="true" />
+                      ) : (
+                        <span>{task.title}</span>
+                      )}
+                    </button>
+                    {task.capabilities.canEditSchedule && (
+                      <>
+                        <button
+                          type="button"
+                          data-drag-handle
+                          className="gantt-bar__drag"
+                          aria-label={`Move ${task.title}`}
+                          style={{ left: LABEL_WIDTH + bounds.left + (milestone ? 0 : 8), top: 20 }}
+                          onPointerDown={(event) => beginDrag(event, task, 'move')}
+                        />
+                        <button
+                          type="button"
+                          data-resize-handle
+                          className="gantt-bar__resize"
+                          aria-label={`Change due date for ${task.title}`}
+                          style={{ left: LABEL_WIDTH + bounds.right - 9, top: 20 }}
+                          onPointerDown={(event) => beginDrag(event, task, 'resize')}
+                        />
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+
+              {!scheduled.length && (
+                <div className="gantt-empty">
+                  <strong>No scheduled work in this range</strong>
+                  <span>Use the planning inbox below to add dates.</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <UnscheduledTasksPanel
+        tasks={unscheduled}
+        onOpenTask={onOpenTask}
+        onScheduleChange={onScheduleChange}
+      />
+    </section>
   );
 }
