@@ -67,7 +67,7 @@ var TaskStatus;
     TaskStatus["COMPLETED"] = "completed";
     TaskStatus["BLOCKED"] = "blocked";
 })(TaskStatus || (exports.TaskStatus = TaskStatus = {}));
-/** Final-handoff state for a task that requires delivery confirmation. */
+/** Handoff verification states. */
 var HandoffStatus;
 (function (HandoffStatus) {
     HandoffStatus["PENDING"] = "pending";

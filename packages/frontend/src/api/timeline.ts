@@ -45,8 +45,8 @@ export const timelineKeys = {
 /** Produces the same ordered query string for a request and its cache key. */
 export function buildTimelineParams(scope: TimelineScope, query: TimelineQuery): URLSearchParams {
   const params = new URLSearchParams();
-  params.set('from', query.from.trim());
-  params.set('to', query.to.trim());
+  if (query.from?.trim()) params.set('from', query.from.trim());
+  if (query.to?.trim()) params.set('to', query.to.trim());
 
   const departmentId =
     scope.kind === 'dashboard' ? scope.departmentId?.trim() : query.departmentId?.trim();

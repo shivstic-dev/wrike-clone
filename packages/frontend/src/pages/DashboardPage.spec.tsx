@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  HandoffStatus,
   TaskPriority,
   TaskStatus,
   type DashboardOverview,
@@ -80,7 +81,7 @@ const overview: DashboardOverview = {
 const dashboardTasks: DashboardTaskListResponse = {
   generatedAt: '2026-07-30T12:00:00.000Z', bucket: 'overdue', data: [{
     id: 'task-self-assigned', title: 'Self assigned follow-up', projectId: 'project-1', projectName: 'Community launch',
-    departmentId: 'department-1', status: TaskStatus.IN_PROGRESS, handoffStatus: pendingHandoffStatus, handoffOwner: null,
+    departmentId: 'department-1', status: TaskStatus.IN_PROGRESS, handoffStatus: HandoffStatus.PENDING, handoffOwner: null,
     assignees: [{ userId: 'user-1', name: 'Harper Head' }], dueDate: null, handoffReadyAt: null,
   }],
 };

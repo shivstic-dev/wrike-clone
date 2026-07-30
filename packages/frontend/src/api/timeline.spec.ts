@@ -99,7 +99,7 @@ describe('timeline API', () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'dep-1' } });
     vi.mocked(apiClient.patch).mockResolvedValue({ data: { id: 'dep-1' } });
     vi.mocked(apiClient.delete).mockResolvedValue({ data: undefined });
-    await mountMutation(client, useCreateDependency)({ taskId: 'task-1', dependsOnTaskId: 'task-0', dependencyType: 'finish_to_start', lagDays: 2 });
+    await mountMutation(client, useCreateDependency)({ taskId: 'task-1', dependsOnTaskId: 'task-0', dependencyType: DependencyType.FINISH_TO_START, lagDays: 2 });
     await mountMutation(client, useUpdateDependency)({ id: 'dep-1', dependencyType: DependencyType.START_TO_START, lagDays: 0 });
     await mountMutation(client, useDeleteDependency)('dep-1');
     expect(apiClient.post).toHaveBeenCalledWith('/tasks/dependencies', expect.any(Object));

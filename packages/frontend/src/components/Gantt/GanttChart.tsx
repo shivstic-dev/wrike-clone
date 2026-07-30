@@ -356,7 +356,7 @@ export function GanttChart({
     const predecessor = boundsByTask.get(dependency.dependsOnTaskId);
     const dependent = boundsByTask.get(dependency.taskId);
     if (!predecessor || !dependent) return null;
-    const geometry = dependencyPath(dependency.dependencyType, predecessor, dependent);
+    const geometry = dependencyPath(dependency.dependencyType as DependencyType, predecessor, dependent);
     const label = `${readableStatus(dependency.dependencyType)} dependency${dependency.lagDays ? `, ${dependency.lagDays} day lag` : ''}`;
     const middle = geometry.points[Math.floor(geometry.points.length / 2)] ?? {
       x: geometry.anchors.toX,

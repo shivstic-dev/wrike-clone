@@ -21,6 +21,7 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
+      "@wrike-clone/shared": ["../shared/dist/index.d.ts"],
       "@/*": ["./src/*"]
     }
   },

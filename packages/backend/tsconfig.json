@@ -9,7 +9,9 @@
     "emitDecoratorMetadata": true,
     "target": "ES2022",
     "module": "commonjs",
+    "baseUrl": ".",
     "paths": {
+      "@wrike-clone/shared": ["../shared/dist/index.d.ts"],
       "@/*": ["./src/*"]
     }
   },

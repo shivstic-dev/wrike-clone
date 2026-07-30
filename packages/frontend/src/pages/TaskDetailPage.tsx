@@ -14,8 +14,8 @@ import { useState } from 'react';
 import { useWorkspaceMembers, useWorkspaces } from '../api/workspaces';
 import { useAuth } from '../contexts/AuthContext';
 import { useMoveTaskLocation, useTaskLocations } from '../api/task-locations';
-import { HandoffCompletionDialog } from '../components/Task/HandoffCompletionDialog';
 import { useTaskCompletionFlow } from '../components/Task/useTaskCompletionFlow';
+import { HandoffCompletionDialog } from '../components/Task/HandoffCompletionDialog';
 
 const statusOptions: { value: string; label: string }[] = [
   { value: TASK_STATUS.TODO, label: 'To Do' },
@@ -150,27 +150,14 @@ export default function TaskDetailPage() {
   const { data: departmentMembers = [] } = useWorkspaceMembers(task?.departmentId || '');
   const { user, membership } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const { requestCompletion, dialogProps } = useTaskCompletionFlow();
-
-  const completeWithHandoff = async (taskToComplete: Task) => {
-    const completedTask = await requestCompletion(taskToComplete);
-    if (!completedTask) return false;
-
-    if (completedTask.handoffStatus === 'ready') {
-      toast.success('Saved in Ready for handoff');
-    } else {
-      toast.success('Handoff confirmed and task completed');
-    }
-    return true;
-  };
+  const completionFlow = useTaskCompletionFlow();
 
   const handleStatusChange = async (status: string) => {
+    if (status === 'completed' && task?.handoffRequired) {
+      completionFlow.requestCompletion(task);
+      return;
+    }
     try {
-      if (!task) return;
-      if (status === TASK_STATUS.COMPLETED) {
-        await completeWithHandoff(task);
-        return;
-      }
       await updateTask.mutateAsync({ id: taskId!, status: status as Task['status'] });
       toast.success('Status updated');
     } catch {
@@ -180,23 +167,10 @@ export default function TaskDetailPage() {
 
   const handleUpdateTask = async (values: Partial<Task>) => {
     try {
-      if (!task) return;
-      const { id: _id, status, ...changes } = values;
-      if (status === TASK_STATUS.COMPLETED && task?.status !== TASK_STATUS.COMPLETED) {
-        const taskToComplete = Object.keys(changes).length
-          ? await updateTask.mutateAsync({ id: taskId!, ...changes } as UpdateTaskRequest & {
-              id: string;
-            })
-          : task;
-        await completeWithHandoff(taskToComplete);
-      } else {
-        await updateTask.mutateAsync({
-          id: taskId!,
-          ...changes,
-          ...(status && status !== TASK_STATUS.COMPLETED ? { status } : {}),
-        } as UpdateTaskRequest & { id: string });
-        toast.success('Task updated');
-      }
+      await updateTask.mutateAsync({ id: taskId!, ...values } as UpdateTaskRequest & {
+        id: string;
+      });
+      toast.success('Task updated');
       setIsEditing(false);
     } catch {
       toast.error('Failed to update task');
@@ -237,12 +211,6 @@ export default function TaskDetailPage() {
           (member) => member.role === 'employee' || member.userId === user?.id,
         )
       : departmentMembers;
-  const handoffConfirmer = task.handoffConfirmedBy
-    ? departmentMembers.find((member) => member.userId === task.handoffConfirmedBy) ||
-      (user?.id === task.handoffConfirmedBy ? user : undefined)
-    : undefined;
-  const handoffConfirmerName =
-    handoffConfirmer?.displayName || handoffConfirmer?.email || 'A team member';
 
   return (
     <div className="mx-auto max-w-4xl p-6">
@@ -298,9 +266,8 @@ export default function TaskDetailPage() {
           {/* Status and Priority */}
           <div className="mb-6 grid grid-cols-3 gap-4">
             <div>
-              <label className="label" htmlFor="task-status">Status</label>
+              <label className="label">Status</label>
               <select
-                id="task-status"
                 value={task.status}
                 onChange={(e) => handleStatusChange(e.target.value)}
                 className="input text-sm"
@@ -339,43 +306,6 @@ export default function TaskDetailPage() {
               </div>
             </div>
           </div>
-
-          <section className="card mb-6 border-atlas-mist p-4" aria-labelledby="handoff-status-heading">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-atlas-current">
-              Final handoff
-            </p>
-            <h2 id="handoff-status-heading" className="mt-1 text-sm font-semibold text-atlas-ink">
-              {task.handoffStatus === 'confirmed'
-                ? 'Handoff confirmed'
-                : task.handoffStatus === 'ready'
-                  ? 'Ready for handoff'
-                  : task.handoffRequired
-                    ? 'Confirmation required before completion'
-                    : 'Handoff confirmation not required'}
-            </h2>
-            <dl className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-              <div>
-                <dt className="text-slate-400">Task owner</dt>
-                <dd className="font-medium text-slate-700">
-                  {task.handoffOwner?.displayName || task.handoffOwner?.email || 'Not assigned'}
-                </dd>
-              </div>
-              {task.handoffConfirmedBy && (
-                <div>
-                  <dt className="text-slate-400">Confirmed by</dt>
-                  <dd className="font-medium text-slate-700">{handoffConfirmerName}</dd>
-                </div>
-              )}
-              {task.handoffConfirmedAt && (
-                <div>
-                  <dt className="text-slate-400">Confirmed at</dt>
-                  <dd className="font-medium text-slate-700">
-                    {format(new Date(task.handoffConfirmedAt), 'MMM d, yyyy, h:mm a')}
-                  </dd>
-                </div>
-              )}
-            </dl>
-          </section>
 
           {/* Dates */}
           <div className="mb-6 grid grid-cols-3 gap-4 text-sm">
@@ -424,7 +354,8 @@ export default function TaskDetailPage() {
           <CommentSection taskId={task.id} />
         </>
       )}
-      <HandoffCompletionDialog {...dialogProps} />
+      {/* Handoff completion dialog */}
+      <HandoffCompletionDialog {...completionFlow.dialogProps} />
     </div>
   );
 }

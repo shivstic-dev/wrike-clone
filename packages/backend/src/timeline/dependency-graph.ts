@@ -244,6 +244,8 @@ function requiredStartDay(
       return predecessor.end + edge.lagDays - dependentDuration + 1;
     case DependencyType.START_TO_FINISH:
       return predecessor.start + edge.lagDays - dependentDuration + 1;
+    default:
+      return predecessor.end + edge.lagDays + 1;
   }
 }
 

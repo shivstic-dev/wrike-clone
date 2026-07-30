@@ -7,19 +7,13 @@
  */
 
 import { z } from 'zod';
-import {
-  HandoffStatus,
-  TaskStatus,
-  TaskPriority,
-  DependencyType,
-  TriggerEvent,
-  TenantRole,
-} from '../enums';
+import { TaskStatus, TaskPriority, HandoffStatus, DependencyType, TriggerEvent, TenantRole } from '../enums';
 
 // ── Helpers ────────────────────────────────────────────────────
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const slugRegex = /^[a-z0-9-]+$/;
+
 
 export const uuidField = z.string().regex(uuidRegex, 'Invalid UUID format');
 export const slugField = z
@@ -210,9 +204,9 @@ export const createTaskSchema = taskLocationInputSchema.and(
     estimatedHours: z.number().nonnegative().optional(),
     startDate: isoDate.optional(),
     dueDate: isoDate.optional(),
-    handoffRequired: z.boolean().optional(),
     visibility: z.enum(['global', 'department']).optional().default('department'),
     customFields: z.record(z.unknown()).optional(),
+    handoffRequired: z.boolean().optional().default(true),
   }),
 );
 
@@ -228,10 +222,10 @@ export const updateTaskSchema = z
     actualHours: z.number().nonnegative().optional(),
     startDate: isoDate.nullable().optional(),
     dueDate: isoDate.nullable().optional(),
-    handoffRequired: z.boolean().optional(),
     visibility: z.enum(['global', 'department']).optional(),
     sortOrder: z.number().int().optional(),
     customFields: z.record(z.unknown()).optional(),
+    handoffRequired: z.boolean().optional(),
   })
   .refine((d) => Object.keys(d).length > 0, 'At least one field required');
 
@@ -246,14 +240,27 @@ export const taskFilterSchema = z.object({
     (value) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value),
     z.array(z.nativeEnum(TaskPriority)).optional(),
   ),
-  handoffStatus: z.nativeEnum(HandoffStatus).optional(),
   search: z.string().max(200).optional(),
   dueDateBefore: isoDate.optional(),
   dueDateAfter: isoDate.optional(),
   folderId: uuidField.optional(),
   departmentId: uuidField.optional(),
   page: z.coerce.number().int().positive().optional().default(1),
-  perPage: z.coerce.number().int().min(1).max(100).optional().default(25),
+  perPage: z.coerce.number().int().min(1).max(1000).optional().default(25),
+  handoffStatus: z.nativeEnum(HandoffStatus).optional(),
+});
+
+export const taskCompletionSchema = z.object({
+  outcome: z.enum(['confirmed', 'not_yet']),
+});
+
+export const bulkTaskCompletionSchema = z.object({
+  items: z.array(
+    z.object({
+      taskId: uuidField,
+      outcome: z.enum(['confirmed', 'not_yet']),
+    }),
+  ).min(1).max(100),
 });
 
 export const bulkTaskUpdateSchema = z.object({
@@ -261,45 +268,6 @@ export const bulkTaskUpdateSchema = z.object({
   updates: updateTaskSchema,
 });
 
-export const taskCompletionSchema = z.object({
-  outcome: z.enum(['confirmed', 'not_yet']),
-});
-
-export const BULK_TASK_COMPLETION_DUPLICATE_MESSAGE =
-  'Each task can appear only once in a bulk completion request';
-
-export const bulkTaskCompletionSchema = z.object({
-  items: z
-    .array(
-      z.object({
-        taskId: uuidField,
-        outcome: z.enum(['confirmed', 'not_yet']),
-      }),
-    )
-    .min(1)
-    .max(100),
-}).superRefine(({ items }, ctx) => {
-  const seenTaskIds = new Set<string>();
-  items.forEach((item, index) => {
-    if (seenTaskIds.has(item.taskId)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: BULK_TASK_COMPLETION_DUPLICATE_MESSAGE,
-        path: ['items', index, 'taskId'],
-      });
-    }
-    seenTaskIds.add(item.taskId);
-  });
-});
-
-export const dashboardTaskBucketSchema = z.enum([
-  'active',
-  'completed',
-  'overdue',
-  'blocked',
-  'unassigned',
-  'ready_for_handoff',
-]);
 
 // ── Dependencies ───────────────────────────────────────────────
 
@@ -307,54 +275,7 @@ export const createDependencySchema = z.object({
   taskId: uuidField,
   dependsOnTaskId: uuidField,
   dependencyType: z.nativeEnum(DependencyType),
-  lagDays: z.number().int().min(0).max(3650).optional().default(0),
-});
-
-const MAX_TIMELINE_RANGE_MS = 730 * 24 * 60 * 60 * 1000;
-
-export const timelineQuerySchema = z
-  .object({
-    from: isoDate,
-    to: isoDate,
-    departmentId: uuidField.optional(),
-    projectId: uuidField.optional(),
-    assigneeId: uuidField.optional(),
-    status: z.array(z.nativeEnum(TaskStatus)).optional(),
-    cursor: z.string().min(1).optional(),
-    perPage: z.coerce.number().int().min(1).max(500).optional(),
-    includeCriticalPath: z.coerce.boolean().optional(),
-  })
-  .refine(
-    (value) => new Date(value.from).getTime() <= new Date(value.to).getTime(),
-    { message: 'from must be before or equal to to', path: ['to'] },
-  )
-  .refine(
-    (value) => new Date(value.to).getTime() - new Date(value.from).getTime() <= MAX_TIMELINE_RANGE_MS,
-    { message: 'timeline range must not exceed 730 days', path: ['to'] },
-  );
-
-export const updateTaskScheduleSchema = z
-  .object({
-    startDate: isoDate.nullable(),
-    dueDate: isoDate.nullable(),
-    expectedUpdatedAt: isoDate,
-  })
-  .refine(
-    (value) =>
-      (value.startDate === null && value.dueDate === null) ||
-      (value.startDate !== null && value.dueDate !== null),
-    { message: 'startDate and dueDate must be scheduled together' },
-  )
-  .refine(
-    (value) =>
-      value.startDate === null ||
-      new Date(value.startDate).getTime() <= new Date(value.dueDate!).getTime(),
-    { message: 'startDate must not be after dueDate' },
-  );
-
-export const updateDependencySchema = z.object({
-  dependencyType: z.nativeEnum(DependencyType),
-  lagDays: z.number().int().min(0).max(3650),
+  lagDays: z.number().int().nonnegative().optional().default(0),
 });
 
 // ── Comments ───────────────────────────────────────────────────
@@ -513,6 +434,35 @@ export const dashboardTasksQuerySchema = z.object({
   ]),
 });
 
+export const updateDependencySchema = z.object({
+  dependencyType: z.nativeEnum(DependencyType).optional(),
+  lagDays: z.number().int().nonnegative().optional(),
+});
+
+export const updateTaskScheduleSchema = z.object({
+  startDate: isoDate,
+  dueDate: isoDate,
+  expectedUpdatedAt: isoDate,
+});
+
+export const timelineQuerySchema = z.object({
+  projectId: uuidField.optional(),
+  departmentId: uuidField.optional(),
+  assigneeId: uuidField.optional(),
+  status: z.preprocess(
+    (value) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value),
+    z.array(z.nativeEnum(TaskStatus)).optional(),
+  ),
+  priority: z.preprocess(
+    (value) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value),
+    z.array(z.nativeEnum(TaskPriority)).optional(),
+  ),
+  from: isoDate.optional(),
+  to: isoDate.optional(),
+  cursor: z.string().optional(),
+  perPage: z.coerce.number().int().min(1).max(500).optional().default(100),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type AdminResetPasswordInput = z.infer<typeof adminResetPasswordSchema>;
@@ -530,12 +480,7 @@ export type CreateTaskInput = z.input<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type TaskFilterInput = z.infer<typeof taskFilterSchema>;
 export type BulkTaskUpdateInput = z.infer<typeof bulkTaskUpdateSchema>;
-export type TaskCompletionInput = z.infer<typeof taskCompletionSchema>;
-export type BulkTaskCompletionInput = z.infer<typeof bulkTaskCompletionSchema>;
 export type CreateDependencyInput = z.infer<typeof createDependencySchema>;
-export type TimelineQueryInput = z.infer<typeof timelineQuerySchema>;
-export type UpdateTaskScheduleInput = z.infer<typeof updateTaskScheduleSchema>;
-export type UpdateDependencyInput = z.infer<typeof updateDependencySchema>;
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;
 export type CreateTimeEntryInput = z.infer<typeof createTimeEntrySchema>;
 export type CreateAutomationRuleInput = z.infer<typeof createAutomationRuleSchema>;

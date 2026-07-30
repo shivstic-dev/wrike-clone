@@ -6,15 +6,7 @@
  * so API contracts are a single source of truth.
  */
 
-import type {
-  TaskPriority,
-  TaskStatus,
-  HandoffStatus,
-  DependencyType,
-  TenantRole,
-  PlanTier,
-  FileCategory,
-} from '../enums';
+import type { TaskPriority, TaskStatus, HandoffStatus, TenantRole, PlanTier, FileCategory } from '../enums';
 
 // ── Timestamp helpers ──────────────────────────────────────────
 export type Timestamp = string; // ISO-8601
@@ -149,13 +141,6 @@ export interface Task extends BaseEntity {
   title: string;
   description: string | null;
   status: TaskStatus;
-  handoffRequired: boolean;
-  handoffStatus: HandoffStatus;
-  handoffOwnerId: string | null;
-  handoffOwner?: Pick<User, 'id' | 'displayName' | 'email'> | null;
-  handoffReadyAt: Timestamp | null;
-  handoffConfirmedBy: string | null;
-  handoffConfirmedAt: Timestamp | null;
   priority: TaskPriority;
   estimatedHours: number | null;
   actualHours: number | null;
@@ -167,13 +152,21 @@ export interface Task extends BaseEntity {
   customFields: Record<string, unknown>;
   isRecurring: boolean;
   recurrenceRule: string | null;
+  handoffRequired?: boolean;
+  handoffStatus?: HandoffStatus;
+  handoffOwnerId?: string | null;
+  handoffOwner?: Pick<User, 'id' | 'displayName' | 'email'> | null;
+  handoffReadyAt?: Timestamp | null;
+  handoffConfirmedBy?: string | null;
+  handoffConfirmedAt?: Timestamp | null;
 }
+
 
 export interface TaskDependency {
   id: string;
   taskId: string; // the task that depends
   dependsOnTaskId: string; // the task it depends on
-  dependencyType: DependencyType;
+  dependencyType: string;
   lagDays: number;
 }
 

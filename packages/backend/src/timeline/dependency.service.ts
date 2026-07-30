@@ -80,8 +80,8 @@ export class DependencyService {
       const candidate: DependencyEdge = {
         taskId: dependency.task_id,
         dependsOnTaskId: dependency.depends_on_task_id,
-        dependencyType: input.dependencyType,
-        lagDays: input.lagDays,
+        dependencyType: input.dependencyType ?? (dependency.dependency_type as DependencyEdge['dependencyType']),
+        lagDays: input.lagDays ?? Number(dependency.lag_days),
       };
       const edges = (await this.edges(trx)).filter((edge) => edge.id !== id);
       if (wouldCreateCycle(edges, candidate)) {
@@ -90,7 +90,11 @@ export class DependencyService {
 
       const [row] = await trx('task_dependencies')
         .where({ id, tenant_id: requireTenantContext().tenantId })
-        .update({ dependency_type: input.dependencyType, lag_days: input.lagDays, updated_at: new Date() })
+        .update({
+          dependency_type: candidate.dependencyType,
+          lag_days: candidate.lagDays,
+          updated_at: new Date(),
+        })
         .returning('*');
       if (!row) throw new NotFoundException('Dependency not found');
       return this.toDependency(row);
@@ -129,7 +133,7 @@ export class DependencyService {
       id: row.id,
       taskId: row.task_id,
       dependsOnTaskId: row.depends_on_task_id,
-      dependencyType: row.dependency_type,
+      dependencyType: row.dependency_type as DependencyEdge['dependencyType'],
       lagDays: Number(row.lag_days),
     }));
   }

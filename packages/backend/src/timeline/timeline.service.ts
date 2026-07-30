@@ -136,9 +136,9 @@ export function buildScheduledTimelineQuery(
 ): Knex.QueryBuilder {
   const query = baseTimelineQuery(db, ctx, input)
     .whereNotNull('tasks.start_date')
-    .whereNotNull('tasks.due_date')
-    .andWhere('tasks.start_date', '<=', input.to)
-    .andWhere('tasks.due_date', '>=', input.from);
+    .whereNotNull('tasks.due_date');
+  if (input.to) query.andWhere('tasks.start_date', '<=', input.to);
+  if (input.from) query.andWhere('tasks.due_date', '>=', input.from);
   if (input.cursor) {
     const cursor = decodeTimelineCursor(input.cursor);
     query.andWhere((afterCursor) => {
@@ -289,8 +289,8 @@ export class TimelineService {
         lagDays: Number(dependency.lag_days),
       })),
       meta: {
-        from: input.from,
-        to: input.to,
+        from: input.from ?? '',
+        to: input.to ?? '',
         nextCursor: hasMore ? encodeTimelineCursor(scheduled[scheduled.length - 1]!) : null,
       },
     };

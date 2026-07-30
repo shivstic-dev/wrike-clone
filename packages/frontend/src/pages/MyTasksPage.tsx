@@ -86,7 +86,7 @@ export default function MyTasksPage() {
                         </p>
                       </div>
                       <p className="shrink-0 text-sm font-medium text-atlas-current">
-                        {formatWaitingTime(task.handoffReadyAt)}
+                        {formatWaitingTime(task.handoffReadyAt || null)}
                       </p>
                     </div>
                   </li>

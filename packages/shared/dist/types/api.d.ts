@@ -161,6 +161,15 @@ export interface UpdateTaskRequest {
     sortOrder?: number;
     customFields?: Record<string, unknown>;
 }
+export interface TaskCompletionRequest {
+    outcome: 'confirmed' | 'not_yet';
+}
+export interface BulkTaskCompletionRequest {
+    items: Array<{
+        taskId: string;
+        outcome: 'confirmed' | 'not_yet';
+    }>;
+}
 export interface TaskFilterParams extends PaginationParams {
     departmentId?: string;
     projectId?: string;
@@ -189,8 +198,8 @@ export interface BulkTaskUpdateRequest {
     updates: UpdateTaskRequest;
 }
 export interface TimelineQuery {
-    from: string;
-    to: string;
+    from?: string;
+    to?: string;
     departmentId?: string;
     projectId?: string;
     assigneeId?: string;
@@ -275,9 +284,11 @@ export interface DashboardTaskListResponse {
 export interface CreateDependencyRequest {
     taskId: string;
     dependsOnTaskId: string;
-    dependencyType: string;
+    dependencyType: DependencyType;
     lagDays?: number;
 }
+export type UpdateDependencyInput = Partial<CreateDependencyRequest>;
+export type UpdateTaskScheduleInput = Partial<UpdateTaskScheduleRequest>;
 export interface CreateCommentRequest {
     taskId: string;
     content: string;
