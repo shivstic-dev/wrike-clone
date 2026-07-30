@@ -535,6 +535,32 @@ export function QuickTaskModal({ open, initialDepartmentId, onClose }: QuickTask
                 </div>
               </details>
 
+              <div className="flex items-center gap-3 rounded-xl border border-atlas-mist bg-slate-50 px-4 py-3">
+                <input
+                  id="quick-task-handoff"
+                  type="checkbox"
+                  checked={state.handoffRequired}
+                  className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  onChange={(event) =>
+                    setState((current) => ({
+                      ...current,
+                      handoffRequired: event.target.checked,
+                    }))
+                  }
+                />
+                <div>
+                  <label
+                    htmlFor="quick-task-handoff"
+                    className="text-sm font-medium text-slate-800"
+                  >
+                    Final handoff required
+                  </label>
+                  <p className="text-xs text-slate-500">
+                    Requires confirming deliverable delivery before marking task completed.
+                  </p>
+                </div>
+              </div>
+
               {submitError && (
                 <p
                   role="alert"

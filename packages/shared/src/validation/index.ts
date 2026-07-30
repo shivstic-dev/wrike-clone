@@ -7,12 +7,13 @@
  */
 
 import { z } from 'zod';
-import { TaskStatus, TaskPriority, DependencyType, TriggerEvent, TenantRole } from '../enums';
+import { TaskStatus, TaskPriority, HandoffStatus, DependencyType, TriggerEvent, TenantRole } from '../enums';
 
 // ── Helpers ────────────────────────────────────────────────────
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const slugRegex = /^[a-z0-9-]+$/;
+
 
 export const uuidField = z.string().regex(uuidRegex, 'Invalid UUID format');
 export const slugField = z
@@ -205,6 +206,7 @@ export const createTaskSchema = taskLocationInputSchema.and(
     dueDate: isoDate.optional(),
     visibility: z.enum(['global', 'department']).optional().default('department'),
     customFields: z.record(z.unknown()).optional(),
+    handoffRequired: z.boolean().optional().default(true),
   }),
 );
 
@@ -223,6 +225,7 @@ export const updateTaskSchema = z
     visibility: z.enum(['global', 'department']).optional(),
     sortOrder: z.number().int().optional(),
     customFields: z.record(z.unknown()).optional(),
+    handoffRequired: z.boolean().optional(),
   })
   .refine((d) => Object.keys(d).length > 0, 'At least one field required');
 
@@ -243,13 +246,28 @@ export const taskFilterSchema = z.object({
   folderId: uuidField.optional(),
   departmentId: uuidField.optional(),
   page: z.coerce.number().int().positive().optional().default(1),
-  perPage: z.coerce.number().int().min(1).max(100).optional().default(25),
+  perPage: z.coerce.number().int().min(1).max(1000).optional().default(25),
+  handoffStatus: z.nativeEnum(HandoffStatus).optional(),
+});
+
+export const taskCompletionSchema = z.object({
+  outcome: z.enum(['confirmed', 'not_yet']),
+});
+
+export const bulkTaskCompletionSchema = z.object({
+  items: z.array(
+    z.object({
+      taskId: uuidField,
+      outcome: z.enum(['confirmed', 'not_yet']),
+    }),
+  ).min(1).max(100),
 });
 
 export const bulkTaskUpdateSchema = z.object({
   taskIds: z.array(uuidField).min(1).max(100),
   updates: updateTaskSchema,
 });
+
 
 // ── Dependencies ───────────────────────────────────────────────
 

@@ -17,6 +17,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { TaskService } from './task.service';
+import { TaskCompletionService } from './task-completion.service';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Permissions } from '../common/decorators/permissions.decorator';
@@ -30,12 +31,17 @@ import {
   createCommentSchema,
   addTaskAssigneeSchema,
   moveTaskLocationSchema,
+  taskCompletionSchema,
+  bulkTaskCompletionSchema,
 } from '@wrike-clone/shared';
 
 @Controller('tasks')
 @UseGuards(AuthGuard, RolesGuard)
 export class TaskController {
-  constructor(private readonly taskService: TaskService) {}
+  constructor(
+    private readonly taskService: TaskService,
+    private readonly taskCompletionService: TaskCompletionService,
+  ) {}
 
   @Get()
   @Permissions('task:read')
@@ -50,6 +56,21 @@ export class TaskController {
     const filter = taskFilterSchema.parse(query || {});
     return this.taskService.findMyTasks(filter);
   }
+
+  @Post('bulk-completion')
+  @Permissions('task:status:update')
+  async completeMany(@Body() body: unknown) {
+    const input = bulkTaskCompletionSchema.parse(body);
+    return this.taskCompletionService.completeMany(input);
+  }
+
+  @Post(':taskId/completion')
+  @Permissions('task:status:update')
+  async complete(@Param('taskId') taskId: string, @Body() body: unknown) {
+    const input = taskCompletionSchema.parse(body);
+    return this.taskCompletionService.complete(taskId, input);
+  }
+
 
   @Post(':id/assignees')
   @Permissions('task:read')

@@ -6,7 +6,7 @@
  * so API contracts are a single source of truth.
  */
 
-import type { TaskPriority, TaskStatus, TenantRole, PlanTier, FileCategory } from '../enums';
+import type { TaskPriority, TaskStatus, HandoffStatus, TenantRole, PlanTier, FileCategory } from '../enums';
 
 // ── Timestamp helpers ──────────────────────────────────────────
 export type Timestamp = string; // ISO-8601
@@ -152,7 +152,15 @@ export interface Task extends BaseEntity {
   customFields: Record<string, unknown>;
   isRecurring: boolean;
   recurrenceRule: string | null;
+  handoffRequired?: boolean;
+  handoffStatus?: HandoffStatus;
+  handoffOwnerId?: string | null;
+  handoffOwner?: Pick<User, 'id' | 'displayName' | 'email'> | null;
+  handoffReadyAt?: Timestamp | null;
+  handoffConfirmedBy?: string | null;
+  handoffConfirmedAt?: Timestamp | null;
 }
+
 
 export interface TaskDependency {
   id: string;

@@ -2,7 +2,7 @@
  * Calendar View component.
  * Shows tasks grouped by due date in month, week, and day views.
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
@@ -28,11 +28,33 @@ type CalendarViewMode = 'month' | 'week' | 'day';
 
 interface CalendarViewProps {
   tasks: Task[];
+  isLoading?: boolean;
+  onDateRangeChange?: (start: string, end: string) => void;
 }
 
-export function CalendarView({ tasks }: CalendarViewProps) {
+export function CalendarView({ tasks, isLoading, onDateRangeChange }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>('month');
+
+  useEffect(() => {
+    if (!onDateRangeChange) return;
+    
+    let start: Date;
+    let end: Date;
+    
+    if (viewMode === 'month') {
+      start = startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 });
+      end = endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 });
+    } else if (viewMode === 'week') {
+      start = startOfWeek(currentDate, { weekStartsOn: 1 });
+      end = endOfWeek(currentDate, { weekStartsOn: 1 });
+    } else {
+      start = currentDate;
+      end = currentDate;
+    }
+    
+    onDateRangeChange(start.toISOString(), end.toISOString());
+  }, [currentDate, viewMode, onDateRangeChange]);
 
   // Group tasks by date
   const tasksByDate = useMemo(() => {
@@ -270,10 +292,16 @@ export function CalendarView({ tasks }: CalendarViewProps) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
             </svg>
           </button>
-          <h2 className="text-base font-semibold text-slate-900 min-w-[200px] text-center">
+          <h2 className="text-base font-semibold text-slate-900 min-w-[200px] text-center flex items-center justify-center gap-2">
             {viewMode === 'month' && format(currentDate, 'MMMM yyyy')}
             {viewMode === 'week' && `Week of ${format(currentDate, 'MMM d, yyyy')}`}
             {viewMode === 'day' && format(currentDate, 'MMM d, yyyy')}
+            {isLoading && (
+              <svg className="h-4 w-4 animate-spin text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            )}
           </h2>
           <button onClick={navigateNext} className="btn-ghost btn-sm p-1.5">
             <svg

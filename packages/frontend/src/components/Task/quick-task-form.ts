@@ -13,6 +13,7 @@ export interface QuickTaskFormState {
   startDate: string;
   estimatedHours: number | '';
   visibility: 'global' | 'department';
+  handoffRequired: boolean;
 }
 
 export function createQuickTaskFormState(departmentId = ''): QuickTaskFormState {
@@ -28,6 +29,7 @@ export function createQuickTaskFormState(departmentId = ''): QuickTaskFormState 
     startDate: '',
     estimatedHours: '',
     visibility: 'department',
+    handoffRequired: true,
   };
 }
 
@@ -85,8 +87,10 @@ export function normalizeQuickTaskInput(state: QuickTaskFormState): CreateTaskRe
     startDate: normalizeQuickTaskDate(state.startDate),
     estimatedHours: normalizeQuickTaskEstimatedHours(state.estimatedHours),
     visibility: state.visibility,
+    handoffRequired: state.handoffRequired,
   };
 }
+
 
 export function canCreateQuickTask<T extends { departmentRole?: string }>(
   departments: T[],

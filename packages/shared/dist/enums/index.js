@@ -6,7 +6,7 @@
  * drift between backend and frontend.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PlanTier = exports.FileCategory = exports.AuthProvider = exports.SortDirection = exports.TriggerEvent = exports.ApprovalStatus = exports.Visibility = exports.WorkspaceRole = exports.EventVisibility = exports.DependencyType = exports.TaskPriority = exports.TaskStatus = exports.Permission = exports.TenantRole = void 0;
+exports.PlanTier = exports.FileCategory = exports.AuthProvider = exports.SortDirection = exports.TriggerEvent = exports.ApprovalStatus = exports.Visibility = exports.WorkspaceRole = exports.EventVisibility = exports.DependencyType = exports.TaskPriority = exports.HandoffStatus = exports.TaskStatus = exports.Permission = exports.TenantRole = void 0;
 /** Tenant-level roles — defined by the tenant admin, not hardcoded system-wide. */
 var TenantRole;
 (function (TenantRole) {
@@ -67,6 +67,14 @@ var TaskStatus;
     TaskStatus["COMPLETED"] = "completed";
     TaskStatus["BLOCKED"] = "blocked";
 })(TaskStatus || (exports.TaskStatus = TaskStatus = {}));
+/** Handoff verification states. */
+var HandoffStatus;
+(function (HandoffStatus) {
+    HandoffStatus["PENDING"] = "pending";
+    HandoffStatus["READY"] = "ready";
+    HandoffStatus["CONFIRMED"] = "confirmed";
+    HandoffStatus["NOT_REQUIRED"] = "not_required";
+})(HandoffStatus || (exports.HandoffStatus = HandoffStatus = {}));
 /** Priority levels for tasks. */
 var TaskPriority;
 (function (TaskPriority) {

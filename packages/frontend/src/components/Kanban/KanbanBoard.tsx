@@ -17,6 +17,8 @@ import { useUpdateTask } from '../../api/tasks';
 import { TASK_STATUS } from '../../api/enums';
 import type { Task } from '@wrike-clone/shared';
 import toast from 'react-hot-toast';
+import { useTaskCompletionFlow } from '../Task/useTaskCompletionFlow';
+import { HandoffCompletionDialog } from '../Task/HandoffCompletionDialog';
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -32,6 +34,7 @@ const COLUMNS: { status: string; title: string; color: string }[] = [
 export function KanbanBoard({ tasks }: KanbanBoardProps) {
   const updateTask = useUpdateTask();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const completionFlow = useTaskCompletionFlow();
 
   const columns = COLUMNS.map((col) => ({
     ...col,
@@ -72,6 +75,11 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
 
       if (!task || task.status === targetStatus) return;
 
+      if (targetStatus === 'completed' && task.handoffRequired) {
+        completionFlow.requestCompletion(task);
+        return;
+      }
+
       try {
         await updateTask.mutateAsync({ id: taskId, status: targetStatus });
         toast.success(`Moved to ${targetStatus.replace('_', ' ')}`);
@@ -83,26 +91,29 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
   );
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {columns.map((col) => (
-          <div key={col.status} className="min-w-[280px] flex-1">
-            <KanbanColumn
-              status={col.status}
-              title={col.title}
-              tasks={col.tasks}
-              color={col.color}
-            />
-          </div>
-        ))}
-      </div>
+    <>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {columns.map((col) => (
+            <div key={col.status} className="min-w-[280px] flex-1">
+              <KanbanColumn
+                status={col.status}
+                title={col.title}
+                tasks={col.tasks}
+                color={col.color}
+              />
+            </div>
+          ))}
+        </div>
 
-      <DragOverlay>{activeTask ? <TaskCard task={activeTask} /> : null}</DragOverlay>
-    </DndContext>
+        <DragOverlay>{activeTask ? <TaskCard task={activeTask} /> : null}</DragOverlay>
+      </DndContext>
+      <HandoffCompletionDialog {...completionFlow.dialogProps} />
+    </>
   );
 }

@@ -197,3 +197,25 @@ export function useDeleteTask() {
     },
   });
 }
+
+export function useCompleteTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      outcome,
+    }: {
+      taskId: string;
+      outcome: 'confirmed' | 'not_yet';
+    }) => {
+      const { data } = await apiClient.post<Task>(`/tasks/${taskId}/completion`, { outcome });
+      return data;
+    },
+    onSuccess: (result) => {
+      invalidateTaskDependentQueries(queryClient);
+      queryClient.invalidateQueries({ queryKey: taskKeys.detail(result.id) });
+    },
+  });
+}
+

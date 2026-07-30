@@ -130,6 +130,7 @@ export interface CreateTaskRequest {
     dueDate?: string;
     visibility?: 'global' | 'department';
     customFields?: Record<string, unknown>;
+    handoffRequired?: boolean;
 }
 export interface MoveTaskLocationRequest {
     folderId?: string;
@@ -158,6 +159,16 @@ export interface UpdateTaskRequest {
     visibility?: 'global' | 'department';
     sortOrder?: number;
     customFields?: Record<string, unknown>;
+    handoffRequired?: boolean;
+}
+export interface TaskCompletionRequest {
+    outcome: 'confirmed' | 'not_yet';
+}
+export interface BulkTaskCompletionRequest {
+    items: Array<{
+        taskId: string;
+        outcome: 'confirmed' | 'not_yet';
+    }>;
 }
 export interface TaskFilterParams extends PaginationParams {
     departmentId?: string;
@@ -169,6 +180,7 @@ export interface TaskFilterParams extends PaginationParams {
     dueDateBefore?: string;
     dueDateAfter?: string;
     folderId?: string;
+    handoffStatus?: string;
 }
 export interface DepartmentReportFilter {
     departmentId?: string;

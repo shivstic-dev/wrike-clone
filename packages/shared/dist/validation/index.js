@@ -7,7 +7,7 @@
  * frontend (form validation), so rules never diverge.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.dashboardOverviewQuerySchema = exports.departmentReportFilterSchema = exports.paginationSchema = exports.addTaskAssigneeSchema = exports.changeDepartmentMemberRoleSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.createDependencySchema = exports.bulkTaskUpdateSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.moveTaskLocationSchema = exports.taskLocationInputSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
+exports.dashboardOverviewQuerySchema = exports.departmentReportFilterSchema = exports.paginationSchema = exports.addTaskAssigneeSchema = exports.changeDepartmentMemberRoleSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.createDependencySchema = exports.bulkTaskUpdateSchema = exports.bulkTaskCompletionSchema = exports.taskCompletionSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.moveTaskLocationSchema = exports.taskLocationInputSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
 const zod_1 = require("zod");
 const enums_1 = require("../enums");
 // ── Helpers ────────────────────────────────────────────────────
@@ -171,6 +171,7 @@ exports.createTaskSchema = exports.taskLocationInputSchema.and(zod_1.z.object({
     dueDate: exports.isoDate.optional(),
     visibility: zod_1.z.enum(['global', 'department']).optional().default('department'),
     customFields: zod_1.z.record(zod_1.z.unknown()).optional(),
+    handoffRequired: zod_1.z.boolean().optional().default(true),
 }));
 exports.updateTaskSchema = zod_1.z
     .object({
@@ -187,6 +188,7 @@ exports.updateTaskSchema = zod_1.z
     visibility: zod_1.z.enum(['global', 'department']).optional(),
     sortOrder: zod_1.z.number().int().optional(),
     customFields: zod_1.z.record(zod_1.z.unknown()).optional(),
+    handoffRequired: zod_1.z.boolean().optional(),
 })
     .refine((d) => Object.keys(d).length > 0, 'At least one field required');
 exports.taskFilterSchema = zod_1.z.object({
@@ -200,7 +202,17 @@ exports.taskFilterSchema = zod_1.z.object({
     folderId: exports.uuidField.optional(),
     departmentId: exports.uuidField.optional(),
     page: zod_1.z.coerce.number().int().positive().optional().default(1),
-    perPage: zod_1.z.coerce.number().int().min(1).max(100).optional().default(25),
+    perPage: zod_1.z.coerce.number().int().min(1).max(1000).optional().default(25),
+    handoffStatus: zod_1.z.nativeEnum(enums_1.HandoffStatus).optional(),
+});
+exports.taskCompletionSchema = zod_1.z.object({
+    outcome: zod_1.z.enum(['confirmed', 'not_yet']),
+});
+exports.bulkTaskCompletionSchema = zod_1.z.object({
+    items: zod_1.z.array(zod_1.z.object({
+        taskId: exports.uuidField,
+        outcome: zod_1.z.enum(['confirmed', 'not_yet']),
+    })).min(1).max(100),
 });
 exports.bulkTaskUpdateSchema = zod_1.z.object({
     taskIds: zod_1.z.array(exports.uuidField).min(1).max(100),

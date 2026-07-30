@@ -25,7 +25,8 @@ import type {
   CreateCommentInput,
   MoveTaskLocationInput,
 } from '@wrike-clone/shared';
-import { TaskStatus, TaskPriority } from '@wrike-clone/shared';
+import { TaskStatus, TaskPriority, HandoffStatus } from '@wrike-clone/shared';
+
 import { DepartmentAccessService } from '../rbac/department-access.service';
 import { TaskLocationService } from './task-location.service';
 
@@ -362,6 +363,8 @@ export class TaskService {
         await this.departmentAccess.assertCanSetVisibility(location.departmentId);
       }
       await this.validateAssignees(location.departmentId, assigneeIds);
+      const handoffRequired = input.handoffRequired ?? true;
+      const handoffStatus = handoffRequired ? HandoffStatus.PENDING : HandoffStatus.NOT_REQUIRED;
 
       const [created] = await trx('tasks')
         .insert({
@@ -372,6 +375,9 @@ export class TaskService {
           parent_task_id: input.parentTaskId || null,
           assignee_id: assigneeIds[0] || null,
           created_by_id: ctx.userId,
+          handoff_required: handoffRequired,
+          handoff_status: handoffStatus,
+          handoff_owner_id: ctx.userId,
           title: input.title,
           description: input.description || null,
           status: input.status || TaskStatus.TODO,
@@ -445,6 +451,7 @@ export class TaskService {
       visibility: 'visibility',
       sortOrder: 'sort_order',
       customFields: 'custom_fields',
+      handoffRequired: 'handoff_required',
     };
 
     for (const [key, dbField] of Object.entries(fieldMap)) {
@@ -479,6 +486,16 @@ export class TaskService {
 
     // Auto-set completed_at when moved to completed.
     if (updates['status'] === 'completed' && existing.status !== 'completed') {
+      // Block direct status change to completed if handoff is required but not confirmed.
+      // Tasks with handoff_required must go through POST /tasks/:id/completion.
+      const handoffRequired = updates['handoff_required'] !== undefined
+        ? updates['handoff_required']
+        : existing.handoff_required;
+      if (handoffRequired && existing.handoff_status !== 'confirmed') {
+        throw new BadRequestException(
+          'This task requires handoff confirmation before it can be completed. Use the completion flow instead.',
+        );
+      }
       updates['completed_at'] = new Date();
     } else if (updates['status'] && updates['status'] !== 'completed') {
       updates['completed_at'] = null;

@@ -14,6 +14,8 @@ import { useState } from 'react';
 import { useWorkspaceMembers, useWorkspaces } from '../api/workspaces';
 import { useAuth } from '../contexts/AuthContext';
 import { useMoveTaskLocation, useTaskLocations } from '../api/task-locations';
+import { useTaskCompletionFlow } from '../components/Task/useTaskCompletionFlow';
+import { HandoffCompletionDialog } from '../components/Task/HandoffCompletionDialog';
 
 const statusOptions: { value: string; label: string }[] = [
   { value: TASK_STATUS.TODO, label: 'To Do' },
@@ -148,8 +150,13 @@ export default function TaskDetailPage() {
   const { data: departmentMembers = [] } = useWorkspaceMembers(task?.departmentId || '');
   const { user, membership } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const completionFlow = useTaskCompletionFlow();
 
   const handleStatusChange = async (status: string) => {
+    if (status === 'completed' && task?.handoffRequired) {
+      completionFlow.requestCompletion(task);
+      return;
+    }
     try {
       await updateTask.mutateAsync({ id: taskId!, status: status as Task['status'] });
       toast.success('Status updated');
@@ -347,6 +354,8 @@ export default function TaskDetailPage() {
           <CommentSection taskId={task.id} />
         </>
       )}
+      {/* Handoff completion dialog */}
+      <HandoffCompletionDialog {...completionFlow.dialogProps} />
     </div>
   );
 }

@@ -57,6 +57,9 @@ export function TaskForm({
   const [visibility, setVisibility] = useState<Task['visibility']>(
     initialValues?.visibility || 'department',
   );
+  const [handoffRequired, setHandoffRequired] = useState<boolean>(
+    initialValues?.handoffRequired ?? true,
+  );
   const assignableAssignees = assignees.filter((assignee) => assignee.role !== 'admin');
 
   const handleSubmit = async (e: FormEvent) => {
@@ -74,9 +77,11 @@ export function TaskForm({
       startDate: startDate ? new Date(startDate).toISOString() : undefined,
       dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
       ...(canSetVisibility ? { visibility } : {}),
+      handoffRequired,
       projectId: projectId || initialValues?.projectId,
     } as Partial<Task>);
   };
+
 
   const inputClasses =
     'block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm placeholder-slate-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-slate-50 disabled:text-slate-500';
@@ -242,7 +247,26 @@ export function TaskForm({
         </div>
       </div>
 
+      <div className="flex items-center gap-3 pt-2">
+        <input
+          id="handoffRequired"
+          type="checkbox"
+          checked={handoffRequired}
+          onChange={(e) => setHandoffRequired(e.target.checked)}
+          className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+        />
+        <div>
+          <label htmlFor="handoffRequired" className="text-sm font-medium text-slate-800">
+            Final handoff required
+          </label>
+          <p className="text-xs text-slate-500">
+            Requires confirming deliverable delivery before marking task completed.
+          </p>
+        </div>
+      </div>
+
       <div className="flex justify-end gap-3 pt-2">
+
         {onCancel && (
           <button
             type="button"

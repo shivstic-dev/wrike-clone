@@ -71,6 +71,15 @@ export enum TaskStatus {
   BLOCKED = 'blocked',
 }
 
+/** Handoff verification states. */
+export enum HandoffStatus {
+  PENDING = 'pending',
+  READY = 'ready',
+  CONFIRMED = 'confirmed',
+  NOT_REQUIRED = 'not_required',
+}
+
+
 /** Priority levels for tasks. */
 export enum TaskPriority {
   LOW = 'low',
