@@ -723,53 +723,6 @@ describe('TaskService', () => {
     });
   });
 
-  describe('createDependency', () => {
-    it('creates a valid dependency', async () => {
-      tenantContext.enterWith({
-        tenantId: 't1',
-        userId: 'u1',
-        membershipId: 'm1',
-        role: 'admin',
-        permissions: ['*'],
-      });
-      qb.first
-        .mockResolvedValueOnce({ id: 'task-1', tenant_id: 't1' })
-        .mockResolvedValueOnce({ id: 'task-2', tenant_id: 't1' });
-      qb.returning.mockResolvedValue([
-        { id: 'dep-1', task_id: 'task-1', depends_on_task_id: 'task-2' },
-      ]);
-
-      const result = await service.createDependency({
-        taskId: 'task-1',
-        dependsOnTaskId: 'task-2',
-        dependencyType: 'finish_to_start' as any,
-        lagDays: 0,
-      });
-      expect(result.task_id).toBe('task-1');
-    });
-
-    it('rejects self-dependency', async () => {
-      tenantContext.enterWith({
-        tenantId: 't1',
-        userId: 'u1',
-        membershipId: 'm1',
-        role: 'admin',
-        permissions: ['*'],
-      });
-      // Both lookups must succeed before the self-dependency check
-      qb.first
-        .mockResolvedValueOnce({ id: 'same-id', tenant_id: 't1' }) // task check
-        .mockResolvedValueOnce({ id: 'same-id', tenant_id: 't1' }); // dependsOn check
-      await expect(
-        service.createDependency({
-          taskId: 'same-id',
-          dependsOnTaskId: 'same-id',
-          dependencyType: 'finish_to_start' as any,
-          lagDays: 0,
-        }),
-      ).rejects.toThrow('A task cannot depend on itself');
-    });
-  });
 });
 
 function expectCanonicalLocationJoin(qb: any) {

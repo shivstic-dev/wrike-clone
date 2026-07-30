@@ -22,7 +22,6 @@ import type {
   UpdateTaskInput,
   TaskFilterInput,
   BulkTaskUpdateInput,
-  CreateDependencyInput,
   CreateCommentInput,
   MoveTaskLocationInput,
 } from '@wrike-clone/shared';
@@ -1011,62 +1010,6 @@ export class TaskService {
       }
       return results;
     });
-  }
-
-  /**
-   * Create a dependency between two tasks.
-   */
-  async createDependency(input: CreateDependencyInput) {
-    const ctx = requireTenantContext();
-    const id = uuidv4();
-
-    // Validate both tasks exist in tenant
-    const [task, dependsOn] = await Promise.all([
-      this.db('tasks').where({ id: input.taskId, tenant_id: ctx.tenantId }).first(),
-      this.db('tasks').where({ id: input.dependsOnTaskId, tenant_id: ctx.tenantId }).first(),
-    ]);
-
-    if (!task || !dependsOn) {
-      throw new NotFoundException('Task not found');
-    }
-    await this.departmentAccess.assertCanManageTask(task.department_id);
-    await this.departmentAccess.assertCanManageTask(dependsOn.department_id);
-
-    // Prevent self-dependency
-    if (input.taskId === input.dependsOnTaskId) {
-      throw new BadRequestException('A task cannot depend on itself');
-    }
-
-    const [dependency] = await this.db('task_dependencies')
-      .insert({
-        id,
-        task_id: input.taskId,
-        depends_on_task_id: input.dependsOnTaskId,
-        dependency_type: input.dependencyType,
-        lag_days: input.lagDays || 0,
-      })
-      .returning('*');
-
-    return dependency;
-  }
-
-  /**
-   * Remove a dependency.
-   */
-  async removeDependency(id: string): Promise<void> {
-    const ctx = requireTenantContext();
-    const dep = await this.db('task_dependencies')
-      .join('tasks', 'task_dependencies.task_id', 'tasks.id')
-      .where('task_dependencies.id', id)
-      .andWhere('tasks.tenant_id', ctx.tenantId)
-      .first();
-
-    if (!dep) {
-      throw new NotFoundException('Dependency not found');
-    }
-    await this.departmentAccess.assertCanManageTask(dep.department_id);
-
-    await this.db('task_dependencies').where({ id }).del();
   }
 
   /**

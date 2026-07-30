@@ -1,5 +1,6 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import type { TimelineQuery, TimelineResponse, TimelineTask } from '@wrike-clone/shared';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { type TimelineQuery, type TimelineResponse, type TimelineTask, type UpdateTaskScheduleInput, updateTaskScheduleSchema } from '@wrike-clone/shared';
+import { v4 as uuidv4 } from 'uuid';
 import type { Knex } from 'knex';
 import { applyTaskAccessScope } from '../common/visibility.scope';
 import { requireTenantContext, type TenantContextData } from '../common/tenant-context';
@@ -204,6 +205,50 @@ export class TimelineService {
     return this.read({ ...input, projectId });
   }
 
+  async updateSchedule(taskId: string, input: UpdateTaskScheduleInput): Promise<TimelineTask> {
+    const parsed = updateTaskScheduleSchema.safeParse(input);
+    if (!parsed.success) throw new BadRequestException('Invalid task schedule');
+    const ctx = requireTenantContext();
+    const updated = await this.db.transaction(async (trx) => {
+      const current = await trx('tasks')
+        .where({ id: taskId, tenant_id: ctx.tenantId })
+        .whereNull('deleted_at')
+        .first();
+      if (!current) throw new NotFoundException('Task not found');
+      await this.departmentAccess.assertCanManageTask(current.department_id);
+
+      const rows = await trx('tasks')
+        .where({ id: taskId, tenant_id: ctx.tenantId, updated_at: new Date(parsed.data.expectedUpdatedAt) })
+        .whereNull('deleted_at')
+        .update({ start_date: parsed.data.startDate, due_date: parsed.data.dueDate, updated_at: new Date() })
+        .returning('*');
+      const [row] = rows;
+      if (!row) {
+        throw new ConflictException({
+          code: 'STALE_TASK',
+          message: 'This task schedule changed elsewhere.',
+          current: await this.currentSchedule(trx, taskId),
+        });
+      }
+      await trx('activity_logs').insert({
+        id: uuidv4(),
+        tenant_id: ctx.tenantId,
+        actor_id: ctx.userId,
+        entity_type: 'task',
+        entity_id: taskId,
+        action: 'task:schedule:updated',
+        changes: JSON.stringify({
+          startDate: { old: current.start_date, new: parsed.data.startDate },
+          dueDate: { old: current.due_date, new: parsed.data.dueDate },
+        }),
+        metadata: '{}',
+      });
+      return row as TimelineRow;
+    });
+    const role = await this.departmentAccess.getRole(updated.department_id);
+    return this.toTask(updated, new Map([[updated.department_id, scheduleManagers.has(role)]]), new Set());
+  }
+
   private async read(input: TimelineQuery): Promise<TimelineResponse> {
     const ctx = requireTenantContext();
     const perPage = input.perPage ?? 500;
@@ -249,6 +294,16 @@ export class TimelineService {
         nextCursor: hasMore ? encodeTimelineCursor(scheduled[scheduled.length - 1]!) : null,
       },
     };
+  }
+
+  private async currentSchedule(trx: Knex, taskId: string): Promise<Record<string, unknown> | null> {
+    const ctx = requireTenantContext();
+    const task = await trx('tasks')
+      .where({ id: taskId, tenant_id: ctx.tenantId })
+      .whereNull('deleted_at')
+      .select('id', 'start_date', 'due_date', 'updated_at')
+      .first();
+    return task ?? null;
   }
 
   private async readDependencies(tenantId: string, taskIds: string[]): Promise<Array<Record<string, any>>> {

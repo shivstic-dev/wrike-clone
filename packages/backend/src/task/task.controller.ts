@@ -27,7 +27,6 @@ import {
   updateTaskSchema,
   taskFilterSchema,
   bulkTaskUpdateSchema,
-  createDependencySchema,
   createCommentSchema,
   addTaskAssigneeSchema,
   moveTaskLocationSchema,
@@ -136,20 +135,6 @@ export class TaskController {
   async bulkUpdate(@Body() body: unknown) {
     const input = bulkTaskUpdateSchema.parse(body);
     return this.taskService.bulkUpdate(input);
-  }
-
-  @Post('dependencies')
-  @Permissions('task:write')
-  async createDependency(@Body() body: unknown) {
-    const input = createDependencySchema.parse(body);
-    return this.taskService.createDependency(input);
-  }
-
-  @Delete('dependencies/:id')
-  @Permissions('task:write')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async removeDependency(@Param('id') id: string) {
-    await this.taskService.removeDependency(id);
   }
 
   @Post('comments')

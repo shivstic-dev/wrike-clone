@@ -1,9 +1,10 @@
-import { BadRequestException, Controller, Get, HttpStatus, Param, Query, UseGuards } from '@nestjs/common';
-import { timelineQuerySchema } from '@wrike-clone/shared';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { createDependencySchema, timelineQuerySchema, updateDependencySchema, updateTaskScheduleSchema } from '@wrike-clone/shared';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { TimelineService } from './timeline.service';
+import { DependencyService } from './dependency.service';
 
 function parseTimelineQuery(query: unknown) {
   const parsed = timelineQuerySchema.safeParse(query || {});
@@ -24,7 +25,10 @@ function parseTimelineQuery(query: unknown) {
 @Controller()
 @UseGuards(AuthGuard, RolesGuard)
 export class TimelineController {
-  constructor(private readonly timeline: TimelineService) {}
+  constructor(
+    private readonly timeline: TimelineService,
+    private readonly dependencies: DependencyService,
+  ) {}
 
   @Get('timeline')
   @Permissions('task:read')
@@ -37,5 +41,30 @@ export class TimelineController {
   async project(@Param('projectId') projectId: string, @Query() query: unknown) {
     const { projectId: _untrustedProjectId, ...input } = parseTimelineQuery(query);
     return this.timeline.project(projectId, input);
+  }
+
+  @Patch('tasks/:taskId/schedule')
+  @Permissions('task:write')
+  async updateSchedule(@Param('taskId') taskId: string, @Body() body: unknown) {
+    return this.timeline.updateSchedule(taskId, updateTaskScheduleSchema.parse(body));
+  }
+
+  @Post('tasks/dependencies')
+  @Permissions('task:write')
+  async createDependency(@Body() body: unknown) {
+    return this.dependencies.create(createDependencySchema.parse(body));
+  }
+
+  @Patch('tasks/dependencies/:dependencyId')
+  @Permissions('task:write')
+  async updateDependency(@Param('dependencyId') dependencyId: string, @Body() body: unknown) {
+    return this.dependencies.update(dependencyId, updateDependencySchema.parse(body));
+  }
+
+  @Delete('tasks/dependencies/:dependencyId')
+  @Permissions('task:write')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeDependency(@Param('dependencyId') dependencyId: string) {
+    await this.dependencies.remove(dependencyId);
   }
 }
