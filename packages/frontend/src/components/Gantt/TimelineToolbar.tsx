@@ -1,4 +1,3 @@
-import { TaskStatus } from '@wrike-clone/shared';
 import type { TimelineZoom } from './timeline-scale';
 
 export interface TimelineFilterState {
@@ -28,10 +27,10 @@ export interface TimelineToolbarProps {
 }
 
 const statuses = [
-  { id: TaskStatus.TODO, label: 'To do' },
-  { id: TaskStatus.IN_PROGRESS, label: 'In progress' },
-  { id: TaskStatus.BLOCKED, label: 'Blocked' },
-  { id: TaskStatus.COMPLETED, label: 'Completed' },
+  { id: 'todo', label: 'To do' },
+  { id: 'in_progress', label: 'In progress' },
+  { id: 'blocked', label: 'Blocked' },
+  { id: 'completed', label: 'Completed' },
 ];
 
 function FilterSelect({

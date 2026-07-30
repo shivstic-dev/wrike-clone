@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useProject, useWorkspaceMembers, useWorkspaces } from '../api/workspaces';
 import { useCreateTask, useTasks } from '../api/tasks';
@@ -13,11 +13,18 @@ import { useAuth } from '../contexts/AuthContext';
 import type { CreateTaskRequest, Task } from '@wrike-clone/shared';
 import toast from 'react-hot-toast';
 
-type Tab = 'tasks' | 'board';
+const TimelineView = lazy(() =>
+  import('../components/Gantt/TimelineView').then((module) => ({
+    default: module.TimelineView,
+  })),
+);
+
+type Tab = 'tasks' | 'board' | 'timeline';
 
 const tabs: { key: Tab; label: string }[] = [
   { key: 'tasks', label: 'Tasks' },
   { key: 'board', label: 'Board' },
+  { key: 'timeline', label: 'Timeline' },
 ];
 
 export default function ProjectPage() {
@@ -173,6 +180,12 @@ export default function ProjectPage() {
             />
           )}
         </div>
+      )}
+
+      {activeTab === 'timeline' && (
+        <Suspense fallback={<LoadingSpinner className="py-16" size="lg" />}>
+          <TimelineView scope={{ kind: 'project', projectId: projectId! }} />
+        </Suspense>
       )}
 
       {showCreateTask && (

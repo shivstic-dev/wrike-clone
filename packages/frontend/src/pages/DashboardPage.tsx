@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { DashboardTaskBucket, Task } from '@wrike-clone/shared';
@@ -20,6 +20,12 @@ import { DashboardTaskDrawer } from '../components/Dashboard/DashboardTaskDrawer
 import { ErrorDisplay } from '../components/common/ErrorDisplay';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { useAuth } from '../contexts/AuthContext';
+
+const TimelineView = lazy(() =>
+  import('../components/Gantt/TimelineView').then((module) => ({
+    default: module.TimelineView,
+  })),
+);
 
 function AssigneeChips({ task }: { task: Task }) {
   if (!task.assignees?.length) {
@@ -119,6 +125,7 @@ export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedBucket, setSelectedBucket] = useState<DashboardTaskBucket | null>(null);
   const departmentId = searchParams.get('department') || '';
+  const view = searchParams.get('view') === 'timeline' ? 'timeline' : 'overview';
   const { membership, user } = useAuth();
   const departments = useWorkspaces();
   const departmentList = departments.data ?? [];
@@ -173,6 +180,18 @@ export default function DashboardPage() {
         const next = new URLSearchParams(current);
         if (nextDepartmentId) next.set('department', nextDepartmentId);
         else next.delete('department');
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
+  function selectView(nextView: 'overview' | 'timeline') {
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (nextView === 'timeline') next.set('view', 'timeline');
+        else next.delete('view');
         return next;
       },
       { replace: true },
@@ -286,6 +305,28 @@ export default function DashboardPage() {
             </div>
           </header>
 
+          <div
+            aria-label="Dashboard view"
+            className="inline-flex w-fit rounded-xl border border-atlas-mist bg-white p-1 shadow-sm"
+            role="group"
+          >
+            {(['overview', 'timeline'] as const).map((option) => (
+              <button
+                key={option}
+                aria-pressed={view === option}
+                className={
+                  view === option
+                    ? 'rounded-lg bg-atlas-canopy px-4 py-2 text-sm font-semibold text-white'
+                    : 'rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-atlas-paper'
+                }
+                onClick={() => selectView(option)}
+                type="button"
+              >
+                {option === 'overview' ? 'Overview' : 'Timeline'}
+              </button>
+            ))}
+          </div>
+
           {departments.error && (
             <ErrorDisplay
               title="Departments are unavailable"
@@ -312,7 +353,18 @@ export default function DashboardPage() {
               </section>
             )}
 
-          {overviewEnabled && overview.isLoading && (
+          {view === 'timeline' && overviewEnabled && (
+            <Suspense fallback={<LoadingSpinner className="py-16" size="lg" />}>
+              <TimelineView
+                scope={{
+                  kind: 'dashboard',
+                  departmentId: departmentId || undefined,
+                }}
+              />
+            </Suspense>
+          )}
+
+          {view === 'overview' && overviewEnabled && overview.isLoading && (
             <section
               aria-label="Loading dashboard overview"
               className="rounded-2xl border border-atlas-mist bg-white"
@@ -321,7 +373,7 @@ export default function DashboardPage() {
             </section>
           )}
 
-          {overviewEnabled && overview.error && (
+          {view === 'overview' && overviewEnabled && overview.error && (
             <ErrorDisplay
               title="The live overview is unavailable"
               message="Task lanes remain available below while the overview is retried."
@@ -329,7 +381,7 @@ export default function DashboardPage() {
             />
           )}
 
-          {overview.data && (
+          {view === 'overview' && overview.data && (
             <RoleDashboard
               grouped={usableGrouped}
               onSelectBucket={selectBucket}
@@ -337,7 +389,7 @@ export default function DashboardPage() {
             />
           )}
 
-          {((managementView && !!departmentId && grouped.error) ||
+          {view === 'overview' && ((managementView && !!departmentId && grouped.error) ||
             (showPersonalTasks && mine.error)) && (
             <ErrorDisplay
               title="Task lanes are unavailable"
@@ -349,17 +401,17 @@ export default function DashboardPage() {
             />
           )}
 
-          {showPersonalTasks && mine.isLoading && <LoadingSpinner className="py-10" size="md" />}
-          {showPersonalTasks && mine.data && (
+          {view === 'overview' && showPersonalTasks && mine.isLoading && <LoadingSpinner className="py-10" size="md" />}
+          {view === 'overview' && showPersonalTasks && mine.data && (
             <TaskSection title="My tasks" tasks={mine.data.data} />
           )}
 
-          {managementView && !!departmentId && grouped.isLoading && (
+          {view === 'overview' && managementView && !!departmentId && grouped.isLoading && (
             <LoadingSpinner className="py-10" size="md" />
           )}
-          {showGroupedFallback && <GroupedTaskLedger grouped={usableGrouped!} />}
+          {view === 'overview' && showGroupedFallback && <GroupedTaskLedger grouped={usableGrouped!} />}
 
-          {tenantAdmin && !departmentId && (
+          {view === 'overview' && tenantAdmin && !departmentId && (
             <section className="workboard-card rounded-2xl border border-atlas-mist bg-white px-5 py-5">
               <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">
                 Department stewardship
@@ -373,7 +425,7 @@ export default function DashboardPage() {
             </section>
           )}
 
-          {canChangeRoles && (
+          {view === 'overview' && canChangeRoles && (
             <section className="workboard-card overflow-hidden rounded-2xl border border-atlas-mist bg-white">
               <header className="border-b border-atlas-mist px-5 py-4">
                 <p className="font-atlasMono text-[0.6875rem] uppercase tracking-[0.12em] text-atlas-current">

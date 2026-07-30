@@ -11,11 +11,11 @@ import {
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual';
 import type {
   CreateDependencyRequest,
+  DependencyType,
   TaskDependency,
   TimelineResponse,
   TimelineTask,
 } from '@wrike-clone/shared';
-import { DependencyType } from '@wrike-clone/shared';
 import { createTimelineScale, type TimelineZoom } from './timeline-scale';
 import { dependencyPath } from './dependency-path';
 import { UnscheduledTasksPanel } from './UnscheduledTasksPanel';
@@ -35,6 +35,12 @@ const HEADER_HEIGHT = 64;
 const LABEL_WIDTH = 296;
 const BAR_HEIGHT = 30;
 const DAY_MS = 86_400_000;
+const dependencyTypes = [
+  'finish_to_start' as DependencyType,
+  'start_to_start' as DependencyType,
+  'finish_to_finish' as DependencyType,
+  'start_to_finish' as DependencyType,
+] as const;
 
 type Interaction =
   | {
@@ -527,7 +533,7 @@ export function GanttChart({
                                   ...draft, dependencyType: event.target.value as DependencyType,
                                 })}
                               >
-                                {Object.values(DependencyType).map((type) => (
+                                {dependencyTypes.map((type) => (
                                   <option key={type} value={type}>{readableStatus(type)}</option>
                                 ))}
                               </select>
@@ -557,7 +563,7 @@ export function GanttChart({
                                 setDependencyDraft({
                                   taskId: task.id,
                                   dependsOnTaskId: firstPredecessor.id,
-                                  dependencyType: DependencyType.FINISH_TO_START,
+                                  dependencyType: 'finish_to_start' as DependencyType,
                                   lagDays: 0,
                                 });
                               }

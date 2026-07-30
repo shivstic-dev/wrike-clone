@@ -2,7 +2,7 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   TaskPriority,
@@ -61,6 +61,11 @@ const mocks = vi.hoisted(() => ({
   retryMine: vi.fn(),
   myTaskCalls: [] as unknown[][],
   dashboardTaskCalls: [] as unknown[][],
+  timelineScopes: [] as unknown[],
+  auth: {
+    membership: { role: 'member' as 'member' | 'admin' },
+    user: { displayName: 'Harper Head', email: 'harper@example.com' },
+  },
 }));
 
 const overview: DashboardOverview = {
@@ -85,10 +90,14 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({
-    membership: { role: 'member' },
-    user: { displayName: 'Harper Head', email: 'harper@example.com' },
-  }),
+  useAuth: () => mocks.auth,
+}));
+
+vi.mock('../components/Gantt/TimelineView', () => ({
+  TimelineView: ({ scope }: { scope: unknown }) => {
+    mocks.timelineScopes.push(scope);
+    return <section aria-label="Dashboard timeline">Timeline content</section>;
+  },
 }));
 
 vi.mock('../api/dashboard', () => ({
@@ -148,12 +157,18 @@ vi.mock('../api/workspaces', () => ({
 let container: HTMLDivElement;
 let root: Root | undefined;
 
-async function renderPage(): Promise<void> {
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
+}
+
+async function renderPage(initialEntry = '/dashboard'): Promise<void> {
   await act(async () => {
     root = createRoot(container);
     root.render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <DashboardPage />
+        <LocationProbe />
       </MemoryRouter>,
     );
     await Promise.resolve();
@@ -184,6 +199,8 @@ beforeEach(() => {
   mocks.retryMine.mockReset();
   mocks.myTaskCalls.length = 0;
   mocks.dashboardTaskCalls.length = 0;
+  mocks.timelineScopes.length = 0;
+  mocks.auth.membership.role = 'member';
   container = document.createElement('div');
   document.body.append(container);
 });
@@ -366,5 +383,62 @@ describe('DashboardPage personal tasks', () => {
 
     expect(container.textContent).toContain('Current personal assignment');
     expect(container.textContent).not.toContain('Stale grouped assignment');
+  });
+});
+
+describe('DashboardPage timeline', () => {
+  it('preserves range and zoom parameters and passes the authorized department scope', async () => {
+    await renderPage(
+      '/dashboard?department=department-1&from=2026-07-01&to=2026-08-31&zoom=week',
+    );
+
+    const timelineButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'Timeline',
+    );
+    expect(timelineButton).toBeTruthy();
+
+    await act(async () => {
+      timelineButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector('[aria-label="Dashboard timeline"]')).not.toBeNull();
+    expect(mocks.timelineScopes).toContainEqual({
+      kind: 'dashboard',
+      departmentId: 'department-1',
+    });
+    const location = container.querySelector('[data-testid="location"]')?.textContent ?? '';
+    expect(location).toContain('view=timeline');
+    expect(location).toContain('from=2026-07-01');
+    expect(location).toContain('to=2026-08-31');
+    expect(location).toContain('zoom=week');
+  });
+
+  it('offers all-department timeline access only to tenant admins', async () => {
+    await renderPage('/dashboard?department=department-1');
+    expect(
+      Array.from(container.querySelectorAll('option')).some(
+        (option) => option.textContent === 'All departments',
+      ),
+    ).toBe(false);
+
+    act(() => root?.unmount());
+    root = undefined;
+    document.body.innerHTML = '';
+    container = document.createElement('div');
+    document.body.append(container);
+    mocks.auth.membership.role = 'admin';
+
+    await renderPage('/dashboard?view=timeline');
+
+    expect(
+      Array.from(container.querySelectorAll('option')).some(
+        (option) => option.textContent === 'All departments',
+      ),
+    ).toBe(true);
+    expect(mocks.timelineScopes).toContainEqual({
+      kind: 'dashboard',
+      departmentId: undefined,
+    });
   });
 });
