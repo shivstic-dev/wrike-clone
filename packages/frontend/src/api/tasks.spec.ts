@@ -21,8 +21,8 @@ import {
   useCreateTask,
   useDeleteTask,
   useRemoveTaskAssignee,
-  useUpdateTask,
 } from './tasks';
+import { useUpdateTask } from '../hooks/useUpdateTask';
 import { useMoveTaskLocation } from './task-locations';
 
 const apiMocks = vi.hoisted(() => ({

@@ -9,6 +9,7 @@ import { tenantContext } from '../../src/common/tenant-context';
 import { DepartmentAccessService } from '../../src/rbac/department-access.service';
 import { TaskLocationService } from '../../src/task/task-location.service';
 import { TaskCompletionService } from '../../src/task/task-completion.service';
+import { MemoryCacheService } from '../../src/common/cache/memory-cache.service';
 import { TaskStatus } from '@wrike-clone/shared';
 
 const noop = () => {};
@@ -35,6 +36,7 @@ function createQb(): any {
     'clone',
     'count',
     'modify',
+    'groupBy',
   ];
   for (const m of methods) qb[m] = jest.fn(() => self);
   qb.first = jest.fn();
@@ -85,6 +87,7 @@ describe('TaskService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TaskService,
+        MemoryCacheService,
         { provide: DATABASE_PROVIDER, useValue: mockDb },
         { provide: DepartmentAccessService, useValue: departmentAccess },
         { provide: TaskLocationService, useValue: taskLocations },
@@ -720,6 +723,39 @@ describe('TaskService', () => {
       });
       qb.first.mockResolvedValue(null);
       await expect(service.remove('nope')).rejects.toThrow('Task not found');
+    });
+  });
+
+  describe('getDashboardStats', () => {
+    it('calculates aggregate total, status counts, and overdue count with 60s caching', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      qb.first
+        .mockResolvedValueOnce({ count: '10' })
+        .mockResolvedValueOnce({ count: '2' });
+      qb.select.mockReturnValueOnce(qb);
+
+      const stats1 = await service.getDashboardStats();
+      expect(stats1).toEqual({
+        total: 10,
+        byStatus: {
+          todo: 0,
+          in_progress: 0,
+          in_review: 0,
+          completed: 0,
+          cancelled: 0,
+        },
+        overdue: 2,
+      });
+
+      // Subsequent call should hit cache without calling db
+      const stats2 = await service.getDashboardStats();
+      expect(stats2).toEqual(stats1);
     });
   });
 

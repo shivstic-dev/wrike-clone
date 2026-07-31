@@ -13,7 +13,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { KanbanColumn } from './KanbanColumn';
 import { TaskCard } from './TaskCard';
-import { useUpdateTask } from '../../api/tasks';
+import { useUpdateTask } from '../../hooks/useUpdateTask';
 import { TASK_STATUS } from '../../api/enums';
 import type { Task } from '@wrike-clone/shared';
 import toast from 'react-hot-toast';

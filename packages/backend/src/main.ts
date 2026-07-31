@@ -31,12 +31,25 @@ async function bootstrap(): Promise<void> {
   // Security headers
   app.use(helmet());
 
-  // CORS
+  // CORS setup
+  const origins = config.corsOrigins;
+  const isWildcard = origins.includes('*');
+
   app.enableCors({
-    origin: config.corsOrigins,
+    origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow non-browser requests (e.g. curl, server-to-server, health checks)
+      if (!requestOrigin) {
+        return callback(null, true);
+      }
+      if (isWildcard || origins.includes(requestOrigin)) {
+        return callback(null, true);
+      }
+      callback(new Error(`Origin ${requestOrigin} not allowed by CORS`));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['Set-Cookie', 'Cache-Control'],
   });
 
   // Compression

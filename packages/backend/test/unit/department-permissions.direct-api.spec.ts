@@ -10,6 +10,7 @@ import { RolesGuard } from '../../src/common/guards/roles.guard';
 import { tenantContext } from '../../src/common/tenant-context';
 import { TaskLocationService } from '../../src/task/task-location.service';
 import { TaskCompletionService } from '../../src/task/task-completion.service';
+import { MemoryCacheService } from '../../src/common/cache/memory-cache.service';
 
 function queryBuilder() {
   const builder: any = {};
@@ -48,6 +49,7 @@ describe('Department permission checks through the HTTP API', () => {
       controllers: [TaskController],
       providers: [
         TaskService,
+        MemoryCacheService,
         TaskLocationService,
         DepartmentAccessService,
         { provide: TaskCompletionService, useValue: {} },

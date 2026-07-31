@@ -20,6 +20,8 @@ const SearchPage = lazy(() => import('./pages/SearchPage'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
 const TimesheetsPage = lazy(() => import('./pages/TimesheetsPage'));
+const PublicFormPage = lazy(() => import('./pages/PublicFormPage'));
+const SchedulePage = lazy(() => import('./pages/SchedulePage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -71,10 +73,11 @@ export default function App() {
           <AuthProvider>
             <Suspense fallback={<RouteLoadingFallback />}>
               <Routes>
-                {/* Auth routes */}
+                {/* Auth & Public routes */}
                 <Route element={<AuthLayout />}>
                   <Route path="/login" element={<LoginPage />} />
                 </Route>
+                <Route path="/forms/:formId" element={<PublicFormPage />} />
 
                 {/* Protected routes */}
                 <Route
@@ -87,6 +90,7 @@ export default function App() {
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/my-tasks" element={<MyTasksPage />} />
+                  <Route path="/schedule" element={<SchedulePage />} />
                   <Route path="/admin" element={<AdminPage />} />
                   <Route path="/reports" element={<ReportsPage />} />
                   <Route path="/search" element={<SearchPage />} />

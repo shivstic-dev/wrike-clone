@@ -42,7 +42,7 @@ function createConnectionConfig(config: ReturnType<typeof loadDatabaseConfig>) {
           client: 'pg',
           connection: createConnectionConfig(config),
           pool: {
-            min: 0,
+            min: config.minConnections,
             max: config.maxConnections,
             idleTimeoutMillis: config.idleTimeoutMs,
           },

@@ -21,6 +21,7 @@ export interface DatabaseConfig {
   user: string;
   password: string;
   ssl: boolean;
+  minConnections: number;
   maxConnections: number;
   idleTimeoutMs: number;
 }
@@ -56,13 +57,14 @@ export interface SupabaseStorageConfig {
 }
 
 export function parseCorsOrigins(
-  rawValue = process.env['CORS_ORIGINS'] || 'http://localhost:5173',
+  rawValue = process.env['CORS_ORIGIN'] || process.env['CORS_ORIGINS'] || 'http://localhost:5173',
 ): string[] {
   return rawValue
     .split(',')
     .map((value) => value.trim().replace(/^['"]+|['"]+$/g, ''))
     .filter(Boolean)
     .map((value) => {
+      if (value === '*') return '*';
       try {
         return new URL(value).origin;
       } catch {
@@ -72,7 +74,7 @@ export function parseCorsOrigins(
 }
 
 export function loadCorsOrigins(
-  rawValue = process.env['CORS_ORIGINS'] || 'http://localhost:5173',
+  rawValue = process.env['CORS_ORIGIN'] || process.env['CORS_ORIGINS'] || 'http://localhost:5173',
 ): string[] {
   const origins = parseCorsOrigins(rawValue);
   return process.env['NODE_ENV'] === 'production'
@@ -103,8 +105,8 @@ export function validateProductionConfig(): void {
 
   const problems: string[] = [];
   const jwtSecret = process.env['JWT_SECRET'] || '';
-  const rawCorsOrigins = parseCorsOrigins(process.env['CORS_ORIGINS'] || '');
-  const corsOrigins = loadCorsOrigins(process.env['CORS_ORIGINS'] || '');
+  const rawCorsOrigins = parseCorsOrigins(process.env['CORS_ORIGIN'] || process.env['CORS_ORIGINS'] || '');
+  const corsOrigins = loadCorsOrigins(process.env['CORS_ORIGIN'] || process.env['CORS_ORIGINS'] || '');
 
   if (!process.env['DATABASE_URL']) problems.push('DATABASE_URL is required');
   if (jwtSecret.length < 32) problems.push('JWT_SECRET must be at least 32 characters');
@@ -132,6 +134,16 @@ export function validateProductionConfig(): void {
 export function loadDatabaseConfig(): DatabaseConfig {
   // If DATABASE_URL is set, use it as a single connection string (Supabase/Neon style)
   const databaseUrl = process.env['DATABASE_URL'];
+  const minConnections = parseInt(
+    process.env['DATABASE_POOL_MIN'] || process.env['DB_MIN_CONNECTIONS'] || '2',
+    10,
+  );
+  const maxConnections = parseInt(
+    process.env['DATABASE_POOL_MAX'] || process.env['DB_MAX_CONNECTIONS'] || (databaseUrl ? '8' : '10'),
+    10,
+  );
+  const idleTimeoutMs = parseInt(process.env['DB_IDLE_TIMEOUT_MS'] || '10000', 10);
+
   if (databaseUrl) {
     return {
       databaseUrl,
@@ -141,10 +153,9 @@ export function loadDatabaseConfig(): DatabaseConfig {
       user: '',
       password: '',
       ssl: process.env['DB_SSL'] === 'true',
-      // DATABASE_URL is used by hosted/serverless deployments. Keep the
-      // default pool tiny so warm function instances cannot exhaust Supabase.
-      maxConnections: parseInt(process.env['DB_MAX_CONNECTIONS'] || '1', 10),
-      idleTimeoutMs: parseInt(process.env['DB_IDLE_TIMEOUT_MS'] || '1000', 10),
+      minConnections,
+      maxConnections,
+      idleTimeoutMs,
     };
   }
 
@@ -155,8 +166,9 @@ export function loadDatabaseConfig(): DatabaseConfig {
     user: process.env['DB_USER'] || 'wrike',
     password: process.env['DB_PASSWORD'] || 'wrike_dev',
     ssl: process.env['DB_SSL'] === 'true',
-    maxConnections: parseInt(process.env['DB_MAX_CONNECTIONS'] || '25', 10),
-    idleTimeoutMs: parseInt(process.env['DB_IDLE_TIMEOUT_MS'] || '10000', 10),
+    minConnections,
+    maxConnections,
+    idleTimeoutMs,
   };
 }
 

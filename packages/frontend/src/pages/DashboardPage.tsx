@@ -2,7 +2,8 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { DashboardTaskBucket, Task } from '@wrike-clone/shared';
-import { useDashboardOverview, useDashboardTasks } from '../api/dashboard';
+import { useDashboardTasks } from '../api/dashboard';
+import { useDashboardStats } from '../hooks/useDashboardStats';
 import {
   useGroupedDepartmentTasks,
   useMyTasks,
@@ -19,6 +20,7 @@ import { RoleDashboard } from '../components/Dashboard/RoleDashboard';
 import { DashboardTaskDrawer } from '../components/Dashboard/DashboardTaskDrawer';
 import { ErrorDisplay } from '../components/common/ErrorDisplay';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import { Skeleton } from '../components/ui/Skeleton';
 import { useAuth } from '../contexts/AuthContext';
 
 const TimelineView = lazy(() =>
@@ -121,6 +123,41 @@ function greeting(displayName?: string | null, email?: string): string {
   return firstName ? `Good ${dayPart}, ${firstName}.` : `Good ${dayPart}.`;
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-5" aria-label="Loading dashboard overview">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="flex h-[132px] flex-col justify-between rounded-2xl border border-atlas-mist bg-white p-5"
+          >
+            <Skeleton className="h-4 w-24" />
+            <div>
+              <Skeleton className="mb-2 h-8 w-16" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="overflow-hidden rounded-2xl border border-atlas-mist bg-white">
+        <div className="border-b border-atlas-mist px-5 py-4">
+          <Skeleton className="h-6 w-48" />
+        </div>
+        <div className="divide-y divide-atlas-mist">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex flex-wrap items-center gap-3 px-5 py-4">
+              <Skeleton className="h-4 flex-1" />
+              <Skeleton className="h-4 w-16 rounded-full" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedBucket, setSelectedBucket] = useState<DashboardTaskBucket | null>(null);
@@ -143,7 +180,7 @@ export default function DashboardPage() {
     { departmentId: departmentId || undefined, perPage: 100 },
   );
   const overviewEnabled = tenantAdmin || !!departmentId;
-  const overview = useDashboardOverview(
+  const overview = useDashboardStats(
     { departmentId: departmentId || undefined, days: 30 },
     overviewEnabled,
   );
@@ -365,12 +402,7 @@ export default function DashboardPage() {
           )}
 
           {view === 'overview' && overviewEnabled && overview.isLoading && (
-            <section
-              aria-label="Loading dashboard overview"
-              className="rounded-2xl border border-atlas-mist bg-white"
-            >
-              <LoadingSpinner className="py-16" size="lg" />
-            </section>
+            <DashboardSkeleton />
           )}
 
           {view === 'overview' && overviewEnabled && overview.error && (

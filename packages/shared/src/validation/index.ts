@@ -255,12 +255,28 @@ export const taskCompletionSchema = z.object({
 });
 
 export const bulkTaskCompletionSchema = z.object({
-  items: z.array(
-    z.object({
-      taskId: uuidField,
-      outcome: z.enum(['confirmed', 'not_yet']),
+  items: z
+    .array(
+      z.object({
+        taskId: uuidField,
+        outcome: z.enum(['confirmed', 'not_yet']),
+      }),
+    )
+    .min(1)
+    .max(100)
+    .superRefine((items, ctx) => {
+      const seen = new Set<string>();
+      items.forEach((item, index) => {
+        if (seen.has(item.taskId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Each task can appear only once in a bulk completion request',
+            path: [index, 'taskId'],
+          });
+        }
+        seen.add(item.taskId);
+      });
     }),
-  ).min(1).max(100),
 });
 
 export const bulkTaskUpdateSchema = z.object({

@@ -553,7 +553,7 @@ export declare const taskCompletionSchema: z.ZodObject<{
     outcome: "confirmed" | "not_yet";
 }>;
 export declare const bulkTaskCompletionSchema: z.ZodObject<{
-    items: z.ZodArray<z.ZodObject<{
+    items: z.ZodEffects<z.ZodArray<z.ZodObject<{
         taskId: z.ZodString;
         outcome: z.ZodEnum<["confirmed", "not_yet"]>;
     }, "strip", z.ZodTypeAny, {
@@ -562,7 +562,13 @@ export declare const bulkTaskCompletionSchema: z.ZodObject<{
     }, {
         outcome: "confirmed" | "not_yet";
         taskId: string;
-    }>, "many">;
+    }>, "many">, {
+        outcome: "confirmed" | "not_yet";
+        taskId: string;
+    }[], {
+        outcome: "confirmed" | "not_yet";
+        taskId: string;
+    }[]>;
 }, "strip", z.ZodTypeAny, {
     items: {
         outcome: "confirmed" | "not_yet";

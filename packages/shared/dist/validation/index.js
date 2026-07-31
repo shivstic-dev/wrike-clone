@@ -209,10 +209,26 @@ exports.taskCompletionSchema = zod_1.z.object({
     outcome: zod_1.z.enum(['confirmed', 'not_yet']),
 });
 exports.bulkTaskCompletionSchema = zod_1.z.object({
-    items: zod_1.z.array(zod_1.z.object({
+    items: zod_1.z
+        .array(zod_1.z.object({
         taskId: exports.uuidField,
         outcome: zod_1.z.enum(['confirmed', 'not_yet']),
-    })).min(1).max(100),
+    }))
+        .min(1)
+        .max(100)
+        .superRefine((items, ctx) => {
+        const seen = new Set();
+        items.forEach((item, index) => {
+            if (seen.has(item.taskId)) {
+                ctx.addIssue({
+                    code: zod_1.z.ZodIssueCode.custom,
+                    message: 'Each task can appear only once in a bulk completion request',
+                    path: [index, 'taskId'],
+                });
+            }
+            seen.add(item.taskId);
+        });
+    }),
 });
 exports.bulkTaskUpdateSchema = zod_1.z.object({
     taskIds: zod_1.z.array(exports.uuidField).min(1).max(100),

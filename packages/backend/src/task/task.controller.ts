@@ -101,6 +101,12 @@ export class TaskController {
     return this.taskService.addComment(input);
   }
 
+  @Get('stats')
+  @Permissions('task:read')
+  async getDashboardStats() {
+    return this.taskService.getDashboardStats();
+  }
+
   @Get(':id')
   @Permissions('task:read')
   async findOne(@Param('id') id: string) {

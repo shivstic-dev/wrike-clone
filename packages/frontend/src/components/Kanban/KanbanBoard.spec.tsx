@@ -54,7 +54,7 @@ const task: Task = {
   deletedAt: null,
 };
 
-vi.mock('../../api/tasks', () => ({
+vi.mock('../../hooks/useUpdateTask', () => ({
   useUpdateTask: () => ({ mutateAsync: mocks.updateTask }),
 }));
 

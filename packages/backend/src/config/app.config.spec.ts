@@ -63,14 +63,32 @@ describe('application configuration', () => {
     expect(validateProductionConfig).toThrow('CORS_ORIGINS is required');
   });
 
-  it('uses a one-connection pool by default for hosted DATABASE_URL deployments', () => {
+  it('uses default minConnections and maxConnections for hosted DATABASE_URL deployments', () => {
     process.env.DATABASE_URL = 'postgresql://example.invalid/database';
+    delete process.env.DATABASE_POOL_MIN;
+    delete process.env.DB_MIN_CONNECTIONS;
+    delete process.env.DATABASE_POOL_MAX;
     delete process.env.DB_MAX_CONNECTIONS;
-    delete process.env.DB_IDLE_TIMEOUT_MS;
 
     expect(loadDatabaseConfig()).toMatchObject({
-      maxConnections: 1,
-      idleTimeoutMs: 1000,
+      minConnections: 2,
+      maxConnections: 8,
+    });
+  });
+
+  it('supports CORS_ORIGIN (singular) and wildcard *', () => {
+    delete process.env.CORS_ORIGINS;
+    process.env.CORS_ORIGIN = '*';
+    expect(parseCorsOrigins()).toEqual(['*']);
+  });
+
+  it('respects database pool env overrides', () => {
+    process.env.DATABASE_POOL_MIN = '5';
+    process.env.DATABASE_POOL_MAX = '20';
+
+    expect(loadDatabaseConfig()).toMatchObject({
+      minConnections: 5,
+      maxConnections: 20,
     });
   });
 });

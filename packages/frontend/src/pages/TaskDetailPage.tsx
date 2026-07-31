@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { TASK_STATUS } from '../api/enums';
 import type { Task } from '@wrike-clone/shared';
-import { useTask, useUpdateTask } from '../api/tasks';
+import { useTask } from '../api/tasks';
+import { useUpdateTask } from '../hooks/useUpdateTask';
 import type { UpdateTaskRequest } from '@wrike-clone/shared';
 import { TaskForm } from '../components/Task/TaskForm';
 import { CommentSection } from '../components/Comments/CommentSection';

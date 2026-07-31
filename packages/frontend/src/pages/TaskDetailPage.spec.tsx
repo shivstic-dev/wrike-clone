@@ -63,6 +63,9 @@ vi.mock('../api/tasks', () => ({
     error: null,
     refetch: vi.fn(),
   }),
+}));
+
+vi.mock('../hooks/useUpdateTask', () => ({
   useUpdateTask: () => ({
     mutateAsync: mocks.updateTask,
   }),

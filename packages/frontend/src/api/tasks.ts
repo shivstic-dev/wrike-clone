@@ -184,19 +184,9 @@ export function useCreateTask() {
   });
 }
 
-export function useUpdateTask() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ id, ...input }: UpdateTaskRequest & { id: string }) => {
-      const { data } = await apiClient.patch<Task>(`/tasks/${id}`, input);
-      return data;
-    },
-    onSuccess: (result) => {
-      invalidateTaskDependentQueries(queryClient);
-      queryClient.invalidateQueries({ queryKey: taskKeys.detail(result.id) });
-    },
-  });
+export async function updateTask({ id, ...input }: UpdateTaskRequest & { id: string }): Promise<Task> {
+  const { data } = await apiClient.patch<Task>(`/tasks/${id}`, input);
+  return data;
 }
 
 export function useCompleteTask() {

@@ -114,6 +114,15 @@ vi.mock('../api/dashboard', () => ({
   },
 }));
 
+vi.mock('../hooks/useDashboardStats', () => ({
+  useDashboardStats: () => ({
+    data: overview,
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 vi.mock('../api/tasks', () => ({
   useGroupedDepartmentTasks: () => ({
     ...mocks.grouped,

@@ -44,4 +44,11 @@ describe('TaskController completion routes', () => {
     expect(Reflect.getMetadata(PERMISSIONS_KEY, (TaskController as any).prototype.complete)).toEqual(['task:status:update']);
     expect(Reflect.getMetadata(PERMISSIONS_KEY, (TaskController as any).prototype.completeMany)).toEqual(['task:status:update']);
   });
+
+  it('forwards getDashboardStats to taskService', async () => {
+    taskService.getDashboardStats = jest.fn().mockResolvedValue({ total: 5, byStatus: {}, overdue: 1 });
+    await expect(controller.getDashboardStats()).resolves.toEqual({ total: 5, byStatus: {}, overdue: 1 });
+    expect(taskService.getDashboardStats).toHaveBeenCalled();
+    expect(Reflect.getMetadata(PERMISSIONS_KEY, (TaskController as any).prototype.getDashboardStats)).toEqual(['task:read']);
+  });
 });

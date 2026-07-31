@@ -9,9 +9,11 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { DatabaseModule } from './database/database.module';
+import { CacheModule } from './common/cache/cache.module';
 import { TenantContextMiddleware } from './common/middleware/tenant-context.middleware';
 import { TenantContextInterceptor } from './common/interceptors/tenant-context.interceptor';
 import { CamelCaseResponseInterceptor } from './common/interceptors/camel-case-response.interceptor';
+import { CacheControlInterceptor } from './common/interceptors/cache-control.interceptor';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { EventsService } from './common/events.service';
 import { AuthModule } from './auth/auth.module';
@@ -58,6 +60,7 @@ if (process.env['REDIS_HOST']) {
   imports: [
     // Core
     DatabaseModule,
+    CacheModule,
 
     // Rate limiting
     ThrottlerModule.forRoot([
@@ -107,6 +110,10 @@ if (process.env['REDIS_HOST']) {
     {
       provide: APP_INTERCEPTOR,
       useClass: CamelCaseResponseInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: CacheControlInterceptor,
     },
     {
       provide: APP_GUARD,

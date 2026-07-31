@@ -29,6 +29,7 @@ import { TaskStatus, TaskPriority, HandoffStatus } from '@wrike-clone/shared';
 
 import { DepartmentAccessService } from '../rbac/department-access.service';
 import { TaskLocationService } from './task-location.service';
+import { MemoryCacheService } from '../common/cache/memory-cache.service';
 
 @Injectable()
 export class TaskService {
@@ -51,17 +52,125 @@ export class TaskService {
     sort_order: 'tasks.sort_order',
   };
 
+  private static readonly TASK_SELECT_COLUMNS = [
+    'tasks.id',
+    'tasks.tenant_id',
+    'tasks.project_id',
+    'tasks.department_id',
+    'tasks.parent_task_id',
+    'tasks.assignee_id',
+    'tasks.created_by_id',
+    'tasks.handoff_required',
+    'tasks.handoff_status',
+    'tasks.handoff_owner_id',
+    'tasks.handoff_ready_at',
+    'tasks.handoff_confirmed_by',
+    'tasks.handoff_confirmed_at',
+    'tasks.title',
+    'tasks.description',
+    'tasks.status',
+    'tasks.priority',
+    'tasks.estimated_hours',
+    'tasks.actual_hours',
+    'tasks.start_date',
+    'tasks.due_date',
+    'tasks.completed_at',
+    'tasks.visibility',
+    'tasks.sort_order',
+    'tasks.custom_fields',
+    'tasks.created_at',
+    'tasks.updated_at',
+    'tasks.deleted_at',
+  ];
+
   constructor(
     @Inject(DATABASE_PROVIDER) private readonly db: Knex,
     private readonly departmentAccess: DepartmentAccessService,
     private readonly taskLocations: TaskLocationService,
+    private readonly cache: MemoryCacheService,
   ) {}
+
+  invalidateTenantCache(tenantId: string): void {
+    this.cache.invalidatePattern(`^(tasks|stats):${tenantId}`);
+  }
+
+  /**
+   * Get aggregate dashboard stats for current tenant.
+   * Cached for 60s.
+   */
+  async getDashboardStats() {
+    const ctx = requireTenantContext();
+    const cacheKey = `stats:${ctx.tenantId}`;
+    const cached = this.cache.get<{
+      total: number;
+      byStatus: Record<string, number>;
+      overdue: number;
+    }>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
+    const baseQuery = this.db('tasks')
+      .where('tenant_id', ctx.tenantId)
+      .whereNull('deleted_at');
+
+    const countResult = (await baseQuery.clone().count('id as count').first()) as
+      | { count?: string | number }
+      | undefined;
+    const total = Number(countResult?.count || 0);
+
+    const statusResults = await baseQuery
+      .clone()
+      .select('status')
+      .count('id as count')
+      .groupBy('status');
+
+    const byStatus: Record<string, number> = {
+      todo: 0,
+      in_progress: 0,
+      in_review: 0,
+      completed: 0,
+      cancelled: 0,
+    };
+
+    const rows = Array.isArray(statusResults) ? statusResults : [];
+
+    for (const row of rows as Array<{ status: string; count: string | number }>) {
+      if (row.status) {
+        byStatus[row.status] = Number(row.count || 0);
+      }
+    }
+
+    const overdueResult = (await baseQuery
+      .clone()
+      .where('status', '<>', 'completed')
+      .andWhere('due_date', '<', new Date())
+      .count('id as count')
+      .first()) as { count?: string | number } | undefined;
+    const overdue = Number(overdueResult?.count || 0);
+
+    const stats = {
+      total,
+      byStatus,
+      overdue,
+    };
+
+    this.cache.set(cacheKey, stats, 60);
+    return stats;
+  }
 
   /**
    * Find tasks with filtering, sorting, and pagination.
    */
   async findAll(filter: TaskFilterInput) {
     const ctx = requireTenantContext();
+    const cacheKey = `tasks:${ctx.tenantId}:${JSON.stringify(filter)}`;
+    const cached = this.cache.get<{ data: any[]; meta: any }>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const tenantAdmin = await this.departmentAccess.isTenantAdmin();
     const {
       page = 1,
@@ -75,9 +184,14 @@ export class TaskService {
       dueDateAfter,
       folderId,
       departmentId,
+      handoffStatus,
       sortBy = 'created_at',
       sortDirection = 'desc',
-    } = filter as typeof filter & { sortBy?: string; sortDirection?: string };
+    } = filter as typeof filter & {
+      sortBy?: string;
+      sortDirection?: string;
+      handoffStatus?: string;
+    };
 
     const sortColumn = TaskService.SORTABLE_COLUMNS[sortBy] ?? 'tasks.created_at';
     const sortDir = sortDirection === 'asc' ? 'asc' : 'desc';
@@ -122,6 +236,9 @@ export class TaskService {
     if (departmentId) {
       query = query.andWhere('tasks.department_id', departmentId);
     }
+    if (handoffStatus) {
+      query = query.andWhere('tasks.handoff_status', handoffStatus);
+    }
     if (search) {
       query = query.andWhereRaw(
         `tasks.search_vec @@ plainto_tsquery('english', ?)`,
@@ -130,14 +247,55 @@ export class TaskService {
     }
 
     // Count total
-    const countResult = (await query.clone().clearSelect().count('tasks.id').first()) as
-      { count?: string | number } | undefined;
+    let countQuery = this.db('tasks')
+      .where('tasks.tenant_id', ctx.tenantId)
+      .whereNull('tasks.deleted_at');
+
+    if (projectId) countQuery = countQuery.andWhere('tasks.project_id', projectId);
+    if (assigneeId) {
+      countQuery = countQuery.andWhere((assignee) =>
+        assignee.where('tasks.assignee_id', assigneeId).orWhereExists(function () {
+          this.select(1)
+            .from('task_assignees as filtered_ta')
+            .whereRaw('filtered_ta.task_id = tasks.id')
+            .andWhere('filtered_ta.tenant_id', ctx.tenantId)
+            .andWhere('filtered_ta.user_id', assigneeId);
+        }),
+      );
+    }
+    if (status && status.length > 0) countQuery = countQuery.whereIn('tasks.status', status);
+    if (priority && priority.length > 0) countQuery = countQuery.whereIn('tasks.priority', priority);
+    if (dueDateBefore) countQuery = countQuery.andWhere('tasks.due_date', '<=', dueDateBefore);
+    if (dueDateAfter) countQuery = countQuery.andWhere('tasks.due_date', '>=', dueDateAfter);
+    if (folderId) {
+      countQuery = countQuery.join({ home_link: 'task_folder_links' }, function () {
+        this.on('home_link.task_id', '=', 'tasks.id')
+          .andOn('home_link.tenant_id', '=', 'tasks.tenant_id')
+          .andOnVal('home_link.is_home', '=', true);
+      }).andWhere('home_link.folder_id', folderId);
+    }
+    if (departmentId) {
+      countQuery = countQuery.andWhere('tasks.department_id', departmentId);
+    }
+    if (handoffStatus) {
+      countQuery = countQuery.andWhere('tasks.handoff_status', handoffStatus);
+    }
+    if (search) {
+      countQuery = countQuery.andWhereRaw(
+        `tasks.search_vec @@ plainto_tsquery('english', ?)`,
+        [search],
+      );
+    }
+
+    const countResult = (await countQuery.count('tasks.id').first()) as
+      | { count?: string | number }
+      | undefined;
     const total = Number(countResult?.count || 0);
 
-    // Fetch page
+    // Fetch page with explicit select whitelist (omitting tasks.search_vec)
     const tasks = await query
       .select(
-        'tasks.*',
+        ...TaskService.TASK_SELECT_COLUMNS,
         'workspaces.name as department_name',
         'home_folder.id as folder_id',
         'home_folder.name as folder_name',
@@ -152,7 +310,7 @@ export class TaskService {
       .limit(perPage)
       .offset((page - 1) * perPage);
 
-    return {
+    const result = {
       data: await this.attachAssignees(tasks),
       meta: {
         page,
@@ -161,6 +319,9 @@ export class TaskService {
         totalPages: Math.ceil(total / perPage),
       },
     };
+
+    this.cache.set(cacheKey, result, 15);
+    return result;
   }
 
   private async findVisibleTask(id: string) {
@@ -405,6 +566,7 @@ export class TaskService {
     }
 
     this.logger.log(`Task ${id} created in project ${task.projectId}`);
+    this.invalidateTenantCache(ctx.tenantId);
     return { ...task, assignees: await this.getTaskAssignees(id) };
   }
 
@@ -538,6 +700,7 @@ export class TaskService {
       }
     }
 
+    this.invalidateTenantCache(ctx.tenantId);
     return { ...updated, assignees: await this.getTaskAssignees(id) };
   }
 
@@ -554,6 +717,7 @@ export class TaskService {
       await trx('tasks').where({ id, tenant_id: ctx.tenantId }).update({ deleted_at: new Date() });
     });
     await this.logActivity(ctx.userId, 'task', id, 'task:deleted', {});
+    this.invalidateTenantCache(ctx.tenantId);
     this.logger.log(`Task ${id} soft-deleted`);
   }
 
@@ -563,7 +727,9 @@ export class TaskService {
   }
 
   async moveLocation(id: string, input: MoveTaskLocationInput) {
+    const ctx = requireTenantContext();
     await this.taskLocations.move(id, input);
+    this.invalidateTenantCache(ctx.tenantId);
     return this.findById(id);
   }
 
@@ -705,6 +871,7 @@ export class TaskService {
     if (!current.some((assignee) => assignee.user_id === userId)) {
       await this.createAssignmentNotification({ ...task, assignee_id: userId });
     }
+    this.invalidateTenantCache(ctx.tenantId);
     return this.findById(taskId);
   }
 
@@ -725,6 +892,7 @@ export class TaskService {
         .update({ assignee_id: ids[0] || null, updated_at: new Date() });
     });
     await this.logActivity(ctx.userId, 'task', taskId, 'task:assignee:removed', { userId });
+    this.invalidateTenantCache(ctx.tenantId);
     return this.findById(taskId);
   }
 
@@ -845,13 +1013,14 @@ export class TaskService {
           }
         }
 
+        this.invalidateTenantCache(ctx.tenantId);
         return updated;
       }
     }
 
     // Fallback: per-row updates inside a single transaction
-    return this.db.transaction(async (trx) => {
-      const results = [];
+    const results = await this.db.transaction(async (trx) => {
+      const res = [];
       for (const taskId of input.taskIds) {
         try {
           const existing = await trx('tasks')
@@ -885,14 +1054,16 @@ export class TaskService {
               .where({ id: taskId, tenant_id: ctx.tenantId })
               .update(updates)
               .returning('*');
-            results.push(updated);
+            res.push(updated);
           }
         } catch (err) {
           this.logger.warn(`Bulk update failed for task ${taskId}: ${(err as Error).message}`);
         }
       }
-      return results;
+      return res;
     });
+    this.invalidateTenantCache(ctx.tenantId);
+    return results;
   }
 
   /**
