@@ -42,7 +42,36 @@
 - [ ] Run shared validation tests and backend typecheck.
 - [ ] Commit as `fix: restore timeline unscheduling contract`.
 
-### Task 3: Verify the clean baseline
+### Task 3: Restore frontend handoff flow and task detail behavior
+
+**Files:**
+- Modify: `packages/frontend/src/components/Task/HandoffCompletionDialog.tsx`
+- Modify: `packages/frontend/src/components/Task/useTaskCompletionFlow.ts`
+- Modify: `packages/frontend/src/pages/TaskDetailPage.tsx`
+- Modify only if required by the existing tests: `packages/frontend/src/components/Kanban/KanbanBoard.tsx`
+
+- [ ] Compare current code with known-good handoff commits before `9a92aa7`.
+- [ ] Restore accessible dialog naming/focus containment, single-flight completion promises, explicit cancel/not-yet outcomes, task-detail status controls, confirmer display, and Kanban outcome/error handling.
+- [ ] Preserve valid later calendar, task-generation, and clean-build integration.
+- [ ] Run:
+  `npm test -w @wrike-clone/frontend -- src/components/Task/HandoffCompletionDialog.spec.tsx src/pages/TaskDetailPage.spec.tsx src/components/Kanban/KanbanBoard.spec.tsx`
+- [ ] Run frontend typecheck.
+- [ ] Commit as `fix: restore frontend handoff workflow`.
+
+### Task 4: Reconcile task creation contracts and privacy copy
+
+**Files:**
+- Modify: `packages/frontend/src/components/Task/quick-task-form.spec.ts`
+- Modify: `packages/frontend/src/components/Task/TaskForm.tsx`
+
+- [ ] Confirm `handoffRequired: true` is an intentional current create-request contract and update the three stale exact-object expectations rather than removing the field.
+- [ ] Restore the tested privacy copy: `OpenWork only asks for confirmation; it does not store or send the work.`
+- [ ] Run:
+  `npm test -w @wrike-clone/frontend -- src/components/Task/quick-task-form.spec.ts src/components/Task/TaskForm.spec.tsx`
+- [ ] Run frontend typecheck.
+- [ ] Commit as `fix: align task creation handoff guidance`.
+
+### Task 5: Verify the clean baseline
 
 **Files:**
 - No production changes expected.
@@ -53,4 +82,3 @@
 - [ ] Run the frontend test suite independently.
 - [ ] Run `npm run build`.
 - [ ] Record any remaining failures exactly; do not mask or skip tests.
-
