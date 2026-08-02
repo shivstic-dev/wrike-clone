@@ -27,6 +27,12 @@ export async function up(knex: Knex): Promise<void> {
     `);
 
     await knex.raw(`
+      ALTER TABLE tasks
+        ADD CONSTRAINT tasks_handoff_status_check
+        CHECK (handoff_status IN ('pending', 'ready', 'confirmed', 'not_required'));
+    `);
+
+    await knex.raw(`
       CREATE INDEX IF NOT EXISTS idx_tasks_tenant_handoff_ready
       ON tasks (tenant_id, handoff_owner_id, handoff_ready_at DESC)
       WHERE deleted_at IS NULL AND handoff_status = 'ready';
@@ -36,6 +42,7 @@ export async function up(knex: Knex): Promise<void> {
 
 export async function down(knex: Knex): Promise<void> {
   await knex.raw('DROP INDEX IF EXISTS idx_tasks_tenant_handoff_ready;');
+  await knex.raw('ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_handoff_status_check;');
   await knex.schema.alterTable('tasks', (table) => {
     table.dropColumn('handoff_confirmed_at');
     table.dropColumn('handoff_confirmed_by');

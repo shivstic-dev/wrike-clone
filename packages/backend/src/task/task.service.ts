@@ -7,6 +7,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Logger,
@@ -30,6 +31,7 @@ import { TaskStatus, TaskPriority, HandoffStatus } from '@wrike-clone/shared';
 import { DepartmentAccessService } from '../rbac/department-access.service';
 import { TaskLocationService } from './task-location.service';
 import { MemoryCacheService } from '../common/cache/memory-cache.service';
+import { TaskCompletionService } from './task-completion.service';
 
 @Injectable()
 export class TaskService {
@@ -87,6 +89,7 @@ export class TaskService {
     @Inject(DATABASE_PROVIDER) private readonly db: Knex,
     private readonly departmentAccess: DepartmentAccessService,
     private readonly taskLocations: TaskLocationService,
+    private readonly taskCompletion: TaskCompletionService,
     private readonly cache: MemoryCacheService,
   ) {}
 
@@ -209,7 +212,19 @@ export class TaskService {
           .andOnVal('home_link.is_home', '=', true);
       })
       .leftJoin({ task_project: 'projects' }, 'task_project.id', 'tasks.project_id')
-      .leftJoin({ home_folder: 'folders' }, 'home_folder.id', 'home_link.folder_id');
+      .leftJoin({ home_folder: 'folders' }, 'home_folder.id', 'home_link.folder_id')
+      .leftJoin({ handoff_owner_membership: 'tenant_memberships' }, function () {
+        this.on('handoff_owner_membership.tenant_id', '=', 'tasks.tenant_id').andOn(
+          'handoff_owner_membership.user_id',
+          '=',
+          'tasks.handoff_owner_id',
+        );
+      })
+      .leftJoin(
+        { handoff_owner: 'users' },
+        'handoff_owner.id',
+        'handoff_owner_membership.user_id',
+      );
 
     if (!tenantAdmin) {
       query = applyTaskAccessScope(query, { ...ctx, role: 'member' });
@@ -295,12 +310,15 @@ export class TaskService {
     // Fetch page with explicit select whitelist (omitting tasks.search_vec)
     const tasks = await query
       .select(
-        ...TaskService.TASK_SELECT_COLUMNS,
+        TaskService.TASK_SELECT_COLUMNS,
         'workspaces.name as department_name',
         'home_folder.id as folder_id',
         'home_folder.name as folder_name',
         'task_project.name as project_name',
         'task_project.is_system as is_system_project',
+        this.db.raw(
+          `CASE WHEN handoff_owner.id IS NULL THEN NULL ELSE json_build_object('id', handoff_owner.id, 'display_name', handoff_owner.display_name, 'email', handoff_owner.email) END as handoff_owner`,
+        ),
         this.db.raw(
           `json_build_object('id', u.id, 'display_name', u.display_name, 'avatar_url', u.avatar_url) as assignee`,
         ),
@@ -336,6 +354,18 @@ export class TaskService {
       })
       .leftJoin({ task_project: 'projects' }, 'task_project.id', 'tasks.project_id')
       .leftJoin({ home_folder: 'folders' }, 'home_folder.id', 'home_link.folder_id')
+      .leftJoin({ handoff_owner_membership: 'tenant_memberships' }, function () {
+        this.on('handoff_owner_membership.tenant_id', '=', 'tasks.tenant_id').andOn(
+          'handoff_owner_membership.user_id',
+          '=',
+          'tasks.handoff_owner_id',
+        );
+      })
+      .leftJoin(
+        { handoff_owner: 'users' },
+        'handoff_owner.id',
+        'handoff_owner_membership.user_id',
+      )
       .where('tasks.id', id)
       .andWhere('tasks.tenant_id', ctx.tenantId)
       .whereNull('tasks.deleted_at')
@@ -346,6 +376,9 @@ export class TaskService {
         'home_folder.name as folder_name',
         'task_project.name as project_name',
         'task_project.is_system as is_system_project',
+        this.db.raw(
+          `CASE WHEN handoff_owner.id IS NULL THEN NULL ELSE json_build_object('id', handoff_owner.id, 'display_name', handoff_owner.display_name, 'email', handoff_owner.email) END as handoff_owner`,
+        ),
       )
       .modify((qb: Knex.QueryBuilder) => {
         if (!tenantAdmin) {
@@ -514,6 +547,9 @@ export class TaskService {
 
   async create(input: CreateTaskInput) {
     const ctx = requireTenantContext();
+    if (input.status === TaskStatus.COMPLETED && input.handoffRequired !== false) {
+      throw this.handoffRequiredConflict();
+    }
     const id = uuidv4();
     const assigneeIds = this.uniqueAssigneeIds(input);
 
@@ -542,6 +578,7 @@ export class TaskService {
           title: input.title,
           description: input.description || null,
           status: input.status || TaskStatus.TODO,
+          completed_at: input.status === TaskStatus.COMPLETED ? new Date() : null,
           priority: input.priority || TaskPriority.LOW,
           estimated_hours: input.estimatedHours || null,
           start_date: input.startDate || null,
@@ -578,6 +615,10 @@ export class TaskService {
     const existing = await this.findVisibleTask(id);
     const requestedFields = Object.keys(input as Record<string, unknown>);
     const statusOnly = requestedFields.length === 1 && requestedFields[0] === 'status';
+
+    if (input.status === TaskStatus.COMPLETED && existing.status !== TaskStatus.COMPLETED) {
+      throw this.handoffRequiredConflict();
+    }
 
     if (statusOnly) {
       await this.departmentAccess.assertCanChangeStatus(
@@ -634,6 +675,9 @@ export class TaskService {
         changes['assigneeIds'] = { old: existingIds, new: desiredAssigneeIds };
       }
       updates['assignee_id'] = desiredAssigneeIds[0] || null;
+      if (changes['assigneeIds'] && desiredAssigneeIds.some((assigneeId) => !existingIds.includes(assigneeId))) {
+        updates['handoff_owner_id'] = ctx.userId;
+      }
       delete changes['assigneeId'];
     }
 
@@ -665,6 +709,25 @@ export class TaskService {
     updates['updated_at'] = new Date();
 
     const updated = await this.db.transaction(async (trx) => {
+      if (input.status && input.status !== TaskStatus.COMPLETED && existing.status === TaskStatus.COMPLETED) {
+        const reopened = await this.taskCompletion.reopenInTransaction(trx, existing, input.status);
+        const nonStatusUpdates = { ...updates };
+        delete nonStatusUpdates.status;
+        delete nonStatusUpdates.completed_at;
+        const hasNonStatusChanges = Object.keys(nonStatusUpdates).some(
+          (field) => field !== 'updated_at',
+        );
+        if (!hasNonStatusChanges) return reopened;
+
+        const [row] = await trx('tasks')
+          .where({ id, tenant_id: ctx.tenantId })
+          .update(nonStatusUpdates)
+          .returning('*');
+        if (assigneesProvided) {
+          await this.replaceTaskAssignees(id, desiredAssigneeIds, trx);
+        }
+        return row;
+      }
       const [row] = await trx('tasks')
         .where({ id, tenant_id: ctx.tenantId })
         .update(updates)
@@ -860,17 +923,22 @@ export class TaskService {
     await this.validateAssignees(task.department_id, [userId]);
     const current = await this.getTaskAssignees(taskId);
     const ids = current.map((assignee) => assignee.user_id as string);
-    if (!ids.includes(userId)) ids.push(userId);
+    const changed = !ids.includes(userId);
+    if (!changed) return this.findById(taskId);
+
+    ids.push(userId);
     await this.db.transaction(async (trx) => {
       await this.replaceTaskAssignees(taskId, ids, trx);
       await trx('tasks')
         .where({ id: taskId, tenant_id: ctx.tenantId })
-        .update({ assignee_id: ids[0] || null, updated_at: new Date() });
+        .update({
+          assignee_id: ids[0] || null,
+          handoff_owner_id: ctx.userId,
+          updated_at: new Date(),
+        });
     });
     await this.logActivity(ctx.userId, 'task', taskId, 'task:assignee:added', { userId });
-    if (!current.some((assignee) => assignee.user_id === userId)) {
-      await this.createAssignmentNotification({ ...task, assignee_id: userId });
-    }
+    await this.createAssignmentNotification({ ...task, assignee_id: userId });
     this.invalidateTenantCache(ctx.tenantId);
     return this.findById(taskId);
   }
@@ -902,6 +970,7 @@ export class TaskService {
    */
   async bulkUpdate(input: BulkTaskUpdateInput) {
     const ctx = requireTenantContext();
+    if (input.updates.status === TaskStatus.COMPLETED) throw this.handoffRequiredConflict();
     const existingTasks = await this.db('tasks')
       .whereIn('id', input.taskIds)
       .andWhere('tenant_id', ctx.tenantId)
@@ -931,6 +1000,37 @@ export class TaskService {
     }
 
     // Check if all updates are the same (uniform change — the common case)
+    const assignmentProvided =
+      input.updates.assigneeId !== undefined || input.updates.assigneeIds !== undefined;
+    const assignmentOnly =
+      assignmentProvided &&
+      updateFields.every((field) => field === 'assigneeId' || field === 'assigneeIds');
+    if (assignmentOnly) {
+      const desiredAssigneeIds = this.uniqueAssigneeIds(input.updates);
+      const currentAssignees = await this.db('task_assignees')
+        .where({ tenant_id: ctx.tenantId })
+        .whereIn('task_id', input.taskIds)
+        .select('task_id', 'user_id', 'is_primary');
+      const currentByTask = new Map<string, Array<{ user_id: string; is_primary: boolean }>>();
+      for (const assignee of currentAssignees) {
+        const values = currentByTask.get(assignee.task_id) || [];
+        values.push(assignee);
+        currentByTask.set(assignee.task_id, values);
+      }
+      const everyAssignmentMatches = existingTasks.every((task) => {
+        const current = currentByTask.get(task.id) || [];
+        const currentIds = new Set(current.map((assignee) => assignee.user_id));
+        const primary = current.find((assignee) => assignee.is_primary)?.user_id || null;
+        return (
+          currentIds.size === desiredAssigneeIds.length &&
+          desiredAssigneeIds.every((assigneeId) => currentIds.has(assigneeId)) &&
+          primary === (desiredAssigneeIds[0] || null) &&
+          (task.assignee_id || null) === (desiredAssigneeIds[0] || null)
+        );
+      });
+      if (everyAssignmentMatches) return existingTasks;
+    }
+
     const keys = Object.keys(input.updates);
     if (keys.length > 0 && input.taskIds.length > 0) {
       // Try uniform update first: UPDATE ... WHERE id = ANY(?) AND tenant_id = ?
@@ -970,19 +1070,49 @@ export class TaskService {
       // Perform a single batched UPDATE inside a transaction
       if (Object.keys(dbUpdates).length > 0) {
         const updated = await this.db.transaction(async (trx) => {
+          if (dbUpdates['status'] && dbUpdates['status'] !== TaskStatus.COMPLETED) {
+            for (const task of existingTasks) {
+              if (task.status === TaskStatus.COMPLETED) {
+                await this.taskCompletion.reopenInTransaction(trx, task, dbUpdates['status'] as TaskStatus);
+              }
+            }
+          }
           const rows = await trx('tasks')
             .whereIn('id', input.taskIds)
             .andWhere('tenant_id', ctx.tenantId)
             .whereNull('deleted_at')
             .update(dbUpdates)
             .returning('*');
+          let rowsWithOwners = rows;
           if (input.updates.assigneeId !== undefined || input.updates.assigneeIds !== undefined) {
             const assigneeIds = this.uniqueAssigneeIds(input.updates);
-            for (const task of rows) {
+            const currentAssignees = await trx('task_assignees')
+              .where({ tenant_id: ctx.tenantId })
+              .whereIn('task_id', input.taskIds)
+              .select('task_id', 'user_id');
+            const currentByTask = new Map<string, Set<string>>();
+            for (const assignee of currentAssignees) {
+              const ids = currentByTask.get(assignee.task_id) || new Set<string>();
+              ids.add(assignee.user_id);
+              currentByTask.set(assignee.task_id, ids);
+            }
+            const ownerTaskIds = input.taskIds.filter((taskId) =>
+              assigneeIds.some((assigneeId) => !currentByTask.get(taskId)?.has(assigneeId)),
+            );
+            if (ownerTaskIds.length > 0) {
+              const ownerRows = await trx('tasks')
+                .whereIn('id', ownerTaskIds)
+                .andWhere('tenant_id', ctx.tenantId)
+                .update({ handoff_owner_id: ctx.userId, updated_at: new Date() })
+                .returning('*');
+              const ownerByTaskId = new Map(ownerRows.map((task) => [task.id, task]));
+              rowsWithOwners = rows.map((task) => ownerByTaskId.get(task.id) || task);
+            }
+            for (const task of rowsWithOwners) {
               await this.replaceTaskAssignees(task.id, assigneeIds, trx);
             }
           }
-          return rows;
+          return rowsWithOwners;
         });
 
         // Log activity
@@ -1200,5 +1330,12 @@ export class TaskService {
     } catch (err) {
       this.logger.warn(`Failed to log activity: ${(err as Error).message}`);
     }
+  }
+
+  private handoffRequiredConflict(): ConflictException {
+    return new ConflictException({
+      code: 'HANDOFF_CONFIRMATION_REQUIRED',
+      message: 'Confirm final handoff before completing this task.',
+    });
   }
 }

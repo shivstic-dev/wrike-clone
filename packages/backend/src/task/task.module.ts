@@ -6,9 +6,10 @@ import { RbacModule } from '../rbac/rbac.module';
 import { WorkspaceModule } from '../workspace/workspace.module';
 import { DepartmentWorkflowController } from './department-workflow.controller';
 import { TaskLocationService } from './task-location.service';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
-  imports: [RbacModule, WorkspaceModule],
+  imports: [RbacModule, WorkspaceModule, NotificationModule],
   controllers: [TaskController, DepartmentWorkflowController],
   providers: [TaskService, TaskCompletionService, TaskLocationService],
   exports: [TaskService, TaskCompletionService, TaskLocationService],
