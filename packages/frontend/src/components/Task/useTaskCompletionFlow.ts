@@ -1,74 +1,135 @@
-import { useState, useCallback } from 'react';
-import type { Task } from '@wrike-clone/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Task, TaskCompletionOutcome } from '@wrike-clone/shared';
 import { useCompleteTask } from '../../api/tasks';
-import toast from 'react-hot-toast';
+import type { HandoffCompletionDialogProps } from './HandoffCompletionDialog';
 
-export function useTaskCompletionFlow() {
-  const [activeTask, setActiveTask] = useState<Task | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+interface PendingCompletion {
+  task: Task;
+  promise: Promise<Task | null>;
+  resolve: (task: Task | null) => void;
+  reject: (error: Error) => void;
+}
+
+export function useTaskCompletionFlow(): {
+  requestCompletion: (task: Task) => Promise<Task | null>;
+  dialogProps: HandoffCompletionDialogProps;
+} {
   const completeTask = useCompleteTask();
+  const [taskAwaitingConfirmation, setTaskAwaitingConfirmation] = useState<Task | null>(null);
+  const pendingCompletionRef = useRef<PendingCompletion | null>(null);
+  const immediateCompletionPromisesRef = useRef(new Map<string, Promise<Task | null>>());
+  const isResolvingRef = useRef(false);
+  const isMountedRef = useRef(false);
 
-  const handleConfirm = useCallback(async () => {
-    if (!activeTask) return;
-    try {
-      await completeTask.mutateAsync({ taskId: activeTask.id, outcome: 'confirmed' });
-      toast.success('Handoff confirmed and task completed');
-      setIsDialogOpen(false);
-      setActiveTask(null);
-    } catch (error) {
-      toast.error('Failed to confirm handoff');
-    }
-  }, [activeTask, completeTask]);
+  useEffect(() => {
+    isMountedRef.current = true;
 
-  const handleNotYet = useCallback(async () => {
-    if (!activeTask) return;
-    try {
-      await completeTask.mutateAsync({ taskId: activeTask.id, outcome: 'not_yet' });
-      toast('Saved in Ready for handoff', { icon: 'ℹ️' });
-      setIsDialogOpen(false);
-      setActiveTask(null);
-    } catch (error) {
-      toast.error('Failed to update task state');
-    }
-  }, [activeTask, completeTask]);
-
-  const handleCancel = useCallback(() => {
-    setIsDialogOpen(false);
-    setActiveTask(null);
+    return () => {
+      isMountedRef.current = false;
+      isResolvingRef.current = false;
+      immediateCompletionPromisesRef.current.clear();
+      const pendingCompletion = pendingCompletionRef.current;
+      pendingCompletionRef.current = null;
+      pendingCompletion?.resolve(null);
+    };
   }, []);
 
-  const requestCompletion = useCallback(
-    async (task: Task): Promise<boolean> => {
-      if (task.handoffRequired === false) {
-        try {
-          await completeTask.mutateAsync({ taskId: task.id, outcome: 'confirmed' });
-          toast.success('Task completed');
-          return true;
-        } catch {
-          toast.error('Failed to complete task');
-          return false;
+  const resolveOutcome = useCallback(
+    async (outcome: TaskCompletionOutcome) => {
+      const pendingCompletion = pendingCompletionRef.current;
+      if (!pendingCompletion || completeTask.isPending || isResolvingRef.current) return;
+
+      isResolvingRef.current = true;
+
+      try {
+        const completedTask = await completeTask.mutateAsync({
+          taskId: pendingCompletion.task.id,
+          outcome,
+        });
+        if (pendingCompletionRef.current === pendingCompletion) {
+          pendingCompletionRef.current = null;
+          if (isMountedRef.current) setTaskAwaitingConfirmation(null);
+          pendingCompletion.resolve(completedTask);
         }
-      } else {
-        setActiveTask(task);
-        setIsDialogOpen(true);
-        return false;
+      } catch (error) {
+        if (pendingCompletionRef.current === pendingCompletion) {
+          pendingCompletionRef.current = null;
+          if (isMountedRef.current) setTaskAwaitingConfirmation(null);
+          pendingCompletion.reject(
+            error instanceof Error ? error : new Error('Task completion failed'),
+          );
+        }
+      } finally {
+        isResolvingRef.current = false;
       }
+    },
+    [completeTask],
+  );
+
+  const cancel = useCallback(() => {
+    const pendingCompletion = pendingCompletionRef.current;
+    if (!pendingCompletion || completeTask.isPending || isResolvingRef.current) return;
+
+    pendingCompletionRef.current = null;
+    if (isMountedRef.current) setTaskAwaitingConfirmation(null);
+    pendingCompletion.resolve(null);
+  }, [completeTask.isPending]);
+
+  const requestCompletion = useCallback(
+    (task: Task): Promise<Task | null> => {
+      if (!task.handoffRequired) {
+        const existingCompletion = immediateCompletionPromisesRef.current.get(task.id);
+        if (existingCompletion) return existingCompletion;
+
+        const completion = completeTask.mutateAsync({ taskId: task.id, outcome: 'confirmed' });
+        immediateCompletionPromisesRef.current.set(task.id, completion);
+        const removeCompletion = () => {
+          if (immediateCompletionPromisesRef.current.get(task.id) === completion) {
+            immediateCompletionPromisesRef.current.delete(task.id);
+          }
+        };
+        void completion.then(removeCompletion, removeCompletion);
+        return completion;
+      }
+
+      const currentPendingCompletion = pendingCompletionRef.current;
+      if (currentPendingCompletion) {
+        if (currentPendingCompletion.task.id === task.id) {
+          return currentPendingCompletion.promise;
+        }
+        return Promise.reject(
+          new Error('Another task is already awaiting handoff confirmation'),
+        );
+      }
+
+      let resolvePromise: (task: Task | null) => void = () => undefined;
+      let rejectPromise: (error: Error) => void = () => undefined;
+      const promise = new Promise<Task | null>((resolve, reject) => {
+        resolvePromise = resolve;
+        rejectPromise = reject;
+      });
+
+      pendingCompletionRef.current = {
+        task,
+        promise,
+        resolve: resolvePromise,
+        reject: rejectPromise,
+      };
+      setTaskAwaitingConfirmation(task);
+      return promise;
     },
     [completeTask],
   );
 
   return {
     requestCompletion,
-    isDialogOpen,
-    activeTask,
-    isSubmitting: completeTask.isPending,
     dialogProps: {
-      open: isDialogOpen,
-      task: activeTask,
-      isSubmitting: completeTask.isPending,
-      onConfirm: handleConfirm,
-      onNotYet: handleNotYet,
-      onCancel: handleCancel,
+      open: taskAwaitingConfirmation !== null,
+      task: taskAwaitingConfirmation,
+      isPending: completeTask.isPending,
+      onConfirm: () => void resolveOutcome('confirmed'),
+      onNotYet: () => void resolveOutcome('not_yet'),
+      onCancel: cancel,
     },
   };
 }

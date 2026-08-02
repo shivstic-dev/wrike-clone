@@ -4,6 +4,7 @@ import type { Task } from '@wrike-clone/shared';
 export interface HandoffCompletionDialogProps {
   open: boolean;
   task: Task | null;
+  isPending?: boolean;
   isSubmitting?: boolean;
   onConfirm: () => void;
   onNotYet: () => void;
@@ -13,6 +14,7 @@ export interface HandoffCompletionDialogProps {
 export function HandoffCompletionDialog({
   open,
   task,
+  isPending = false,
   isSubmitting = false,
   onConfirm,
   onNotYet,
@@ -20,99 +22,138 @@ export function HandoffCompletionDialog({
 }: HandoffCompletionDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const pending = isPending || isSubmitting;
 
   useEffect(() => {
-    if (!open) return;
-    headingRef.current?.focus();
+    if (!open || !task) return;
+
+    restoreFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isSubmitting) {
+      if (event.key === 'Escape' && !pending) {
+        event.preventDefault();
         onCancel();
+        return;
+      }
+
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+
+      if (
+        event.shiftKey &&
+        (document.activeElement === first || document.activeElement === headingRef.current)
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, isSubmitting, onCancel]);
+    headingRef.current?.focus();
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      restoreFocusRef.current?.focus();
+    };
+  }, [onCancel, open, pending, task]);
 
   if (!open || !task) return null;
 
-  const ownerName =
-    task.handoffOwner?.displayName || task.handoffOwner?.email || 'the task owner';
+  const ownerName = task.handoffOwner?.displayName || task.handoffOwner?.email || 'Task owner';
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm sm:p-6 grid place-items-center">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-atlas-ink/40 p-0 backdrop-blur-[2px] sm:p-4">
       <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="handoff-dialog-title"
-        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl border border-slate-200"
+        className="grid min-h-full place-items-center"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !pending) onCancel();
+        }}
       >
-        <div className="flex items-center gap-3 text-amber-600 mb-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-50">
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">
-              Handoff Confirmation
-            </span>
-          </div>
-        </div>
-
-        <h3
-          id="handoff-dialog-title"
-          ref={headingRef}
-          tabIndex={-1}
-          className="text-lg font-semibold text-slate-900 outline-none"
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="handoff-completion-title"
+          aria-describedby="handoff-completion-question"
+          className="flex min-h-screen w-full flex-col bg-white shadow-2xl outline-none sm:min-h-0 sm:max-w-lg sm:rounded-2xl sm:border sm:border-atlas-mist"
         >
-          Has the finished work been shared with the intended recipient?
-        </h3>
+          <div className="border-b border-atlas-mist bg-slate-50 px-5 py-5 sm:rounded-t-2xl sm:px-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-atlas-current">
+              Final handoff
+            </p>
+            <h2
+              ref={headingRef}
+              id="handoff-completion-title"
+              tabIndex={-1}
+              className="mt-2 font-atlasDisplay text-xl font-semibold tracking-[-0.035em] text-atlas-ink outline-none focus-visible:ring-2 focus-visible:ring-atlas-current focus-visible:ring-offset-2 sm:text-2xl"
+            >
+              Confirm final handoff
+            </h2>
+          </div>
 
-        <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-          Task owner <strong className="text-slate-800">{ownerName}</strong> requires final deliverable
-          confirmation before this task is marked completed.
-        </p>
+          <div className="flex flex-1 flex-col px-5 py-5 sm:px-6">
+            <h3 id="handoff-completion-question" className="text-base font-medium leading-6 text-slate-700">
+              Has the finished work been shared with the intended recipient?
+            </h3>
 
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={onConfirm}
-            className="btn-primary w-full sm:w-auto px-4 py-2 text-sm font-medium"
-          >
-            {isSubmitting ? 'Confirming…' : 'Yes, handoff completed'}
-          </button>
+            <div className="mt-5 rounded-xl border border-atlas-mist border-l-4 border-l-atlas-current bg-atlas-sky px-4 py-3.5">
+              <div className="flex items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-atlas-current shadow-[0_1px_2px_rgba(13,59,42,0.08)]"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m5 12 4 4L19 6" />
+                  </svg>
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-atlas-canopy">
+                    Intended recipient
+                  </p>
+                  <h3 className="mt-1 text-sm font-semibold text-atlas-ink">{ownerName}</h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">
+                    Task owner
+                  </p>
+                </div>
+              </div>
+            </div>
 
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={onNotYet}
-            className="btn-secondary w-full sm:w-auto px-4 py-2 text-sm font-medium"
-          >
-            Not yet
-          </button>
+            <p className="mt-4 text-sm leading-6 text-slate-600">
+              Choose Not yet to keep this task in Ready for handoff.
+            </p>
+          </div>
 
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={onCancel}
-            className="btn-ghost w-full sm:w-auto px-4 py-2 text-sm font-medium text-slate-500"
-          >
-            Cancel
-          </button>
+          <div className="flex flex-col-reverse gap-2 border-t border-atlas-mist bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end sm:rounded-b-2xl sm:px-6">
+            <button
+              type="button"
+              disabled={pending}
+              className="btn-secondary min-h-10 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
+              onClick={onNotYet}
+            >
+              Not yet
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              className="btn-primary min-h-10 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
+              onClick={onConfirm}
+            >
+              Yes, handoff completed
+            </button>
+          </div>
         </div>
       </div>
     </div>

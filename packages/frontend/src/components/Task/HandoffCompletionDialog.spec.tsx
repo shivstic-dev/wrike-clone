@@ -189,7 +189,7 @@ describe('HandoffCompletionDialog', () => {
 describe('useTaskCompletionFlow', () => {
   it('completes a handoff-disabled task immediately with the confirmed outcome', async () => {
     completionMutation.mutateAsync.mockResolvedValue(task);
-    let requestCompletion: ((value: Task) => Promise<boolean>) | undefined;
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -217,7 +217,7 @@ describe('useTaskCompletionFlow', () => {
         resolveMutation = resolve;
       }),
     );
-    let requestCompletion: ((value: Task) => Promise<boolean>) | undefined;
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -229,8 +229,8 @@ describe('useTaskCompletionFlow', () => {
     }
 
     act(() => root.render(<Harness />));
-    let first: Promise<boolean> | undefined;
-    let second: Promise<boolean> | undefined;
+    let first: Promise<Task | null> | undefined;
+    let second: Promise<Task | null> | undefined;
     act(() => {
       first = requestCompletion?.({ ...task, handoffRequired: false });
       second = requestCompletion?.({ ...task, handoffRequired: false });
@@ -246,7 +246,7 @@ describe('useTaskCompletionFlow', () => {
 
   it('resolves Not yet only after the member makes that explicit choice', async () => {
     completionMutation.mutateAsync.mockResolvedValue({ ...task, handoffStatus: 'ready' });
-    let requestCompletion: ((value: Task) => Promise<boolean>) | undefined;
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -259,7 +259,7 @@ describe('useTaskCompletionFlow', () => {
     }
 
     act(() => root.render(<Harness />));
-    let result: Promise<boolean> | undefined;
+    let result: Promise<Task | null> | undefined;
     act(() => {
       result = requestCompletion?.(task);
     });
@@ -277,7 +277,7 @@ describe('useTaskCompletionFlow', () => {
   });
 
   it('resolves null when the member cancels the confirmation', async () => {
-    let requestCompletion: ((value: Task) => Promise<boolean>) | undefined;
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -290,7 +290,7 @@ describe('useTaskCompletionFlow', () => {
     }
 
     act(() => root.render(<Harness />));
-    let result: Promise<boolean> | undefined;
+    let result: Promise<Task | null> | undefined;
     act(() => {
       result = requestCompletion?.(task);
     });
@@ -302,7 +302,7 @@ describe('useTaskCompletionFlow', () => {
   });
 
   it('deduplicates repeated completion requests for the same required task', async () => {
-    let requestCompletion: ((value: Task) => Promise<boolean>) | undefined;
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -315,8 +315,8 @@ describe('useTaskCompletionFlow', () => {
     }
 
     act(() => root.render(<Harness />));
-    let first: Promise<boolean> | undefined;
-    let second: Promise<boolean> | undefined;
+    let first: Promise<Task | null> | undefined;
+    let second: Promise<Task | null> | undefined;
     act(() => {
       first = requestCompletion?.(task);
       second = requestCompletion?.(task);
@@ -330,7 +330,7 @@ describe('useTaskCompletionFlow', () => {
   });
 
   it('rejects a different required task while another confirmation is pending', async () => {
-    let requestCompletion: ((value: Task) => Promise<boolean>) | undefined;
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -343,8 +343,8 @@ describe('useTaskCompletionFlow', () => {
     }
 
     act(() => root.render(<Harness />));
-    let first: Promise<boolean> | undefined;
-    let second: Promise<boolean> | undefined;
+    let first: Promise<Task | null> | undefined;
+    let second: Promise<Task | null> | undefined;
     act(() => {
       first = requestCompletion?.(task);
       second = requestCompletion?.({ ...task, id: 'task-2', title: 'Prepare the annual report' });
@@ -362,7 +362,7 @@ describe('useTaskCompletionFlow', () => {
   });
 
   it('settles an open confirmation as cancelled when the flow unmounts', async () => {
-    let requestCompletion: ((value: Task) => Promise<boolean>) | undefined;
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -374,7 +374,7 @@ describe('useTaskCompletionFlow', () => {
     }
 
     act(() => root.render(<Harness />));
-    let result: Promise<boolean> | undefined;
+    let result: Promise<Task | null> | undefined;
     act(() => {
       result = requestCompletion?.(task);
     });
@@ -391,7 +391,7 @@ describe('useTaskCompletionFlow', () => {
         resolveMutation = resolve;
       }),
     );
-    let requestCompletion: ((value: Task) => Promise<boolean>) | undefined;
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -404,7 +404,7 @@ describe('useTaskCompletionFlow', () => {
     }
 
     act(() => root.render(<Harness />));
-    let result: Promise<boolean> | undefined;
+    let result: Promise<Task | null> | undefined;
     act(() => {
       result = requestCompletion?.(task);
     });
@@ -425,7 +425,7 @@ describe('useTaskCompletionFlow', () => {
 
   it('clears a failed completion so the member can make a new choice', async () => {
     completionMutation.mutateAsync.mockRejectedValueOnce(new Error('Network unavailable'));
-    let requestCompletion: ((value: Task) => Promise<boolean>) | undefined;
+    let requestCompletion: ((value: Task) => Promise<Task | null>) | undefined;
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -438,7 +438,7 @@ describe('useTaskCompletionFlow', () => {
     }
 
     act(() => root.render(<Harness />));
-    let failed: Promise<boolean> | undefined;
+    let failed: Promise<Task | null> | undefined;
     act(() => {
       failed = requestCompletion?.(task);
     });
@@ -449,7 +449,7 @@ describe('useTaskCompletionFlow', () => {
     });
     await expect(failed).rejects.toThrow('Network unavailable');
 
-    let retry: Promise<boolean> | undefined;
+    let retry: Promise<Task | null> | undefined;
     act(() => {
       retry = requestCompletion?.(task);
     });
