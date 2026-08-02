@@ -260,7 +260,7 @@ export function TaskForm({
             Final handoff required
           </label>
           <p className="text-xs text-slate-500">
-            Requires confirming deliverable delivery before marking task completed.
+            OpenWork only asks for confirmation; it does not store or send the work.
           </p>
         </div>
       </div>

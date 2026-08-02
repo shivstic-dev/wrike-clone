@@ -26,6 +26,7 @@ describe('quick task form helpers', () => {
       startDate: '',
       estimatedHours: '',
       visibility: 'department',
+      handoffRequired: true,
     });
   });
 
@@ -55,6 +56,7 @@ describe('quick task form helpers', () => {
       startDate: '2026-07-29T00:00:00.000Z',
       estimatedHours: 3.5,
       visibility: 'global',
+      handoffRequired: true,
     });
   });
 
@@ -79,6 +81,7 @@ describe('quick task form helpers', () => {
       startDate: undefined,
       estimatedHours: undefined,
       visibility: 'department',
+      handoffRequired: true,
     });
   });
 
