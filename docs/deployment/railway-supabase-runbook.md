@@ -26,8 +26,8 @@ Do not edit, delete, or renumber applied migrations.
 Set these production variables without printing their values in build or startup logs:
 
 - `NODE_ENV=production`: required by startup; any other value fails closed before migrations.
-- `DATABASE_URL`: Supabase pooled runtime URL.
-- `MIGRATE_DATABASE_URL`: Supabase direct database URL on port 5432, used only by Knex migrations.
+- `DATABASE_URL`: the exact Supabase Shared Pooler URL copied from the dashboard. Railway startup and the API use this same credential.
+- `MIGRATE_DATABASE_URL`: optional local fallback for migration-only workflows; Railway does not require or prefer it.
 - `APP_PUBLIC_URL`: HTTPS frontend/public application origin.
 - `CORS_ORIGINS`: comma-separated HTTPS browser origins, with no wildcard.
 - `JWT_SECRET`: random secret of at least 32 characters.

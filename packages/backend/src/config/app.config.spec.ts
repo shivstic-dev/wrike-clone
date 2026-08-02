@@ -69,7 +69,20 @@ describe('application configuration', () => {
     expect(validateProductionConfig).toThrow('CORS_ORIGINS is required');
   });
 
-  it('requires a direct migration URL and HTTPS public URL in production', () => {
+  it('does not require a second database credential in production', () => {
+    process.env = {
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://pooler/runtime',
+      JWT_SECRET: 'j'.repeat(64),
+      CORS_ORIGINS: 'https://app.example.com',
+      APP_PUBLIC_URL: 'https://app.example.com',
+      DB_SSL: 'true',
+      ALLOW_PUBLIC_REGISTRATION: 'false',
+    };
+    expect(validateProductionConfig).not.toThrow();
+  });
+
+  it('requires an HTTPS public URL in production', () => {
     process.env = {
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://pooler/runtime',
@@ -78,9 +91,6 @@ describe('application configuration', () => {
       DB_SSL: 'true',
       ALLOW_PUBLIC_REGISTRATION: 'false',
     };
-    expect(validateProductionConfig).toThrow('MIGRATE_DATABASE_URL is required');
-
-    process.env.MIGRATE_DATABASE_URL = 'postgresql://direct/migrations';
     expect(validateProductionConfig).toThrow('APP_PUBLIC_URL is required');
   });
 

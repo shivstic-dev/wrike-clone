@@ -109,7 +109,6 @@ export function validateProductionConfig(): void {
   const corsOrigins = loadCorsOrigins(process.env['CORS_ORIGIN'] || process.env['CORS_ORIGINS'] || '');
 
   if (!process.env['DATABASE_URL']) problems.push('DATABASE_URL is required');
-  if (!process.env['MIGRATE_DATABASE_URL']) problems.push('MIGRATE_DATABASE_URL is required');
   if (!process.env['APP_PUBLIC_URL']) problems.push('APP_PUBLIC_URL is required');
   if (process.env['ALLOW_PUBLIC_REGISTRATION'] !== 'false') {
     problems.push('ALLOW_PUBLIC_REGISTRATION must be false');

@@ -15,11 +15,9 @@ export function migrationFileConfig(filename = __filename): {
 export function buildMigrationConnection(
   env: NodeJS.ProcessEnv = process.env,
 ): Knex.Config['connection'] {
-  const migrationUrl = env['MIGRATE_DATABASE_URL'];
-  if (env['NODE_ENV'] === 'production' && !migrationUrl) {
-    throw new Error('MIGRATE_DATABASE_URL is required for production migrations');
-  }
-  const databaseUrl = migrationUrl || env['DATABASE_URL'];
+  // Keep Railway startup on the same known-good credential as the application.
+  // MIGRATE_DATABASE_URL remains a local fallback for migration-only workflows.
+  const databaseUrl = env['DATABASE_URL'] || env['MIGRATE_DATABASE_URL'];
   if (databaseUrl) {
     return {
       connectionString: databaseUrl,
