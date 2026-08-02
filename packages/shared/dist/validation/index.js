@@ -239,7 +239,7 @@ exports.createDependencySchema = zod_1.z.object({
     taskId: exports.uuidField,
     dependsOnTaskId: exports.uuidField,
     dependencyType: zod_1.z.nativeEnum(enums_1.DependencyType),
-    lagDays: zod_1.z.number().int().nonnegative().optional().default(0),
+    lagDays: zod_1.z.number().int().min(0).max(3650).optional().default(0),
 });
 // ── Comments ───────────────────────────────────────────────────
 exports.createCommentSchema = zod_1.z.object({
@@ -369,7 +369,7 @@ exports.dashboardTasksQuerySchema = zod_1.z.object({
 });
 exports.updateDependencySchema = zod_1.z.object({
     dependencyType: zod_1.z.nativeEnum(enums_1.DependencyType).optional(),
-    lagDays: zod_1.z.number().int().nonnegative().optional(),
+    lagDays: zod_1.z.number().int().min(0).max(3650).optional(),
 });
 exports.updateTaskScheduleSchema = zod_1.z
     .object({
@@ -381,7 +381,9 @@ exports.updateTaskScheduleSchema = zod_1.z
     (value.startDate !== null && value.dueDate !== null), { message: 'startDate and dueDate must be scheduled together' })
     .refine((value) => value.startDate === null ||
     new Date(value.startDate).getTime() <= new Date(value.dueDate).getTime(), { message: 'startDate must not be after dueDate' });
-exports.timelineQuerySchema = zod_1.z.object({
+const MAX_TIMELINE_RANGE_MS = 730 * 24 * 60 * 60 * 1000;
+exports.timelineQuerySchema = zod_1.z
+    .object({
     projectId: exports.uuidField.optional(),
     departmentId: exports.uuidField.optional(),
     assigneeId: exports.uuidField.optional(),
@@ -391,5 +393,9 @@ exports.timelineQuerySchema = zod_1.z.object({
     to: exports.isoDate.optional(),
     cursor: zod_1.z.string().optional(),
     perPage: zod_1.z.coerce.number().int().min(1).max(500).optional().default(100),
-});
+})
+    .refine((value) => !value.from || !value.to || new Date(value.from).getTime() <= new Date(value.to).getTime(), { message: 'from must be before or equal to to', path: ['to'] })
+    .refine((value) => !value.from ||
+    !value.to ||
+    new Date(value.to).getTime() - new Date(value.from).getTime() <= MAX_TIMELINE_RANGE_MS, { message: 'timeline range must not exceed 730 days', path: ['to'] });
 //# sourceMappingURL=index.js.map

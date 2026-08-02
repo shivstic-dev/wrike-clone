@@ -291,7 +291,7 @@ export const createDependencySchema = z.object({
   taskId: uuidField,
   dependsOnTaskId: uuidField,
   dependencyType: z.nativeEnum(DependencyType),
-  lagDays: z.number().int().nonnegative().optional().default(0),
+  lagDays: z.number().int().min(0).max(3650).optional().default(0),
 });
 
 // ── Comments ───────────────────────────────────────────────────
@@ -452,7 +452,7 @@ export const dashboardTasksQuerySchema = z.object({
 
 export const updateDependencySchema = z.object({
   dependencyType: z.nativeEnum(DependencyType).optional(),
-  lagDays: z.number().int().nonnegative().optional(),
+  lagDays: z.number().int().min(0).max(3650).optional(),
 });
 
 export const updateTaskScheduleSchema = z
@@ -474,23 +474,37 @@ export const updateTaskScheduleSchema = z
     { message: 'startDate must not be after dueDate' },
   );
 
-export const timelineQuerySchema = z.object({
-  projectId: uuidField.optional(),
-  departmentId: uuidField.optional(),
-  assigneeId: uuidField.optional(),
-  status: z.preprocess(
-    (value) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value),
-    z.array(z.nativeEnum(TaskStatus)).optional(),
-  ),
-  priority: z.preprocess(
-    (value) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value),
-    z.array(z.nativeEnum(TaskPriority)).optional(),
-  ),
-  from: isoDate.optional(),
-  to: isoDate.optional(),
-  cursor: z.string().optional(),
-  perPage: z.coerce.number().int().min(1).max(500).optional().default(100),
-});
+const MAX_TIMELINE_RANGE_MS = 730 * 24 * 60 * 60 * 1000;
+
+export const timelineQuerySchema = z
+  .object({
+    projectId: uuidField.optional(),
+    departmentId: uuidField.optional(),
+    assigneeId: uuidField.optional(),
+    status: z.preprocess(
+      (value) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value),
+      z.array(z.nativeEnum(TaskStatus)).optional(),
+    ),
+    priority: z.preprocess(
+      (value) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value),
+      z.array(z.nativeEnum(TaskPriority)).optional(),
+    ),
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    cursor: z.string().optional(),
+    perPage: z.coerce.number().int().min(1).max(500).optional().default(100),
+  })
+  .refine(
+    (value) => !value.from || !value.to || new Date(value.from).getTime() <= new Date(value.to).getTime(),
+    { message: 'from must be before or equal to to', path: ['to'] },
+  )
+  .refine(
+    (value) =>
+      !value.from ||
+      !value.to ||
+      new Date(value.to).getTime() - new Date(value.from).getTime() <= MAX_TIMELINE_RANGE_MS,
+    { message: 'timeline range must not exceed 730 days', path: ['to'] },
+  );
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;

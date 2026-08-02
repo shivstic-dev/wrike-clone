@@ -1013,7 +1013,7 @@ export declare const updateTaskScheduleSchema: z.ZodEffects<z.ZodEffects<z.ZodOb
     dueDate: string | null;
     expectedUpdatedAt: string;
 }>;
-export declare const timelineQuerySchema: z.ZodObject<{
+export declare const timelineQuerySchema: z.ZodEffects<z.ZodEffects<z.ZodObject<{
     projectId: z.ZodOptional<z.ZodString>;
     departmentId: z.ZodOptional<z.ZodString>;
     assigneeId: z.ZodOptional<z.ZodString>;
@@ -1024,6 +1024,46 @@ export declare const timelineQuerySchema: z.ZodObject<{
     cursor: z.ZodOptional<z.ZodString>;
     perPage: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 }, "strip", z.ZodTypeAny, {
+    perPage: number;
+    departmentId?: string | undefined;
+    projectId?: string | undefined;
+    assigneeId?: string | undefined;
+    status?: TaskStatus[] | undefined;
+    priority?: TaskPriority[] | undefined;
+    from?: string | undefined;
+    to?: string | undefined;
+    cursor?: string | undefined;
+}, {
+    departmentId?: string | undefined;
+    projectId?: string | undefined;
+    assigneeId?: string | undefined;
+    status?: unknown;
+    priority?: unknown;
+    perPage?: number | undefined;
+    from?: string | undefined;
+    to?: string | undefined;
+    cursor?: string | undefined;
+}>, {
+    perPage: number;
+    departmentId?: string | undefined;
+    projectId?: string | undefined;
+    assigneeId?: string | undefined;
+    status?: TaskStatus[] | undefined;
+    priority?: TaskPriority[] | undefined;
+    from?: string | undefined;
+    to?: string | undefined;
+    cursor?: string | undefined;
+}, {
+    departmentId?: string | undefined;
+    projectId?: string | undefined;
+    assigneeId?: string | undefined;
+    status?: unknown;
+    priority?: unknown;
+    perPage?: number | undefined;
+    from?: string | undefined;
+    to?: string | undefined;
+    cursor?: string | undefined;
+}>, {
     perPage: number;
     departmentId?: string | undefined;
     projectId?: string | undefined;
