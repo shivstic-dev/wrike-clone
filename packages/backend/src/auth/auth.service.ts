@@ -188,72 +188,98 @@ export class AuthService {
   ): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
     const config = loadAuthConfig();
     const tokenHash = hashRefreshToken(input.refreshToken);
+    return this.db.transaction(async (trx) => {
+      const checkedAt = new Date();
+      const candidate = await trx('sessions')
+        .where({ refresh_token: tokenHash })
+        .where('expires_at', '>', checkedAt)
+        .first();
+      if (!candidate) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
 
-    const session = await this.db('sessions')
-      .where({
-        refresh_token: tokenHash,
-      })
-      .where('expires_at', '>', new Date())
-      .first();
+      // UserService.remove takes the same membership-first, session-second lock order.
+      const membership = await trx('tenant_memberships')
+        .where({
+          id: candidate.membership_id,
+          tenant_id: candidate.tenant_id,
+          is_active: true,
+        })
+        .forUpdate()
+        .first();
+      if (!membership) {
+        throw new UnauthorizedException('Membership no longer active');
+      }
 
-    if (!session) {
-      throw new UnauthorizedException('Invalid or expired refresh token');
-    }
+      const session = await trx('sessions')
+        .where({
+          id: candidate.id,
+          refresh_token: tokenHash,
+          tenant_id: candidate.tenant_id,
+          membership_id: candidate.membership_id,
+          user_id: candidate.user_id,
+        })
+        .where('expires_at', '>', checkedAt)
+        .forUpdate()
+        .first();
+      if (!session) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
 
-    const membership = await this.db('tenant_memberships')
-      .where({ id: session.membership_id, is_active: true })
-      .first();
+      const user = await trx('users')
+        .where({ id: session.user_id, is_active: true, deleted_at: null })
+        .first();
+      if (
+        !user ||
+        user.is_active !== true ||
+        user.deleted_at !== null ||
+        membership.user_id !== user.id ||
+        membership.tenant_id !== session.tenant_id
+      ) {
+        throw new UnauthorizedException('Account no longer active');
+      }
 
-    if (!membership) {
-      throw new UnauthorizedException('Membership no longer active');
-    }
+      const permissions =
+        DEFAULT_ROLE_PERMISSIONS[membership.role] || DEFAULT_ROLE_PERMISSIONS['member'] || [];
+      const accessToken = sign(
+        {
+          sub: user.id,
+          userId: user.id,
+          tenantId: session.tenant_id,
+          membershipId: session.membership_id,
+          email: user.email,
+          role: membership.role,
+          permissions,
+        },
+        config.jwtSecret,
+        {
+          expiresIn: config.accessTokenTtlSec,
+          algorithm: 'HS256',
+          issuer: config.issuer,
+          audience: config.audience,
+        },
+      );
 
-    const user = await this.db('users')
-      .where({ id: session.user_id, is_active: true, deleted_at: null })
-      .first();
-    if (
-      !user ||
-      user.is_active !== true ||
-      user.deleted_at !== null ||
-      membership.user_id !== user.id ||
-      membership.tenant_id !== session.tenant_id
-    ) {
-      throw new UnauthorizedException('Account no longer active');
-    }
+      const refreshToken = randomBytes(48).toString('base64url');
+      const updated = await trx('sessions')
+        .where({
+          id: session.id,
+          refresh_token: tokenHash,
+          tenant_id: session.tenant_id,
+          membership_id: session.membership_id,
+          user_id: session.user_id,
+        })
+        .where('expires_at', '>', checkedAt)
+        .update({
+          refresh_token: hashRefreshToken(refreshToken),
+          expires_at: new Date(Date.now() + config.refreshTokenTtlSec * 1000),
+        });
+      if (updated !== 1) {
+        throw new UnauthorizedException('Refresh token has already been used');
+      }
 
-    const permissions =
-      DEFAULT_ROLE_PERMISSIONS[membership.role] || DEFAULT_ROLE_PERMISSIONS['member'] || [];
-    const payload = {
-      sub: user.id,
-      userId: user.id,
-      tenantId: session.tenant_id,
-      membershipId: session.membership_id,
-      email: user.email,
-      role: membership.role,
-      permissions,
-    };
-
-    const accessToken = sign(payload, config.jwtSecret, {
-      expiresIn: config.accessTokenTtlSec,
-      algorithm: 'HS256',
-      issuer: config.issuer,
-      audience: config.audience,
+      return { accessToken, refreshToken, expiresIn: config.accessTokenTtlSec };
     });
-
-    // One-time refresh token rotation prevents replay after a token is stolen.
-    const refreshToken = randomBytes(48).toString('base64url');
-    const updated = await this.db('sessions')
-      .where({ id: session.id, refresh_token: tokenHash })
-      .update({
-        refresh_token: hashRefreshToken(refreshToken),
-        expires_at: new Date(Date.now() + config.refreshTokenTtlSec * 1000),
-      });
-
-    if (updated !== 1) {
-      throw new UnauthorizedException('Refresh token has already been used');
-    }
-
-    return { accessToken, refreshToken, expiresIn: config.accessTokenTtlSec };
   }
 
   async logout(refreshToken: string): Promise<void> {

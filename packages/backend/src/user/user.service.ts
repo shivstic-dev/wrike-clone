@@ -109,12 +109,13 @@ export class UserService {
 
   async remove(userId: string): Promise<void> {
     const ctx = requireTenantContext();
-    const membership = await this.db('tenant_memberships')
-      .where({ tenant_id: ctx.tenantId, user_id: userId })
-      .first();
-    if (!membership) throw new NotFoundException('User not in tenant');
-
     await this.db.transaction(async (trx) => {
+      const membership = await trx('tenant_memberships')
+        .where({ tenant_id: ctx.tenantId, user_id: userId })
+        .forUpdate()
+        .first();
+      if (!membership) throw new NotFoundException('User not in tenant');
+
       await trx('tenant_memberships')
         .where({ id: membership.id, tenant_id: ctx.tenantId })
         .update({ is_active: false });

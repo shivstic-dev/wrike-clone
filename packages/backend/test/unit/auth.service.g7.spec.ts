@@ -24,6 +24,7 @@ function createQb() {
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     whereNull: jest.fn().mockReturnThis(),
+    forUpdate: jest.fn().mockReturnThis(),
     join: jest.fn().mockReturnThis(),
     first: jest.fn(),
     insert: jest.fn().mockReturnThis(),
@@ -140,6 +141,87 @@ describe('AuthService (G7 + Phase 2 features)', () => {
   });
 
   describe('refreshToken', () => {
+    it('cannot resurrect a session when membership removal interleaves with refresh', async () => {
+      const state = {
+        membershipActive: true,
+        expiresAt: new Date(Date.now() + 60_000),
+        pendingRemoval: false,
+      };
+      const lockOrder: string[] = [];
+      const applyRemoval = () => {
+        state.membershipActive = false;
+        state.expiresAt = new Date(Date.now() - 1_000);
+      };
+
+      const query = (table: string) => {
+        let lockRequested = false;
+        return {
+          where: jest.fn().mockReturnThis(),
+          forUpdate: jest.fn().mockImplementation(function (this: unknown) {
+            lockRequested = true;
+            lockOrder.push(table);
+            return this;
+          }),
+          first: jest.fn(async () => {
+            if (table === 'sessions') {
+              return state.expiresAt > new Date()
+                ? {
+                    id: 'session-1',
+                    user_id: 'user-1',
+                    tenant_id: 'tenant-1',
+                    membership_id: 'membership-1',
+                  }
+                : null;
+            }
+            if (table === 'tenant_memberships') {
+              return state.membershipActive
+                ? {
+                    id: 'membership-1',
+                    user_id: 'user-1',
+                    tenant_id: 'tenant-1',
+                    role: 'member',
+                    is_active: true,
+                  }
+                : null;
+            }
+            if (table === 'users') {
+              if (lockRequested) throw new Error('users must not be locked');
+              if (lockOrder.includes('tenant_memberships')) state.pendingRemoval = true;
+              else applyRemoval();
+              return {
+                id: 'user-1',
+                email: 'user@acme.com',
+                is_active: true,
+                deleted_at: null,
+              };
+            }
+            throw new Error(`Unexpected table: ${table}`);
+          }),
+          update: jest.fn(async (changes: { expires_at: Date }) => {
+            if (table !== 'sessions') throw new Error(`Unexpected update: ${table}`);
+            state.expiresAt = changes.expires_at;
+            return 1;
+          }),
+        };
+      };
+      const trx = jest.fn((table: string) => query(table));
+      const raceDb = Object.assign(jest.fn((table: string) => query(table)), {
+        transaction: jest.fn(async (callback: (transaction: typeof trx) => Promise<unknown>) => {
+          try {
+            return await callback(trx);
+          } finally {
+            if (state.pendingRemoval) applyRemoval();
+          }
+        }),
+      });
+      const raceService = new AuthService(raceDb as never);
+
+      await raceService.refreshToken({ refreshToken: 'refresh-token' });
+
+      expect(state.expiresAt.getTime()).toBeLessThanOrEqual(Date.now());
+      expect(lockOrder).toEqual(['tenant_memberships', 'sessions']);
+    });
+
     it.each([
       ['missing', null],
       ['inactive', { id: 'user-1', email: 'user@acme.com', is_active: false, deleted_at: null }],
@@ -161,6 +243,12 @@ describe('AuthService (G7 + Phase 2 features)', () => {
           tenant_id: 'tenant-1',
           role: 'member',
           is_active: true,
+        })
+        .mockResolvedValueOnce({
+          id: 'session-1',
+          user_id: 'user-1',
+          tenant_id: 'tenant-1',
+          membership_id: 'membership-1',
         })
         .mockResolvedValueOnce(user);
 

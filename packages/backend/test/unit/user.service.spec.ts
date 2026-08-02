@@ -4,6 +4,7 @@ import { UserService } from '../../src/user/user.service';
 function createQueryBuilder() {
   return {
     where: jest.fn().mockReturnThis(),
+    forUpdate: jest.fn().mockReturnThis(),
     first: jest.fn(),
     update: jest.fn(),
   };
@@ -15,6 +16,7 @@ describe('UserService', () => {
     membershipLookup.first.mockResolvedValue({ id: 'membership-1' });
 
     const membershipQuery = createQueryBuilder();
+    membershipQuery.first.mockResolvedValue({ id: 'membership-1' });
     membershipQuery.update.mockResolvedValue(1);
     const sessionQuery = createQueryBuilder();
     sessionQuery.update.mockResolvedValue(1);
@@ -37,6 +39,7 @@ describe('UserService', () => {
     );
 
     expect(trx).toHaveBeenCalledWith('tenant_memberships');
+    expect(membershipQuery.forUpdate).toHaveBeenCalledTimes(1);
     expect(membershipQuery.where).toHaveBeenCalledWith({
       id: 'membership-1',
       tenant_id: 'tenant-1',
@@ -47,5 +50,8 @@ describe('UserService', () => {
       tenant_id: 'tenant-1',
     });
     expect(sessionQuery.update).toHaveBeenCalledWith({ expires_at: expect.any(Date) });
+    expect(membershipQuery.forUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+      sessionQuery.update.mock.invocationCallOrder[0]!,
+    );
   });
 });

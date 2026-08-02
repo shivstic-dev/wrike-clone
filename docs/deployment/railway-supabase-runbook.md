@@ -25,6 +25,7 @@ Do not edit, delete, or renumber applied migrations.
 
 Set these production variables without printing their values in build or startup logs:
 
+- `NODE_ENV=production`: required by startup; any other value fails closed before migrations.
 - `DATABASE_URL`: Supabase pooled runtime URL.
 - `MIGRATE_DATABASE_URL`: Supabase direct database URL on port 5432, used only by Knex migrations.
 - `APP_PUBLIC_URL`: HTTPS frontend/public application origin.

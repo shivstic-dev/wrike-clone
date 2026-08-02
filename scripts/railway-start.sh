@@ -5,6 +5,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 echo "=== Work Management API Railway Startup ==="
 
+if [ "${NODE_ENV:-}" != "production" ]; then
+  echo "[ERROR] NODE_ENV must be production"
+  exit 1
+fi
+
 for required in DATABASE_URL MIGRATE_DATABASE_URL; do
   if [ -z "${!required:-}" ]; then
     echo "[ERROR] $required is required"
