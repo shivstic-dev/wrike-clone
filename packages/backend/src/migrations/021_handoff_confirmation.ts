@@ -27,9 +27,28 @@ export async function up(knex: Knex): Promise<void> {
     `);
 
     await knex.raw(`
-      ALTER TABLE tasks
-        ADD CONSTRAINT tasks_handoff_status_check
-        CHECK (handoff_status IN ('pending', 'ready', 'confirmed', 'not_required'));
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'tasks_handoff_status_check'
+        ) THEN
+          ALTER TABLE tasks
+            ADD CONSTRAINT tasks_handoff_status_check
+            CHECK (handoff_status IN ('pending', 'ready', 'confirmed', 'not_required'));
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'tasks_handoff_confirmation_check'
+        ) THEN
+          ALTER TABLE tasks
+            ADD CONSTRAINT tasks_handoff_confirmation_check
+            CHECK (
+              handoff_status <> 'confirmed'
+              OR (handoff_confirmed_by IS NOT NULL AND handoff_confirmed_at IS NOT NULL)
+            );
+        END IF;
+      END;
+      $$;
     `);
 
     await knex.raw(`
@@ -42,6 +61,7 @@ export async function up(knex: Knex): Promise<void> {
 
 export async function down(knex: Knex): Promise<void> {
   await knex.raw('DROP INDEX IF EXISTS idx_tasks_tenant_handoff_ready;');
+  await knex.raw('ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_handoff_confirmation_check;');
   await knex.raw('ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_handoff_status_check;');
   await knex.schema.alterTable('tasks', (table) => {
     table.dropColumn('handoff_confirmed_at');

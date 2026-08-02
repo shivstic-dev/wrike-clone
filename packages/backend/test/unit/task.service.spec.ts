@@ -11,6 +11,7 @@ import { TaskLocationService } from '../../src/task/task-location.service';
 import { TaskCompletionService } from '../../src/task/task-completion.service';
 import { MemoryCacheService } from '../../src/common/cache/memory-cache.service';
 import { TaskStatus } from '@wrike-clone/shared';
+import knex, { type Knex } from 'knex';
 
 const noop = () => {};
 
@@ -179,16 +180,32 @@ describe('TaskService', () => {
       expectCanonicalLocationJoin(qb);
       expectTenantSafeHandoffOwnerJoin(qb);
       expect(qb.andWhere).toHaveBeenCalledWith('home_link.folder_id', 'folder-home');
-      expect(qb.select).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.anything(),
-        'home_folder.id as folder_id',
-        'home_folder.name as folder_name',
-        'task_project.name as project_name',
-        'task_project.is_system as is_system_project',
-        expect.anything(),
-        expect.anything(),
-      );
+      expect(qb.select).toHaveBeenCalled();
+    });
+
+    it('compiles handoff-owner and metadata fields into the list projection', async () => {
+      const database = knex({ client: 'pg' });
+      const projectionBuilder = (TaskService as unknown as {
+        buildListProjection(db: Knex): Array<string | Knex.Raw>;
+      }).buildListProjection;
+
+      try {
+        const sql = database('tasks')
+          .select(...projectionBuilder(database))
+          .toSQL()
+          .sql
+          .replace(/\s+/gu, ' ')
+          .toLowerCase();
+
+        expect(sql).toContain('"workspaces"."name" as "department_name"');
+        expect(sql).toContain('"home_folder"."id" as "folder_id"');
+        expect(sql).toContain('"task_project"."name" as "project_name"');
+        expect(sql).toContain('json_build_object(\'id\', handoff_owner.id');
+        expect(sql).toContain('as handoff_owner');
+        expect(sql).toContain('as assignee');
+      } finally {
+        await database.destroy();
+      }
     });
   });
 

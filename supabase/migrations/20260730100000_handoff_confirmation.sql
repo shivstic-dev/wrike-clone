@@ -32,6 +32,17 @@ BEGIN
       ADD CONSTRAINT tasks_handoff_status_check
       CHECK (handoff_status IN ('pending', 'ready', 'confirmed', 'not_required'));
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'tasks_handoff_confirmation_check'
+  ) THEN
+    ALTER TABLE tasks
+      ADD CONSTRAINT tasks_handoff_confirmation_check
+      CHECK (
+        handoff_status <> 'confirmed'
+        OR (handoff_confirmed_by IS NOT NULL AND handoff_confirmed_at IS NOT NULL)
+      );
+  END IF;
 END;
 $$;
 

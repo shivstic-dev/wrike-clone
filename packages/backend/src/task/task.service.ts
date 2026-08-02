@@ -85,6 +85,23 @@ export class TaskService {
     'tasks.deleted_at',
   ];
 
+  private static buildListProjection(db: Knex): Array<string | Knex.Raw> {
+    return [
+      ...TaskService.TASK_SELECT_COLUMNS,
+      'workspaces.name as department_name',
+      'home_folder.id as folder_id',
+      'home_folder.name as folder_name',
+      'task_project.name as project_name',
+      'task_project.is_system as is_system_project',
+      db.raw(
+        `CASE WHEN handoff_owner.id IS NULL THEN NULL ELSE json_build_object('id', handoff_owner.id, 'display_name', handoff_owner.display_name, 'email', handoff_owner.email) END as handoff_owner`,
+      ),
+      db.raw(
+        `json_build_object('id', u.id, 'display_name', u.display_name, 'avatar_url', u.avatar_url) as assignee`,
+      ),
+    ];
+  }
+
   constructor(
     @Inject(DATABASE_PROVIDER) private readonly db: Knex,
     private readonly departmentAccess: DepartmentAccessService,
@@ -309,20 +326,7 @@ export class TaskService {
 
     // Fetch page with explicit select whitelist (omitting tasks.search_vec)
     const tasks = await query
-      .select(
-        TaskService.TASK_SELECT_COLUMNS,
-        'workspaces.name as department_name',
-        'home_folder.id as folder_id',
-        'home_folder.name as folder_name',
-        'task_project.name as project_name',
-        'task_project.is_system as is_system_project',
-        this.db.raw(
-          `CASE WHEN handoff_owner.id IS NULL THEN NULL ELSE json_build_object('id', handoff_owner.id, 'display_name', handoff_owner.display_name, 'email', handoff_owner.email) END as handoff_owner`,
-        ),
-        this.db.raw(
-          `json_build_object('id', u.id, 'display_name', u.display_name, 'avatar_url', u.avatar_url) as assignee`,
-        ),
-      )
+      .select(...TaskService.buildListProjection(this.db))
       .leftJoin({ u: 'users' }, 'tasks.assignee_id', 'u.id')
       .orderBy(sortColumn, sortDir)
       .limit(perPage)
