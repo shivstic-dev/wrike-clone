@@ -136,8 +136,11 @@ Update the following in `.env`:
 ```env
 # Database (Supabase)
 DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres
+MIGRATE_DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
+APP_PUBLIC_URL=https://app.example.com
 DB_SSL=true
 DB_MAX_CONNECTIONS=10
+ALLOW_PUBLIC_REGISTRATION=false
 
 # Auth
 JWT_SECRET=your-secret-key-change-in-production
@@ -190,6 +193,9 @@ npm run dev
 Frontend will run on http://localhost:5173
 
 ## 🌐 Deployment
+
+For production backend deployment, use the
+[Railway + Supabase runbook](docs/deployment/railway-supabase-runbook.md).
 
 ### Deploy to Vercel (Frontend + Backend)
 

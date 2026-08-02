@@ -113,6 +113,31 @@ describe('AuthService', () => {
         .rejects.toThrow(UnauthorizedException);
     });
 
+    it.each([
+      { is_active: false, deleted_at: null },
+      { is_active: true, deleted_at: new Date() },
+    ])('rejects inactive or deleted users: %j', async () => {
+      qb.first
+        .mockResolvedValueOnce({ id: 'tenant-1', slug: 'acme', settings: '{}' })
+        .mockResolvedValueOnce(null);
+
+      await expect(
+        service.login({
+          email: 'disabled@acme.com',
+          password: 'secret',
+          tenantSlug: 'acme',
+        }),
+      ).rejects.toThrow('Invalid tenant or credentials');
+
+      expect(qb.where).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'disabled@acme.com',
+          is_active: true,
+          deleted_at: null,
+        }),
+      );
+    });
+
     it('rejects wrong password', async () => {
       qb.first
         .mockResolvedValueOnce({ id: 'tenant-1', settings: '{}' })

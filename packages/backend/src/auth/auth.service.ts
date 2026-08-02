@@ -70,7 +70,9 @@ export class AuthService {
     }
 
     // Find the user by email
-    const user = await this.db('users').where({ email: input.email }).first();
+    const user = await this.db('users')
+      .where({ email: input.email, is_active: true, deleted_at: null })
+      .first();
 
     if (!user) {
       throw new UnauthorizedException('Invalid tenant or credentials');
@@ -206,7 +208,18 @@ export class AuthService {
       throw new UnauthorizedException('Membership no longer active');
     }
 
-    const user = await this.db('users').where({ id: session.user_id }).first();
+    const user = await this.db('users')
+      .where({ id: session.user_id, is_active: true, deleted_at: null })
+      .first();
+    if (
+      !user ||
+      user.is_active !== true ||
+      user.deleted_at !== null ||
+      membership.user_id !== user.id ||
+      membership.tenant_id !== session.tenant_id
+    ) {
+      throw new UnauthorizedException('Account no longer active');
+    }
 
     const permissions =
       DEFAULT_ROLE_PERMISSIONS[membership.role] || DEFAULT_ROLE_PERMISSIONS['member'] || [];

@@ -114,7 +114,14 @@ export class UserService {
       .first();
     if (!membership) throw new NotFoundException('User not in tenant');
 
-    await this.db('tenant_memberships').where({ id: membership.id }).update({ is_active: false });
+    await this.db.transaction(async (trx) => {
+      await trx('tenant_memberships')
+        .where({ id: membership.id, tenant_id: ctx.tenantId })
+        .update({ is_active: false });
+      await trx('sessions')
+        .where({ membership_id: membership.id, tenant_id: ctx.tenantId })
+        .update({ expires_at: new Date() });
+    });
     this.logger.log(`User ${userId} removed from tenant ${ctx.tenantId}`);
   }
 }

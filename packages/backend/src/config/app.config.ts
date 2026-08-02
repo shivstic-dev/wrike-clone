@@ -109,6 +109,11 @@ export function validateProductionConfig(): void {
   const corsOrigins = loadCorsOrigins(process.env['CORS_ORIGIN'] || process.env['CORS_ORIGINS'] || '');
 
   if (!process.env['DATABASE_URL']) problems.push('DATABASE_URL is required');
+  if (!process.env['MIGRATE_DATABASE_URL']) problems.push('MIGRATE_DATABASE_URL is required');
+  if (!process.env['APP_PUBLIC_URL']) problems.push('APP_PUBLIC_URL is required');
+  if (process.env['ALLOW_PUBLIC_REGISTRATION'] !== 'false') {
+    problems.push('ALLOW_PUBLIC_REGISTRATION must be false');
+  }
   if (jwtSecret.length < 32) problems.push('JWT_SECRET must be at least 32 characters');
   if (process.env['SETUP_KEY'] && process.env['SETUP_KEY']!.length < 24) {
     problems.push('SETUP_KEY must be at least 24 characters');

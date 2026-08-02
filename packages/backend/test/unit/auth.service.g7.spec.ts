@@ -139,6 +139,38 @@ describe('AuthService (G7 + Phase 2 features)', () => {
     });
   });
 
+  describe('refreshToken', () => {
+    it.each([
+      ['missing', null],
+      ['inactive', { id: 'user-1', email: 'user@acme.com', is_active: false, deleted_at: null }],
+      [
+        'deleted',
+        { id: 'user-1', email: 'user@acme.com', is_active: true, deleted_at: new Date() },
+      ],
+    ])('rejects a %s user before rotating the session', async (_label, user) => {
+      qb.first
+        .mockResolvedValueOnce({
+          id: 'session-1',
+          user_id: 'user-1',
+          tenant_id: 'tenant-1',
+          membership_id: 'membership-1',
+        })
+        .mockResolvedValueOnce({
+          id: 'membership-1',
+          user_id: 'user-1',
+          tenant_id: 'tenant-1',
+          role: 'member',
+          is_active: true,
+        })
+        .mockResolvedValueOnce(user);
+
+      await expect(service.refreshToken({ refreshToken: 'refresh-token' })).rejects.toThrow(
+        'Account no longer active',
+      );
+      expect(qb.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('login with brute-force lockout', () => {
     it('locks account after 10 failed attempts', async () => {
       qb.first

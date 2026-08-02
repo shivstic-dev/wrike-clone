@@ -42,9 +42,12 @@ describe('application configuration', () => {
     process.env = {
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://example.invalid/database',
+      MIGRATE_DATABASE_URL: 'postgresql://direct.example.invalid/database',
       JWT_SECRET: 'j'.repeat(64),
       CORS_ORIGINS: '"https://wrike-clone-three.vercel.app/"',
+      APP_PUBLIC_URL: 'https://wrike-clone-three.vercel.app',
       DB_SSL: 'true',
+      ALLOW_PUBLIC_REGISTRATION: 'false',
     };
 
     expect(validateProductionConfig).not.toThrow();
@@ -55,12 +58,59 @@ describe('application configuration', () => {
     process.env = {
       NODE_ENV: 'production',
       DATABASE_URL: 'postgresql://example.invalid/database',
+      MIGRATE_DATABASE_URL: 'postgresql://direct.example.invalid/database',
       JWT_SECRET: 'j'.repeat(64),
       CORS_ORIGINS: 'http://wrike-clone-three.vercel.app',
+      APP_PUBLIC_URL: 'https://wrike-clone-three.vercel.app',
       DB_SSL: 'true',
+      ALLOW_PUBLIC_REGISTRATION: 'false',
     };
 
     expect(validateProductionConfig).toThrow('CORS_ORIGINS is required');
+  });
+
+  it('requires a direct migration URL and HTTPS public URL in production', () => {
+    process.env = {
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://pooler/runtime',
+      JWT_SECRET: 'j'.repeat(64),
+      CORS_ORIGINS: 'https://app.example.com',
+      DB_SSL: 'true',
+      ALLOW_PUBLIC_REGISTRATION: 'false',
+    };
+    expect(validateProductionConfig).toThrow('MIGRATE_DATABASE_URL is required');
+
+    process.env.MIGRATE_DATABASE_URL = 'postgresql://direct/migrations';
+    expect(validateProductionConfig).toThrow('APP_PUBLIC_URL is required');
+  });
+
+  it('accepts the complete production baseline', () => {
+    process.env = {
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://pooler/runtime',
+      MIGRATE_DATABASE_URL: 'postgresql://direct/migrations',
+      JWT_SECRET: 'j'.repeat(64),
+      CORS_ORIGINS: 'https://app.example.com',
+      APP_PUBLIC_URL: 'https://app.example.com',
+      DB_SSL: 'true',
+      ALLOW_PUBLIC_REGISTRATION: 'false',
+    };
+    expect(validateProductionConfig).not.toThrow();
+  });
+
+  it('requires public registration to be disabled in production', () => {
+    process.env = {
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://pooler/runtime',
+      MIGRATE_DATABASE_URL: 'postgresql://direct/migrations',
+      JWT_SECRET: 'j'.repeat(64),
+      CORS_ORIGINS: 'https://app.example.com',
+      APP_PUBLIC_URL: 'https://app.example.com',
+      DB_SSL: 'true',
+      ALLOW_PUBLIC_REGISTRATION: 'true',
+    };
+
+    expect(validateProductionConfig).toThrow('ALLOW_PUBLIC_REGISTRATION must be false');
   });
 
   it('uses default minConnections and maxConnections for hosted DATABASE_URL deployments', () => {

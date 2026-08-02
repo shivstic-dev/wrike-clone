@@ -12,32 +12,34 @@ export function migrationFileConfig(filename = __filename): {
   };
 }
 
-/**
- * Build connection config, supporting both DATABASE_URL (single connection string)
- * and discrete DB_* variables.
- */
-function buildConnection(): Knex.Config['connection'] {
-  const databaseUrl = process.env['DATABASE_URL'] || process.env['MIGRATE_DATABASE_URL'];
+export function buildMigrationConnection(
+  env: NodeJS.ProcessEnv = process.env,
+): Knex.Config['connection'] {
+  const migrationUrl = env['MIGRATE_DATABASE_URL'];
+  if (env['NODE_ENV'] === 'production' && !migrationUrl) {
+    throw new Error('MIGRATE_DATABASE_URL is required for production migrations');
+  }
+  const databaseUrl = migrationUrl || env['DATABASE_URL'];
   if (databaseUrl) {
     return {
       connectionString: databaseUrl,
-      ssl: process.env['DB_SSL'] === 'true' ? { rejectUnauthorized: false } : false,
+      ssl: env['DB_SSL'] === 'true' ? { rejectUnauthorized: false } : false,
     };
   }
 
   return {
-    host: process.env['DB_HOST'] || 'localhost',
-    port: parseInt(process.env['DB_PORT'] || '5432', 10),
-    database: process.env['DB_NAME'] || 'wrike_clone',
-    user: process.env['DB_USER'] || 'wrike',
-    password: process.env['DB_PASSWORD'] || 'wrike_dev',
-    ssl: process.env['DB_SSL'] === 'true' ? { rejectUnauthorized: false } : false,
+    host: env['DB_HOST'] || 'localhost',
+    port: Number.parseInt(env['DB_PORT'] || '5432', 10),
+    database: env['DB_NAME'] || 'wrike_clone',
+    user: env['DB_USER'] || 'wrike',
+    password: env['DB_PASSWORD'] || 'wrike_dev',
+    ssl: env['DB_SSL'] === 'true' ? { rejectUnauthorized: false } : false,
   };
 }
 
 const config: Knex.Config = {
   client: 'pg',
-  connection: buildConnection(),
+  connection: buildMigrationConnection(),
   pool: {
     min: 0,
     max: parseInt(process.env['DB_MAX_CONNECTIONS'] || '1', 10),
