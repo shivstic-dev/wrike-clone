@@ -984,17 +984,33 @@ export declare const updateDependencySchema: z.ZodObject<{
     dependencyType?: DependencyType | undefined;
     lagDays?: number | undefined;
 }>;
-export declare const updateTaskScheduleSchema: z.ZodObject<{
-    startDate: z.ZodUnion<[z.ZodString, z.ZodString]>;
-    dueDate: z.ZodUnion<[z.ZodString, z.ZodString]>;
+export declare const updateTaskScheduleSchema: z.ZodEffects<z.ZodEffects<z.ZodObject<{
+    startDate: z.ZodNullable<z.ZodUnion<[z.ZodString, z.ZodString]>>;
+    dueDate: z.ZodNullable<z.ZodUnion<[z.ZodString, z.ZodString]>>;
     expectedUpdatedAt: z.ZodUnion<[z.ZodString, z.ZodString]>;
 }, "strip", z.ZodTypeAny, {
-    startDate: string;
-    dueDate: string;
+    startDate: string | null;
+    dueDate: string | null;
     expectedUpdatedAt: string;
 }, {
-    startDate: string;
-    dueDate: string;
+    startDate: string | null;
+    dueDate: string | null;
+    expectedUpdatedAt: string;
+}>, {
+    startDate: string | null;
+    dueDate: string | null;
+    expectedUpdatedAt: string;
+}, {
+    startDate: string | null;
+    dueDate: string | null;
+    expectedUpdatedAt: string;
+}>, {
+    startDate: string | null;
+    dueDate: string | null;
+    expectedUpdatedAt: string;
+}, {
+    startDate: string | null;
+    dueDate: string | null;
     expectedUpdatedAt: string;
 }>;
 export declare const timelineQuerySchema: z.ZodObject<{

@@ -371,11 +371,16 @@ exports.updateDependencySchema = zod_1.z.object({
     dependencyType: zod_1.z.nativeEnum(enums_1.DependencyType).optional(),
     lagDays: zod_1.z.number().int().nonnegative().optional(),
 });
-exports.updateTaskScheduleSchema = zod_1.z.object({
-    startDate: exports.isoDate,
-    dueDate: exports.isoDate,
+exports.updateTaskScheduleSchema = zod_1.z
+    .object({
+    startDate: exports.isoDate.nullable(),
+    dueDate: exports.isoDate.nullable(),
     expectedUpdatedAt: exports.isoDate,
-});
+})
+    .refine((value) => (value.startDate === null && value.dueDate === null) ||
+    (value.startDate !== null && value.dueDate !== null), { message: 'startDate and dueDate must be scheduled together' })
+    .refine((value) => value.startDate === null ||
+    new Date(value.startDate).getTime() <= new Date(value.dueDate).getTime(), { message: 'startDate must not be after dueDate' });
 exports.timelineQuerySchema = zod_1.z.object({
     projectId: exports.uuidField.optional(),
     departmentId: exports.uuidField.optional(),

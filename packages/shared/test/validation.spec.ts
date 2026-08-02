@@ -474,6 +474,18 @@ describe('Validation Schemas', () => {
       }).success).toBe(false);
     });
 
+    it.each([
+      [{ startDate: '2026-08-01T00:00:00.000Z', dueDate: '2026-08-02T00:00:00.000Z' }, true],
+      [{ startDate: null, dueDate: null }, true],
+      [{ startDate: '2026-08-02T00:00:00.000Z', dueDate: '2026-08-01T00:00:00.000Z' }, false],
+      [{ startDate: '2026-08-01T00:00:00.000Z', dueDate: null }, false],
+    ])('accepts only valid complete schedule pairs: %o', (schedule, expected) => {
+      expect(updateTaskScheduleSchema.safeParse({
+        ...schedule,
+        expectedUpdatedAt: '2026-07-31T00:00:00.000Z',
+      }).success).toBe(expected);
+    });
+
     it('limits timeline dependency lag and types', () => {
       expect(updateDependencySchema.safeParse({
         dependencyType: 'finish_to_start',

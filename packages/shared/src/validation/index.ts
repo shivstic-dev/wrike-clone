@@ -455,11 +455,24 @@ export const updateDependencySchema = z.object({
   lagDays: z.number().int().nonnegative().optional(),
 });
 
-export const updateTaskScheduleSchema = z.object({
-  startDate: isoDate,
-  dueDate: isoDate,
-  expectedUpdatedAt: isoDate,
-});
+export const updateTaskScheduleSchema = z
+  .object({
+    startDate: isoDate.nullable(),
+    dueDate: isoDate.nullable(),
+    expectedUpdatedAt: isoDate,
+  })
+  .refine(
+    (value) =>
+      (value.startDate === null && value.dueDate === null) ||
+      (value.startDate !== null && value.dueDate !== null),
+    { message: 'startDate and dueDate must be scheduled together' },
+  )
+  .refine(
+    (value) =>
+      value.startDate === null ||
+      new Date(value.startDate).getTime() <= new Date(value.dueDate!).getTime(),
+    { message: 'startDate must not be after dueDate' },
+  );
 
 export const timelineQuerySchema = z.object({
   projectId: uuidField.optional(),
