@@ -71,7 +71,9 @@ server-generated PDF/XLSX reports. Generic Gantt, automation, portfolio,
 timesheet, schedule, search, Copilot, webhook, and public-form interfaces remain
 dormant and are not exposed in the production navigation or route table. See
 [feature coverage](FEATURE_COVERAGE.md) and
-[production cutover](PRODUCTION_CUTOVER.md) before deploying.
+[production cutover](PRODUCTION_CUTOVER.md) before deploying. CEPAA users should
+start with the [user guide](docs/CEPAA_USER_GUIDE.md); release owners should use
+the [distribution readiness checklist](docs/deployment/distribution-readiness-checklist.md).
 
 ## 🛠️ Tech Stack
 
@@ -103,7 +105,7 @@ dormant and are not exposed in the production navigation or route table. See
 
 ## 📋 Prerequisites
 
-- **Node.js** 18+
+- **Node.js** 22.x
 - **npm** or **yarn**
 - **Supabase account** (for database)
 - **Git**
@@ -197,7 +199,7 @@ Frontend will run on http://localhost:5173
 For production backend deployment, use the
 [Railway + Supabase runbook](docs/deployment/railway-supabase-runbook.md).
 
-### Deploy to Vercel (Frontend + Backend)
+### Deploy the frontend to Vercel
 
 1. **Push to GitHub** (already done!)
 
@@ -208,11 +210,12 @@ For production backend deployment, use the
    - Vercel will auto-detect the monorepo structure
 
 3. **Configure Environment Variables:**
-   Add all variables from `.env` to Vercel project settings
+   Add the frontend API base URL required by `packages/frontend`.
 
 4. **Deploy!**
 
-The `vercel.json` file is already configured for both frontend and backend deployment.
+The production architecture deploys the Vite frontend to Vercel and the NestJS
+API to Railway. Railway runs Knex migrations before starting the backend.
 
 ### Backend API Endpoints
 

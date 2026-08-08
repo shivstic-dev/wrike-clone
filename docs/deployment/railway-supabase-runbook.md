@@ -11,7 +11,7 @@ npm ci --omit=dev
 npm run build
 ```
 
-Confirm migration history is contiguous and includes the expected latest migration (currently 023):
+Confirm migration history is contiguous and includes the expected latest migration (currently 024):
 
 ```sql
 select id, name, batch, migration_time
