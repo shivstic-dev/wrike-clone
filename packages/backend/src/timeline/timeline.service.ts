@@ -1,5 +1,17 @@
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { type TimelineQuery, type TimelineResponse, type TimelineTask, type UpdateTaskScheduleInput, updateTaskScheduleSchema } from '@wrike-clone/shared';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  type TimelineQuery,
+  type TimelineResponse,
+  type TimelineTask,
+  type UpdateTaskScheduleInput,
+  updateTaskScheduleSchema,
+} from '@wrike-clone/shared';
 import { v4 as uuidv4 } from 'uuid';
 import type { Knex } from 'knex';
 import { applyTaskAccessScope } from '../common/visibility.scope';
@@ -15,13 +27,17 @@ type TimelineRow = Record<string, unknown> & {
   due_date: Date | string | null;
 };
 
+interface CapabilityDepartmentRow {
+  department_id: string;
+  workspace_role: string;
+  department_head_user_id: string | null;
+}
+
 interface TimelineCursor {
   startDate: string;
   dueDate: string;
   id: string;
 }
-
-const scheduleManagers = new Set<DepartmentRole>(['admin', 'department_head', 'manager']);
 
 /** Decodes the intentionally opaque timeline continuation cursor. */
 export function decodeTimelineCursor(cursor: string): TimelineCursor {
@@ -61,10 +77,7 @@ function toIso(value: Date | string | null): string {
   return date.toISOString();
 }
 
-function applyTimelineFilters(
-  query: Knex.QueryBuilder,
-  input: TimelineQuery,
-): Knex.QueryBuilder {
+function applyTimelineFilters(query: Knex.QueryBuilder, input: TimelineQuery): Knex.QueryBuilder {
   if (input.departmentId) query.andWhere('tasks.department_id', input.departmentId);
   if (input.projectId) query.andWhere('tasks.project_id', input.projectId);
   if (input.assigneeId) {
@@ -157,7 +170,10 @@ export function buildScheduledTimelineQuery(
         });
     });
   }
-  return query.orderBy('tasks.start_date', 'asc').orderBy('tasks.due_date', 'asc').orderBy('tasks.id', 'asc');
+  return query
+    .orderBy('tasks.start_date', 'asc')
+    .orderBy('tasks.due_date', 'asc')
+    .orderBy('tasks.id', 'asc');
 }
 
 export function buildUnscheduledTimelineQuery(
@@ -185,7 +201,10 @@ export class TimelineService {
     return this.read(input);
   }
 
-  async project(projectId: string, input: Omit<TimelineQuery, 'projectId'>): Promise<TimelineResponse> {
+  async project(
+    projectId: string,
+    input: Omit<TimelineQuery, 'projectId'>,
+  ): Promise<TimelineResponse> {
     const ctx = requireTenantContext();
     const project = await this.db('projects as timeline_project')
       .leftJoin('folders as timeline_folder', function () {
@@ -213,14 +232,23 @@ export class TimelineService {
       const current = await trx('tasks')
         .where({ id: taskId, tenant_id: ctx.tenantId })
         .whereNull('deleted_at')
+        .forUpdate()
         .first();
       if (!current) throw new NotFoundException('Task not found');
-      await this.departmentAccess.assertCanManageTask(current.department_id);
+      await this.departmentAccess.assertCanManageTask(current.department_id, current.id, trx);
 
       const rows = await trx('tasks')
-        .where({ id: taskId, tenant_id: ctx.tenantId, updated_at: new Date(parsed.data.expectedUpdatedAt) })
+        .where({
+          id: taskId,
+          tenant_id: ctx.tenantId,
+          updated_at: new Date(parsed.data.expectedUpdatedAt),
+        })
         .whereNull('deleted_at')
-        .update({ start_date: parsed.data.startDate, due_date: parsed.data.dueDate, updated_at: new Date() })
+        .update({
+          start_date: parsed.data.startDate,
+          due_date: parsed.data.dueDate,
+          updated_at: new Date(),
+        })
         .returning('*');
       const [row] = rows;
       if (!row) {
@@ -245,8 +273,7 @@ export class TimelineService {
       });
       return row as TimelineRow;
     });
-    const role = await this.departmentAccess.getRole(updated.department_id);
-    return this.toTask(updated, new Map([[updated.department_id, scheduleManagers.has(role)]]), new Set());
+    return this.toTask(updated, new Map([[updated.id, true]]), new Set());
   }
 
   private async read(input: TimelineQuery): Promise<TimelineResponse> {
@@ -296,7 +323,10 @@ export class TimelineService {
     };
   }
 
-  private async currentSchedule(trx: Knex, taskId: string): Promise<Record<string, unknown> | null> {
+  private async currentSchedule(
+    trx: Knex,
+    taskId: string,
+  ): Promise<Record<string, unknown> | null> {
     const ctx = requireTenantContext();
     const task = await trx('tasks')
       .where({ id: taskId, tenant_id: ctx.tenantId })
@@ -306,7 +336,10 @@ export class TimelineService {
     return task ?? null;
   }
 
-  private async readDependencies(tenantId: string, taskIds: string[]): Promise<Array<Record<string, any>>> {
+  private async readDependencies(
+    tenantId: string,
+    taskIds: string[],
+  ): Promise<Array<Record<string, any>>> {
     if (taskIds.length === 0) return [];
     return this.db('task_dependencies')
       .where('tenant_id', tenantId)
@@ -318,16 +351,109 @@ export class TimelineService {
   }
 
   private async resolveCapabilities(rows: TimelineRow[]): Promise<Map<string, boolean>> {
-    const cache = new Map<string, boolean>();
-    for (const departmentId of new Set(rows.map((row) => row.department_id))) {
-      const role = await this.departmentAccess.getRole(departmentId);
-      cache.set(departmentId, scheduleManagers.has(role));
+    const capabilities = new Map(rows.map((row) => [row.id, false]));
+    if (rows.length === 0) return capabilities;
+
+    const ctx = requireTenantContext();
+    const tenantMembership = await this.db('tenant_memberships')
+      .where({ tenant_id: ctx.tenantId, user_id: ctx.userId, is_active: true })
+      .first('role');
+    if (!tenantMembership) return capabilities;
+    if (tenantMembership.role === 'admin') {
+      for (const row of rows) capabilities.set(row.id, true);
+      return capabilities;
     }
-    return cache;
+
+    const departmentIds = [...new Set(rows.map((row) => row.department_id))];
+    const departmentMemberships = (await this.db('workspace_members as capability_actor_wm')
+      .leftJoin('department_heads as capability_actor_dh', function () {
+        this.on('capability_actor_dh.department_id', '=', 'capability_actor_wm.workspace_id')
+          .andOn('capability_actor_dh.tenant_id', '=', 'capability_actor_wm.tenant_id')
+          .andOn('capability_actor_dh.user_id', '=', 'capability_actor_wm.user_id');
+      })
+      .where({
+        'capability_actor_wm.tenant_id': ctx.tenantId,
+        'capability_actor_wm.user_id': ctx.userId,
+      })
+      .whereIn('capability_actor_wm.workspace_id', departmentIds)
+      .select(
+        'capability_actor_wm.workspace_id as department_id',
+        'capability_actor_wm.role as workspace_role',
+        'capability_actor_dh.user_id as department_head_user_id',
+      )) as CapabilityDepartmentRow[];
+
+    const roles = new Map<string, DepartmentRole>();
+    for (const membership of departmentMemberships) {
+      const role: DepartmentRole = membership.department_head_user_id
+        ? 'department_head'
+        : tenantMembership.role === 'manager' || membership.workspace_role === 'manager'
+          ? 'manager'
+          : 'employee';
+      roles.set(membership.department_id, role);
+    }
+
+    const managerTaskIds: string[] = [];
+    const managerDepartmentIds = new Set<string>();
+    for (const row of rows) {
+      const role = roles.get(row.department_id) ?? 'none';
+      if (role === 'department_head') capabilities.set(row.id, true);
+      if (role === 'manager') {
+        capabilities.set(row.id, true);
+        managerTaskIds.push(row.id);
+        managerDepartmentIds.add(row.department_id);
+      }
+    }
+    if (managerTaskIds.length === 0) return capabilities;
+
+    const peerManagerTasks = (await this.db('tasks as capability_task')
+      .join('workspace_members as capability_peer_wm', function () {
+        this.on('capability_peer_wm.workspace_id', '=', 'capability_task.department_id').andOn(
+          'capability_peer_wm.tenant_id',
+          '=',
+          'capability_task.tenant_id',
+        );
+      })
+      .join('tenant_memberships as capability_peer_tm', function () {
+        this.on('capability_peer_tm.tenant_id', '=', 'capability_peer_wm.tenant_id').andOn(
+          'capability_peer_tm.user_id',
+          '=',
+          'capability_peer_wm.user_id',
+        );
+      })
+      .where('capability_task.tenant_id', ctx.tenantId)
+      .whereNull('capability_task.deleted_at')
+      .whereIn('capability_task.id', managerTaskIds)
+      .whereIn('capability_task.department_id', [...managerDepartmentIds])
+      .where('capability_peer_tm.is_active', true)
+      .whereNot('capability_peer_wm.user_id', ctx.userId)
+      .andWhere((managerRole) => {
+        managerRole
+          .where('capability_peer_wm.role', 'manager')
+          .orWhere('capability_peer_tm.role', 'manager');
+      })
+      .andWhere((assigned) => {
+        assigned
+          .whereRaw('capability_task.assignee_id = capability_peer_wm.user_id')
+          .orWhereExists(function () {
+            this.select(1)
+              .from('task_assignees as capability_peer_ta')
+              .whereRaw('capability_peer_ta.task_id = capability_task.id')
+              .andWhereRaw('capability_peer_ta.tenant_id = capability_task.tenant_id')
+              .whereRaw('capability_peer_ta.user_id = capability_peer_wm.user_id');
+          });
+      })
+      .distinct('capability_task.id as task_id')) as Array<{ task_id: string }>;
+
+    for (const row of peerManagerTasks) capabilities.set(row.task_id, false);
+    return capabilities;
   }
 
-  private toTask(row: TimelineRow, capabilities: Map<string, boolean>, critical: Set<string>): TimelineTask {
-    const canManage = capabilities.get(row.department_id) ?? false;
+  private toTask(
+    row: TimelineRow,
+    capabilities: Map<string, boolean>,
+    critical: Set<string>,
+  ): TimelineTask {
+    const canManage = capabilities.get(row.id) ?? false;
     return {
       ...(row as unknown as TimelineTask),
       capabilities: { canEditSchedule: canManage, canManageDependencies: canManage },

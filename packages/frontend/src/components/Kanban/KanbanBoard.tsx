@@ -43,7 +43,7 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
     if (completedTask.handoffStatus === 'ready') {
       toast.success('Saved in Ready for handoff');
     } else {
-      toast.success('Handoff confirmed and task completed');
+      toast.success(task.handoffRequired ? 'Handoff confirmed and task completed' : 'Moved to completed');
     }
   };
 

@@ -46,13 +46,16 @@ describe('timeline query construction', () => {
   it('applies task access scope for an employee and uses tuple cursor ordering', () => {
     const query = buildScheduledTimelineQuery(db, context, {
       ...input,
-      cursor: Buffer.from(JSON.stringify({ startDate: input.from, dueDate: input.to, id: 'task-1' }))
-        .toString('base64url'),
+      cursor: Buffer.from(
+        JSON.stringify({ startDate: input.from, dueDate: input.to, id: 'task-1' }),
+      ).toString('base64url'),
     });
     const compiled = sql(query);
 
     expect(compiled.sql).toContain('from "task_assignees" as "own_ta"');
-    expect(compiled.sql).toContain('order by "tasks"."start_date" asc, "tasks"."due_date" asc, "tasks"."id" asc');
+    expect(compiled.sql).toContain(
+      'order by "tasks"."start_date" asc, "tasks"."due_date" asc, "tasks"."id" asc',
+    );
     expect(compiled.sql).toContain('"tasks"."start_date" > ?');
   });
 
@@ -72,6 +75,9 @@ describe('TimelineService', () => {
   const taskRows = jest.fn();
   const dependencyRows = jest.fn();
   const projectRow = jest.fn();
+  const tenantMembershipRow = jest.fn();
+  const departmentMembershipRows = jest.fn();
+  const peerManagerTaskRows = jest.fn();
   const departmentAccess = {
     assertCanViewDepartment: jest.fn(),
     assertCanManageTask: jest.fn(),
@@ -84,21 +90,65 @@ describe('TimelineService', () => {
     taskRows.mockReset();
     dependencyRows.mockReset();
     projectRow.mockReset();
+    tenantMembershipRow.mockReset();
+    departmentMembershipRows.mockReset();
+    peerManagerTaskRows.mockReset();
     departmentAccess.assertCanViewDepartment.mockReset();
+    departmentAccess.assertCanManageTask.mockReset();
+    departmentAccess.assertCanManageTask.mockRejectedValue(new ForbiddenException());
     departmentAccess.getRole.mockReset();
     departmentAccess.getRole.mockResolvedValue('employee');
+    tenantMembershipRow.mockResolvedValue({ role: 'member' });
+    departmentMembershipRows.mockResolvedValue([]);
+    peerManagerTaskRows.mockResolvedValue([]);
 
     const taskQuery: any = {
-      leftJoin: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), whereNull: jest.fn().mockReturnThis(), whereNotNull: jest.fn().mockReturnThis(),
-      andWhere: jest.fn().mockReturnThis(), select: jest.fn().mockReturnThis(), orderBy: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(), first: jest.fn(() => projectRow()),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      whereNull: jest.fn().mockReturnThis(),
+      whereNotNull: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      first: jest.fn(() => projectRow()),
       then: (resolve: any, reject: any) => taskRows().then(resolve, reject),
     };
     const dependencyQuery: any = {
-      where: jest.fn().mockReturnThis(), whereIn: jest.fn().mockReturnThis(), select: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(), then: (resolve: any, reject: any) => dependencyRows().then(resolve, reject),
+      where: jest.fn().mockReturnThis(),
+      whereIn: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      then: (resolve: any, reject: any) => dependencyRows().then(resolve, reject),
     };
-    const database = jest.fn((table: string) => table === 'task_dependencies' ? dependencyQuery : taskQuery) as any;
+    const tenantMembershipQuery: any = {
+      where: jest.fn().mockReturnThis(),
+      first: jest.fn(() => tenantMembershipRow()),
+    };
+    const departmentMembershipQuery: any = {
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      whereIn: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      then: (resolve: any, reject: any) => departmentMembershipRows().then(resolve, reject),
+    };
+    const peerManagerTaskQuery: any = {
+      join: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      whereIn: jest.fn().mockReturnThis(),
+      whereNull: jest.fn().mockReturnThis(),
+      whereNot: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      distinct: jest.fn().mockReturnThis(),
+      then: (resolve: any, reject: any) => peerManagerTaskRows().then(resolve, reject),
+    };
+    const database = jest.fn((table: string) => {
+      if (table === 'task_dependencies') return dependencyQuery;
+      if (table === 'tenant_memberships') return tenantMembershipQuery;
+      if (table === 'workspace_members as capability_actor_wm') return departmentMembershipQuery;
+      if (table === 'tasks as capability_task') return peerManagerTaskQuery;
+      return taskQuery;
+    }) as any;
     database.raw = jest.fn((value: string) => value);
     db = database;
     service = new TimelineService(db, departmentAccess as never);
@@ -108,7 +158,9 @@ describe('TimelineService', () => {
     taskRows.mockResolvedValue([]);
     dependencyRows.mockResolvedValue([]);
 
-    await tenantContext.run(context, () => service.dashboard({ ...input, departmentId: 'department-1' }));
+    await tenantContext.run(context, () =>
+      service.dashboard({ ...input, departmentId: 'department-1' }),
+    );
 
     expect(departmentAccess.assertCanViewDepartment).toHaveBeenCalledWith('department-1');
   });
@@ -116,13 +168,21 @@ describe('TimelineService', () => {
   it('rejects a project that is not visible through its department', async () => {
     projectRow.mockResolvedValue(undefined);
 
-    await expect(tenantContext.run(context, () => service.project('project-1', input)))
-      .rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      tenantContext.run(context, () => service.project('project-1', input)),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('returns scheduled and unscheduled tasks, edge set, capabilities, and no critical path by default', async () => {
     taskRows
-      .mockResolvedValueOnce([{ id: 'scheduled', start_date: new Date(input.from), due_date: new Date(input.to), department_id: 'department-1' }])
+      .mockResolvedValueOnce([
+        {
+          id: 'scheduled',
+          start_date: new Date(input.from),
+          due_date: new Date(input.to),
+          department_id: 'department-1',
+        },
+      ])
       .mockResolvedValueOnce([]);
     dependencyRows.mockResolvedValue([]);
 
@@ -130,15 +190,105 @@ describe('TimelineService', () => {
 
     expect(result.tasks).toHaveLength(1);
     expect(result.unscheduled).toEqual([]);
-    expect(result.tasks[0]!.capabilities).toEqual({ canEditSchedule: false, canManageDependencies: false });
+    expect(result.tasks[0]!.capabilities).toEqual({
+      canEditSchedule: false,
+      canManageDependencies: false,
+    });
     expect(result.tasks[0]!.isCritical).toBe(false);
+  });
+
+  it('keeps a peer-manager task readable but disables its mutation capabilities per task', async () => {
+    const managerContext = { ...context, userId: 'manager-1', role: 'manager' as const };
+    taskRows
+      .mockResolvedValueOnce([
+        {
+          id: 'own-task',
+          start_date: new Date(input.from),
+          due_date: new Date(input.to),
+          department_id: 'department-1',
+        },
+        {
+          id: 'peer-task',
+          start_date: new Date(input.from),
+          due_date: new Date(input.to),
+          department_id: 'department-1',
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    dependencyRows.mockResolvedValue([]);
+    tenantMembershipRow.mockResolvedValue({ role: 'manager' });
+    departmentMembershipRows.mockResolvedValue([
+      { department_id: 'department-1', workspace_role: 'manager', department_head_user_id: null },
+    ]);
+    peerManagerTaskRows.mockResolvedValue([{ task_id: 'peer-task' }]);
+
+    const result = await tenantContext.run(managerContext, () => service.dashboard(input));
+
+    expect(result.tasks.map((task) => task.id)).toEqual(['own-task', 'peer-task']);
+    expect(result.tasks[0]!.capabilities).toEqual({
+      canEditSchedule: true,
+      canManageDependencies: true,
+    });
+    expect(result.tasks[1]!.capabilities).toEqual({
+      canEditSchedule: false,
+      canManageDependencies: false,
+    });
+  });
+
+  it('resolves manager capabilities in a bounded query set and denies every peer-manager-assigned task', async () => {
+    const managerContext = { ...context, userId: 'manager-1', role: 'manager' as const };
+    taskRows
+      .mockResolvedValueOnce([
+        {
+          id: 'employee-task',
+          start_date: new Date(input.from),
+          due_date: new Date(input.to),
+          department_id: 'department-1',
+        },
+        {
+          id: 'peer-primary-task',
+          start_date: new Date(input.from),
+          due_date: new Date(input.to),
+          department_id: 'department-1',
+        },
+        {
+          id: 'peer-coassigned-task',
+          start_date: new Date(input.from),
+          due_date: new Date(input.to),
+          department_id: 'department-1',
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    dependencyRows.mockResolvedValue([]);
+    tenantMembershipRow.mockResolvedValue({ role: 'manager' });
+    departmentMembershipRows.mockResolvedValue([
+      { department_id: 'department-1', workspace_role: 'manager', department_head_user_id: null },
+    ]);
+    peerManagerTaskRows.mockResolvedValue([
+      { task_id: 'peer-primary-task' },
+      { task_id: 'peer-coassigned-task' },
+    ]);
+
+    const result = await tenantContext.run(managerContext, () => service.dashboard(input));
+
+    expect(
+      result.tasks.map(({ id, capabilities }) => ({ id, canEdit: capabilities.canEditSchedule })),
+    ).toEqual([
+      { id: 'employee-task', canEdit: true },
+      { id: 'peer-primary-task', canEdit: false },
+      { id: 'peer-coassigned-task', canEdit: false },
+    ]);
+    expect(db).toHaveBeenCalledTimes(6);
+    expect(departmentAccess.assertCanManageTask).not.toHaveBeenCalled();
   });
 
   describe('updateSchedule', () => {
     it('rejects a stale optimistic schedule update with the current schedule', async () => {
+      departmentAccess.assertCanManageTask.mockResolvedValue('employee');
       const scheduleQuery: any = {
         where: jest.fn().mockReturnThis(),
         whereNull: jest.fn().mockReturnThis(),
+        forUpdate: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         update: jest.fn().mockReturnThis(),
         returning: jest.fn().mockResolvedValue([]),
@@ -172,12 +322,16 @@ describe('TimelineService', () => {
     });
 
     it('writes a complete schedule with tenant, optimistic timestamp, and activity data', async () => {
+      departmentAccess.assertCanManageTask.mockResolvedValue('employee');
       const task = { id: 'task-1', tenant_id: context.tenantId, department_id: 'department-1' };
       const scheduleQuery: any = {
         where: jest.fn().mockReturnThis(),
         whereNull: jest.fn().mockReturnThis(),
+        forUpdate: jest.fn().mockReturnThis(),
         update: jest.fn().mockReturnThis(),
-        returning: jest.fn().mockResolvedValue([{ ...task, start_date: '2026-08-03', due_date: '2026-08-04' }]),
+        returning: jest
+          .fn()
+          .mockResolvedValue([{ ...task, start_date: '2026-08-03', due_date: '2026-08-04' }]),
         first: jest.fn().mockResolvedValue(task),
         insert: jest.fn().mockResolvedValue(undefined),
       };
@@ -193,29 +347,48 @@ describe('TimelineService', () => {
         }),
       );
 
-      expect(result).toMatchObject({ id: 'task-1', start_date: '2026-08-03', due_date: '2026-08-04' });
-      expect(scheduleQuery.where).toHaveBeenCalledWith({
-        id: 'task-1', tenant_id: context.tenantId, updated_at: new Date('2026-08-01T00:00:00.000Z'),
+      expect(result).toMatchObject({
+        id: 'task-1',
+        start_date: '2026-08-03',
+        due_date: '2026-08-04',
       });
-      expect(scheduleQuery.insert).toHaveBeenCalledWith(expect.objectContaining({ action: 'task:schedule:updated' }));
+      expect(scheduleQuery.where).toHaveBeenCalledWith({
+        id: 'task-1',
+        tenant_id: context.tenantId,
+        updated_at: new Date('2026-08-01T00:00:00.000Z'),
+      });
+      expect(scheduleQuery.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'task:schedule:updated' }),
+      );
     });
 
     it('unschedules a task only when both schedule values are null', async () => {
+      departmentAccess.assertCanManageTask.mockResolvedValue('employee');
       const task = { id: 'task-1', tenant_id: context.tenantId, department_id: 'department-1' };
       const scheduleQuery: any = {
-        where: jest.fn().mockReturnThis(), whereNull: jest.fn().mockReturnThis(), update: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        whereNull: jest.fn().mockReturnThis(),
+        forUpdate: jest.fn().mockReturnThis(),
+        update: jest.fn().mockReturnThis(),
         returning: jest.fn().mockResolvedValue([{ ...task, start_date: null, due_date: null }]),
-        first: jest.fn().mockResolvedValue(task), insert: jest.fn().mockResolvedValue(undefined),
+        first: jest.fn().mockResolvedValue(task),
+        insert: jest.fn().mockResolvedValue(undefined),
       };
       const database: any = jest.fn(() => scheduleQuery);
       database.transaction = jest.fn((callback: (trx: any) => unknown) => callback(database));
       const updateService = new TimelineService(database, departmentAccess as never);
 
-      await tenantContext.run(context, () => (updateService as any).updateSchedule('task-1', {
-        startDate: null, dueDate: null, expectedUpdatedAt: '2026-08-01T00:00:00.000Z',
-      }));
+      await tenantContext.run(context, () =>
+        (updateService as any).updateSchedule('task-1', {
+          startDate: null,
+          dueDate: null,
+          expectedUpdatedAt: '2026-08-01T00:00:00.000Z',
+        }),
+      );
 
-      expect(scheduleQuery.update).toHaveBeenCalledWith(expect.objectContaining({ start_date: null, due_date: null }));
+      expect(scheduleQuery.update).toHaveBeenCalledWith(
+        expect.objectContaining({ start_date: null, due_date: null }),
+      );
     });
 
     it.each([
@@ -234,33 +407,60 @@ describe('TimelineService', () => {
     });
 
     it('does not permit an employee to schedule another task', async () => {
-      const forbidden = new ForbiddenException({ code: 'FORBIDDEN', message: 'Schedule access denied' });
+      const forbidden = new ForbiddenException({
+        code: 'FORBIDDEN',
+        message: 'Schedule access denied',
+      });
       departmentAccess.assertCanManageTask.mockRejectedValueOnce(forbidden);
       const taskQuery: any = {
-        where: jest.fn().mockReturnThis(), whereNull: jest.fn().mockReturnThis(),
-        first: jest.fn().mockResolvedValue({ id: 'task-1', tenant_id: context.tenantId, department_id: 'department-1' }),
+        where: jest.fn().mockReturnThis(),
+        whereNull: jest.fn().mockReturnThis(),
+        forUpdate: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({
+          id: 'task-1',
+          tenant_id: context.tenantId,
+          department_id: 'department-1',
+        }),
       };
       const database: any = jest.fn(() => taskQuery);
       database.transaction = jest.fn((callback: (trx: any) => unknown) => callback(database));
       const updateService = new TimelineService(database, departmentAccess as never);
 
-      await expect(tenantContext.run(context, () => (updateService as any).updateSchedule('task-1', {
-        startDate: null, dueDate: null, expectedUpdatedAt: '2026-08-01T00:00:00.000Z',
-      }))).rejects.toBe(forbidden);
+      await expect(
+        tenantContext.run(context, () =>
+          (updateService as any).updateSchedule('task-1', {
+            startDate: null,
+            dueDate: null,
+            expectedUpdatedAt: '2026-08-01T00:00:00.000Z',
+          }),
+        ),
+      ).rejects.toBe(forbidden);
     });
 
     it('does not update a task outside the active tenant', async () => {
       const taskQuery: any = {
-        where: jest.fn().mockReturnThis(), whereNull: jest.fn().mockReturnThis(), first: jest.fn().mockResolvedValue(undefined),
+        where: jest.fn().mockReturnThis(),
+        whereNull: jest.fn().mockReturnThis(),
+        forUpdate: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(undefined),
       };
       const database: any = jest.fn(() => taskQuery);
       database.transaction = jest.fn((callback: (trx: any) => unknown) => callback(database));
       const updateService = new TimelineService(database, departmentAccess as never);
 
-      await expect(tenantContext.run(context, () => (updateService as any).updateSchedule('other-tenant-task', {
-        startDate: null, dueDate: null, expectedUpdatedAt: '2026-08-01T00:00:00.000Z',
-      }))).rejects.toBeInstanceOf(NotFoundException);
-      expect(taskQuery.where).toHaveBeenCalledWith({ id: 'other-tenant-task', tenant_id: context.tenantId });
+      await expect(
+        tenantContext.run(context, () =>
+          (updateService as any).updateSchedule('other-tenant-task', {
+            startDate: null,
+            dueDate: null,
+            expectedUpdatedAt: '2026-08-01T00:00:00.000Z',
+          }),
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(taskQuery.where).toHaveBeenCalledWith({
+        id: 'other-tenant-task',
+        tenant_id: context.tenantId,
+      });
     });
   });
 });

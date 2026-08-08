@@ -14,6 +14,10 @@ function runAsAdmin<T>(operation: () => Promise<T>): Promise<T> {
   return tenantContext.run(adminContext, operation);
 }
 
+function runAsMember<T>(operation: () => Promise<T>): Promise<T> {
+  return tenantContext.run({ ...adminContext, userId: 'member-1', role: 'member' }, operation);
+}
+
 function createProtectionQuery(firstRow: Record<string, unknown>) {
   const query: any = {};
   for (const method of [
@@ -50,9 +54,12 @@ describe('System container protection', () => {
     id: 'folder-1',
     is_system_general: true,
   });
-  const projectDb = Object.assign(jest.fn(() => projectQuery), {
-    raw: jest.fn(),
-  });
+  const projectDb = Object.assign(
+    jest.fn(() => projectQuery),
+    {
+      raw: jest.fn(),
+    },
+  );
   const folderDb = jest.fn(() => folderQuery);
   const projectService = new ProjectService(projectDb as never);
   const folderService = new FolderService(folderDb as never);
@@ -78,6 +85,36 @@ describe('System container protection', () => {
     await runAsAdmin(() => projectService.findById('project-1'));
 
     expect(projectQuery.where).toHaveBeenCalledWith('projects.is_system', false);
+  });
+
+  it('tenant-scopes project task counts while preserving the admin bypass', async () => {
+    projectQuery.first.mockResolvedValueOnce({ id: 'project-1', is_system: false });
+
+    await runAsAdmin(() => projectService.findById('project-1'));
+
+    expect(projectQuery.where).toHaveBeenCalledWith({
+      project_id: 'project-1',
+      tenant_id: 'tenant-1',
+      deleted_at: null,
+    });
+    expect(
+      projectQuery.andWhere.mock.calls.some((call: unknown[]) => typeof call[0] === 'function'),
+    ).toBe(false);
+  });
+
+  it('applies shared task scope to project counts for non-admin callers', async () => {
+    projectQuery.first.mockResolvedValueOnce({ id: 'project-1', is_system: false });
+
+    await runAsMember(() => projectService.findById('project-1'));
+
+    expect(projectQuery.where).toHaveBeenCalledWith({
+      project_id: 'project-1',
+      tenant_id: 'tenant-1',
+      deleted_at: null,
+    });
+    expect(
+      projectQuery.andWhere.mock.calls.some((call: unknown[]) => typeof call[0] === 'function'),
+    ).toBe(true);
   });
 
   it('keeps the system General folder readable', async () => {

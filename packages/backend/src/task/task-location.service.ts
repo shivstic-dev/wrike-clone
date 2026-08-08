@@ -37,12 +37,12 @@ export class TaskLocationService {
         input.folderId,
         trx,
       );
-      await this.departmentAccess.assertCanCreateTask(destination.departmentId);
+      await this.departmentAccess.assertCanCreateTask(destination.departmentId, trx);
       return destination;
     }
 
     const departmentId = input.departmentId!;
-    await this.departmentAccess.assertCanCreateTask(departmentId);
+    await this.departmentAccess.assertCanCreateTask(departmentId, trx);
     const folder = input.folderId
       ? await this.requireFolder(input.folderId, departmentId, trx)
       : await this.getOrCreateGeneralFolder(departmentId, trx);
@@ -124,7 +124,7 @@ export class TaskLocationService {
       const task = await this.requireTaskWithLocation(taskId, trx, {
         forUpdate: true,
       });
-      await this.departmentAccess.assertCanManageTask(task.department_id);
+      await this.departmentAccess.assertCanManageTask(task.department_id, task.id, trx);
       const destination = await this.resolveForMove(task.department_id, input, trx);
 
       await trx('tasks')

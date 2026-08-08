@@ -461,8 +461,10 @@ class FakeDepartmentAccess {
   createDenied = false;
   manageDenied = false;
   viewDenied = false;
+  createExecutors: unknown[] = [];
 
-  async assertCanCreateTask(): Promise<'admin'> {
+  async assertCanCreateTask(_departmentId: string, executor?: unknown): Promise<'admin'> {
+    this.createExecutors.push(executor);
     if (this.createDenied) throw new Error('Department access denied');
     return 'admin';
   }
@@ -514,6 +516,7 @@ describe('TaskLocationService', () => {
     });
     expect(fakeDb.rows.folders!.filter((row) => row.is_system_general)).toHaveLength(1);
     expect(fakeDb.rows.projects!.filter((row) => row.is_system)).toHaveLength(1);
+    expect(departmentAccess.createExecutors).toEqual([fakeDb.knex]);
   });
 
   it('reuses the same system records on repeated requests', async () => {
@@ -556,6 +559,7 @@ describe('TaskLocationService', () => {
       projectName: 'Website',
       isSystemProject: false,
     });
+    expect(departmentAccess.createExecutors).toEqual([fakeDb.knex]);
   });
 
   it('rejects a folder and project that do not match', async () => {

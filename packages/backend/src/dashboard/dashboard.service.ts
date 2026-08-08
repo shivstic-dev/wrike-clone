@@ -23,7 +23,7 @@ export interface DashboardQueryScope {
   departmentId?: string;
 }
 
-function managerEmployeeIds(db: Knex, scope: DashboardQueryScope): Knex.QueryBuilder {
+function managerVisibleMemberIds(db: Knex, scope: DashboardQueryScope): Knex.QueryBuilder {
   return db('workspace_members as dashboard_member_workspace')
     .join('tenant_memberships as dashboard_member_tenant', function () {
       this.on(
@@ -40,8 +40,6 @@ function managerEmployeeIds(db: Knex, scope: DashboardQueryScope): Knex.QueryBui
     .where('dashboard_member_workspace.workspace_id', scope.departmentId!)
     .where('dashboard_member_tenant.is_active', true)
     .whereNot('dashboard_member_tenant.role', 'admin')
-    .whereNot('dashboard_member_workspace.role', 'manager')
-    .whereNot('dashboard_member_tenant.role', 'manager')
     .whereNotExists(function () {
       this.select(1)
         .from('department_heads as dashboard_member_head')
@@ -74,7 +72,7 @@ function applyManagerScope(
   query.andWhere((visible) => {
     visible
       .where('tasks.assignee_id', scope.userId)
-      .orWhereIn('tasks.assignee_id', managerEmployeeIds(db, scope))
+      .orWhereIn('tasks.assignee_id', managerVisibleMemberIds(db, scope))
       .orWhereExists(function () {
         this.select(1)
           .from('task_assignees as dashboard_manager_ta')
@@ -83,7 +81,7 @@ function applyManagerScope(
           .andWhere((assigned) => {
             assigned
               .where('dashboard_manager_ta.user_id', scope.userId)
-              .orWhereIn('dashboard_manager_ta.user_id', managerEmployeeIds(db, scope));
+              .orWhereIn('dashboard_manager_ta.user_id', managerVisibleMemberIds(db, scope));
           });
       })
       .orWhere((unassigned) => {
@@ -121,8 +119,6 @@ function assigneeProjection(db: Knex, scope: DashboardQueryScope): Knex.Raw {
               "dashboard_assignees"."user_id"
             AND "dashboard_member_tenant"."is_active" = ?
             AND "dashboard_member_tenant"."role" <> ?
-            AND "dashboard_member_workspace"."role" <> ?
-            AND "dashboard_member_tenant"."role" <> ?
             AND NOT EXISTS (
               SELECT 1
               FROM "department_heads" AS "dashboard_member_head"
@@ -139,8 +135,6 @@ function assigneeProjection(db: Knex, scope: DashboardQueryScope): Knex.Raw {
       scope.tenantId,
       true,
       'admin',
-      'manager',
-      'manager',
       scope.tenantId,
     );
   }

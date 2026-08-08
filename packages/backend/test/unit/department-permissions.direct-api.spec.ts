@@ -18,6 +18,7 @@ function queryBuilder() {
     'leftJoin',
     'join',
     'where',
+    'whereNot',
     'andWhere',
     'whereNull',
     'whereIn',
@@ -26,6 +27,7 @@ function queryBuilder() {
     'update',
     'insert',
     'orderBy',
+    'forUpdate',
   ]) {
     builder[method] = jest.fn(() => builder);
   }
@@ -106,6 +108,7 @@ describe('Department permission checks through the HTTP API', () => {
       })
       .mockResolvedValueOnce(tenantMembership)
       .mockResolvedValueOnce(workspaceMembership)
+      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(tenantMembership)
       .mockResolvedValueOnce(workspaceMembership)

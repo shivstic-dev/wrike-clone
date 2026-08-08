@@ -32,7 +32,10 @@ export function applyVisibilityScope(
 
   return qb.where((b) =>
     b.where(visibilityColumn, 'global').orWhereIn(workspaceIdColumn, function () {
-      this.select('workspace_id').from('workspace_members').where('user_id', ctx.userId);
+      this.select('workspace_id')
+        .from('workspace_members')
+        .where('user_id', ctx.userId)
+        .andWhere('tenant_id', ctx.tenantId);
     }),
   );
 }
@@ -41,7 +44,7 @@ export function applyVisibilityScope(
  * Apply the role-aware task scope from the department RBAC model.
  *
  * Employees see only tasks assigned to them. Managers see their own tasks and
- * tasks assigned to employees in departments they manage. Department heads
+ * tasks assigned to employees or peer managers in departments they manage. Department heads
  * see every task in their departments. Tenant admins bypass this helper.
  */
 export function applyTaskAccessScope(
@@ -72,7 +75,7 @@ export function applyTaskAccessScope(
           .whereExists(function () {
             this.select(1)
               .from('workspace_members as actor_wm')
-              .leftJoin('tenant_memberships as actor_tm', function () {
+              .join('tenant_memberships as actor_tm', function () {
                 this.on('actor_tm.tenant_id', '=', 'actor_wm.tenant_id').andOn(
                   'actor_tm.user_id',
                   '=',
@@ -82,12 +85,21 @@ export function applyTaskAccessScope(
               .whereRaw('actor_wm.workspace_id = tasks.department_id')
               .andWhere('actor_wm.tenant_id', ctx.tenantId)
               .andWhere('actor_wm.user_id', ctx.userId)
+              .andWhere('actor_tm.is_active', true)
+              .whereNot('actor_tm.role', 'admin')
+              .whereNotExists(function () {
+                this.select(1)
+                  .from('department_heads as actor_dh')
+                  .whereRaw('actor_dh.department_id = tasks.department_id')
+                  .andWhere('actor_dh.tenant_id', ctx.tenantId)
+                  .whereRaw('actor_dh.user_id = actor_wm.user_id');
+              })
               .andWhere((role) =>
                 role.where('actor_wm.role', 'manager').orWhere('actor_tm.role', 'manager'),
               );
           })
-          .andWhere((employeeTask) => {
-            employeeTask
+          .andWhere((visibleMemberTask) => {
+            visibleMemberTask
               .where((unassigned) => {
                 unassigned.whereNull('tasks.assignee_id').whereNotExists(function () {
                   this.select(1)
@@ -97,26 +109,58 @@ export function applyTaskAccessScope(
                 });
               })
               .orWhereIn('tasks.assignee_id', function () {
-                this.select('employee_wm.user_id')
-                  .from('workspace_members as employee_wm')
-                  .whereRaw('employee_wm.workspace_id = tasks.department_id')
-                  .andWhere('employee_wm.tenant_id', ctx.tenantId)
-                  .andWhere('employee_wm.role', 'employee');
+                this.select('visible_primary_wm.user_id')
+                  .from('workspace_members as visible_primary_wm')
+                  .join('tenant_memberships as visible_primary_tm', function () {
+                    this.on(
+                      'visible_primary_tm.tenant_id',
+                      '=',
+                      'visible_primary_wm.tenant_id',
+                    ).andOn('visible_primary_tm.user_id', '=', 'visible_primary_wm.user_id');
+                  })
+                  .whereRaw('visible_primary_wm.workspace_id = tasks.department_id')
+                  .andWhere('visible_primary_wm.tenant_id', ctx.tenantId)
+                  .andWhere('visible_primary_tm.is_active', true)
+                  .whereNot('visible_primary_tm.role', 'admin')
+                  .whereIn('visible_primary_wm.role', ['employee', 'manager'])
+                  .whereNotExists(function () {
+                    this.select(1)
+                      .from('department_heads as visible_primary_dh')
+                      .whereRaw('visible_primary_dh.department_id = tasks.department_id')
+                      .andWhere('visible_primary_dh.tenant_id', ctx.tenantId)
+                      .whereRaw('visible_primary_dh.user_id = visible_primary_wm.user_id');
+                  });
               })
               .orWhereExists(function () {
                 this.select(1)
-                  .from('task_assignees as employee_ta')
-                  .join('workspace_members as employee_wm', function () {
-                    this.on('employee_wm.user_id', '=', 'employee_ta.user_id').andOn(
-                      'employee_wm.workspace_id',
+                  .from('task_assignees as visible_member_ta')
+                  .join('workspace_members as visible_additional_wm', function () {
+                    this.on(
+                      'visible_additional_wm.user_id',
                       '=',
-                      'tasks.department_id',
-                    );
+                      'visible_member_ta.user_id',
+                    ).andOn('visible_additional_wm.workspace_id', '=', 'tasks.department_id');
                   })
-                  .whereRaw('employee_ta.task_id = tasks.id')
-                  .andWhere('employee_ta.tenant_id', ctx.tenantId)
-                  .andWhere('employee_wm.tenant_id', ctx.tenantId)
-                  .andWhere('employee_wm.role', 'employee');
+                  .join('tenant_memberships as visible_additional_tm', function () {
+                    this.on(
+                      'visible_additional_tm.tenant_id',
+                      '=',
+                      'visible_additional_wm.tenant_id',
+                    ).andOn('visible_additional_tm.user_id', '=', 'visible_additional_wm.user_id');
+                  })
+                  .whereRaw('visible_member_ta.task_id = tasks.id')
+                  .andWhere('visible_member_ta.tenant_id', ctx.tenantId)
+                  .andWhere('visible_additional_wm.tenant_id', ctx.tenantId)
+                  .andWhere('visible_additional_tm.is_active', true)
+                  .whereNot('visible_additional_tm.role', 'admin')
+                  .whereIn('visible_additional_wm.role', ['employee', 'manager'])
+                  .whereNotExists(function () {
+                    this.select(1)
+                      .from('department_heads as visible_additional_dh')
+                      .whereRaw('visible_additional_dh.department_id = tasks.department_id')
+                      .andWhere('visible_additional_dh.tenant_id', ctx.tenantId)
+                      .whereRaw('visible_additional_dh.user_id = visible_additional_wm.user_id');
+                  });
               });
           });
       });

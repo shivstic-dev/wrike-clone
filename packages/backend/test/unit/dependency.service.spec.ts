@@ -12,6 +12,7 @@ function chain(values: { first?: unknown; rows?: unknown[]; returning?: unknown[
     where: jest.fn().mockReturnThis(), whereNull: jest.fn().mockReturnThis(), select: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(), update: jest.fn().mockReturnThis(), del: jest.fn().mockResolvedValue(1),
     insert: jest.fn().mockReturnThis(), returning: jest.fn().mockResolvedValue(values.returning ?? []),
+    forUpdate: jest.fn().mockReturnThis(),
     first: jest.fn().mockResolvedValue(values.first),
     then: (resolve: (value: unknown[]) => unknown) => resolve(values.rows ?? []),
   };
@@ -38,6 +39,32 @@ describe('DependencyService', () => {
     expect(dependencyQuery.insert).toHaveBeenCalledWith(expect.objectContaining({
       tenant_id: context.tenantId, dependency_type: dependencyType, lag_days: 2,
     }));
+  });
+
+  it('locks dependency endpoints in deterministic id order', async () => {
+    const taskQuery = chain();
+    taskQuery.first
+      .mockResolvedValueOnce({ id: 'task-1', tenant_id: context.tenantId, department_id: 'dept-1' })
+      .mockResolvedValueOnce({ id: 'task-2', tenant_id: context.tenantId, department_id: 'dept-1' });
+    const dependencyQuery = chain({ rows: [], returning: [{
+      id: 'dep-1', task_id: 'task-2', depends_on_task_id: 'task-1',
+      dependency_type: DependencyType.FINISH_TO_START, lag_days: 0,
+    }] });
+    const database: any = jest.fn((table: string) => table === 'tasks' ? taskQuery : dependencyQuery);
+    database.transaction = jest.fn((callback: (trx: any) => unknown) => callback(database));
+    const service = new DependencyService(database, departmentAccess as never);
+
+    await tenantContext.run(context, () => service.create({
+      taskId: 'task-2',
+      dependsOnTaskId: 'task-1',
+      dependencyType: DependencyType.FINISH_TO_START,
+      lagDays: 0,
+    }));
+
+    const lockedIds = taskQuery.where.mock.calls
+      .map(([where]: [{ id?: string }]) => where.id)
+      .filter(Boolean);
+    expect(lockedIds).toEqual(['task-1', 'task-2']);
   });
 
   it.each([

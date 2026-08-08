@@ -11,6 +11,61 @@ const context = {
 };
 
 describe('DepartmentAccessService workflow rules', () => {
+  it('rejects a manager mutating a task assigned to another manager', async () => {
+    const assignments = {
+      join: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      whereNot: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      first: jest.fn().mockResolvedValue({ user_id: 'manager-2' }),
+    };
+    const service = new DepartmentAccessService(jest.fn().mockReturnValue(assignments) as never);
+    jest.spyOn(service, 'getRole').mockResolvedValueOnce('manager');
+
+    await expect(
+      tenantContext.run(context, () =>
+        (service as any).assertCanManageTask('department-1', 'task-1'),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects a manager changing another manager task status', async () => {
+    const assignments = {
+      join: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      whereNot: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      first: jest.fn().mockResolvedValue({ user_id: 'manager-2' }),
+    };
+    const service = new DepartmentAccessService(jest.fn().mockReturnValue(assignments) as never);
+    jest
+      .spyOn(service, 'getRole')
+      .mockResolvedValueOnce('manager')
+      .mockResolvedValueOnce('manager');
+
+    await expect(
+      tenantContext.run(context, () =>
+        service.assertCanChangeStatus('department-1', 'task-1', 'manager-2'),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('keeps employee-assigned tasks manageable by a department manager', async () => {
+    const assignments = {
+      join: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      whereNot: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      first: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new DepartmentAccessService(jest.fn().mockReturnValue(assignments) as never);
+    jest.spyOn(service, 'getRole').mockResolvedValueOnce('manager');
+
+    await expect(
+      tenantContext.run(context, () => service.assertCanManageTask('department-1', 'task-1')),
+    ).resolves.toBe('manager');
+  });
+
   it('allows a manager to assign an employee or themselves', async () => {
     const service = new DepartmentAccessService({} as never);
     jest

@@ -2,17 +2,17 @@
  * Search service — full-text search across tasks, projects, comments, and files.
  *
  * v1: PostgreSQL full-text search (already implemented in task.service.ts findAll).
- * v2: When MEILISEARCH_HOST environment variable is set, uses Meilisearch for
- *     faster, typo-tolerant, faceted search across all entities.
+ * Meilisearch remains an optional write-side index. Reads use PostgreSQL so
+ * tenant and role authorization are applied before pagination and counting.
  *
- * This service provides a unified search interface that abstracts
- * the underlying engine (PG vs Meilisearch).
+ * This service provides a unified, authorization-aware search interface.
  */
 
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { Knex } from 'knex';
 import { DATABASE_PROVIDER } from '../database/database.module';
 import { requireTenantContext } from '../common/tenant-context';
+import { applyTaskAccessScope, applyVisibilityScope } from '../common/visibility.scope';
 
 interface SearchOptions {
   query: string;
@@ -49,66 +49,17 @@ export class SearchService {
   constructor(@Inject(DATABASE_PROVIDER) private readonly db: Knex) {
     this.useMeilisearch = !!process.env['MEILISEARCH_HOST'];
     if (this.useMeilisearch) {
-      this.logger.log('Meilisearch detected — will use for full-text search');
+      this.logger.log('Meilisearch detected — indexing enabled; reads use scoped PostgreSQL');
     } else {
       this.logger.log('No Meilisearch configured — falling back to PostgreSQL full-text search');
     }
   }
 
   /**
-   * Unified search across all entity types.
-   * Delegates to Meilisearch or PostgreSQL depending on configuration.
+   * Unified search across all entity types using scoped PostgreSQL reads.
    */
   async search(options: SearchOptions): Promise<SearchResponse> {
-    if (this.useMeilisearch) {
-      return this.searchMeilisearch(options);
-    }
     return this.searchPgOnly(options);
-  }
-
-  /**
-   * Meilisearch-powered search for production use.
-   */
-  private async searchMeilisearch(_options: SearchOptions): Promise<SearchResponse> {
-    // Meilisearch integration — requires the meilisearch npm package
-    if (!this.useMeilisearch) {
-      return this.searchPgOnly(_options);
-    }
-
-    try {
-      const MeiliSearch = require('meilisearch');
-      const client = new MeiliSearch({
-        host: process.env['MEILISEARCH_HOST'] || 'http://localhost:7700',
-        apiKey: process.env['MEILISEARCH_API_KEY'] || '',
-      });
-
-      const index = client.index('tasks');
-      const result = await index.search(_options.query, {
-        limit: _options.perPage || 25,
-        offset: ((_options.page || 1) - 1) * (_options.perPage || 25),
-        filter: _options.projectId ? `project_id = ${_options.projectId}` : undefined,
-      });
-
-      const results: SearchResult[] = (result.hits || []).map((hit: any) => ({
-        id: hit.id,
-        type: 'task' as const,
-        title: hit.title || '',
-        description: hit.description || null,
-        url: `/tasks/${hit.id}`,
-        metadata: { status: hit.status, priority: hit.priority },
-        score: hit._rankingScore,
-      }));
-
-      return {
-        results,
-        total: result.estimatedTotalHits || 0,
-        page: _options.page || 1,
-        perPage: _options.perPage || 25,
-      };
-    } catch (err) {
-      this.logger.warn(`Meilisearch search failed, falling back to PG: ${(err as Error).message}`);
-      return this.searchPgOnly(_options);
-    }
   }
 
   /**
@@ -130,14 +81,15 @@ export class SearchService {
         .whereNull('tasks.deleted_at');
 
       if (searchTerm) {
-        taskQuery = taskQuery.andWhereRaw(
-          `tasks.search_vec @@ plainto_tsquery('english', ?)`,
-          [searchTerm],
-        );
+        taskQuery = taskQuery.andWhereRaw(`tasks.search_vec @@ plainto_tsquery('english', ?)`, [
+          searchTerm,
+        ]);
       }
 
       if (projectId) taskQuery = taskQuery.andWhere('tasks.project_id', projectId);
       if (assigneeId) taskQuery = taskQuery.andWhere('tasks.assignee_id', assigneeId);
+
+      taskQuery = applyTaskAccessScope(taskQuery, ctx);
 
       const countResult = (await taskQuery.clone().clearSelect().count('* as count').first()) as {
         count?: string | number;
@@ -179,7 +131,15 @@ export class SearchService {
     if (type === 'all' || type === 'projects') {
       let projectQuery = this.db('projects')
         .where('projects.tenant_id', ctx.tenantId)
-        .whereNull('projects.deleted_at');
+        .whereNull('projects.deleted_at')
+        .leftJoin('folders', 'projects.folder_id', 'folders.id');
+
+      projectQuery = applyVisibilityScope(
+        projectQuery,
+        ctx,
+        'folders.workspace_id',
+        'projects.visibility',
+      );
 
       if (searchTerm) {
         projectQuery = projectQuery.andWhere(function () {

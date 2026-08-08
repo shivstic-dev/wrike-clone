@@ -12,6 +12,7 @@ import { TaskCompletionService } from '../../src/task/task-completion.service';
 import { MemoryCacheService } from '../../src/common/cache/memory-cache.service';
 import { TaskStatus } from '@wrike-clone/shared';
 import knex, { type Knex } from 'knex';
+import * as visibilityScope from '../../src/common/visibility.scope';
 
 const noop = () => {};
 
@@ -25,6 +26,8 @@ function createQb(): any {
     'andWhere',
     'whereIn',
     'whereNull',
+    'whereNot',
+    'whereNotExists',
     'join',
     'leftJoin',
     'orderBy',
@@ -38,6 +41,7 @@ function createQb(): any {
     'count',
     'modify',
     'groupBy',
+    'forUpdate',
   ];
   for (const m of methods) qb[m] = jest.fn(() => self);
   qb.first = jest.fn();
@@ -102,6 +106,60 @@ describe('TaskService', () => {
   afterEach(() => jest.clearAllMocks());
 
   describe('findAll', () => {
+    it('does not share access-scoped cached results between viewers in the same tenant', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'manager-membership',
+        role: 'member',
+        permissions: ['task:read'],
+      });
+      departmentAccess.isTenantAdmin.mockResolvedValue(false);
+      qb.first.mockResolvedValueOnce({ count: '1' });
+      qb.offset.mockResolvedValueOnce([{ id: 'manager-task', title: 'Manager task' }]);
+
+      const managerResult = await service.findAll({ page: 1, perPage: 25 });
+
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'employee-1',
+        membershipId: 'employee-membership',
+        role: 'member',
+        permissions: ['task:read'],
+      });
+      qb.first.mockResolvedValueOnce({ count: '1' });
+      qb.offset.mockResolvedValueOnce([{ id: 'employee-task', title: 'Employee task' }]);
+
+      const employeeResult = await service.findAll({ page: 1, perPage: 25 });
+
+      expect(managerResult.data).toEqual([expect.objectContaining({ id: 'manager-task' })]);
+      expect(employeeResult.data).toEqual([expect.objectContaining({ id: 'employee-task' })]);
+      expect(departmentAccess.isTenantAdmin).toHaveBeenCalledTimes(2);
+    });
+
+    it('applies the same task access scope to rows and pagination totals', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'manager',
+        permissions: ['task:read'],
+      });
+      departmentAccess.isTenantAdmin.mockResolvedValueOnce(false);
+      qb.first.mockResolvedValueOnce({ count: '0' });
+      qb.offset.mockResolvedValue([]);
+      const accessScope = jest.spyOn(visibilityScope, 'applyTaskAccessScope');
+
+      await service.findAll({ page: 1, perPage: 25 });
+
+      expect(accessScope).toHaveBeenCalledTimes(2);
+      expect(accessScope.mock.calls[0]?.[1]).toMatchObject({
+        tenantId: 't1',
+        userId: 'manager-1',
+      });
+      expect(accessScope.mock.calls[1]?.[1]).toEqual(accessScope.mock.calls[0]?.[1]);
+    });
+
     it('returns paginated tasks', async () => {
       tenantContext.enterWith({
         tenantId: 't1',
@@ -154,7 +212,13 @@ describe('TaskService', () => {
     });
 
     it('filters ready-for-handoff tasks inside the current tenant query', async () => {
-      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
       qb.first.mockResolvedValueOnce({ count: '0' });
       qb.offset.mockResolvedValue([]);
 
@@ -185,22 +249,23 @@ describe('TaskService', () => {
 
     it('compiles handoff-owner and metadata fields into the list projection', async () => {
       const database = knex({ client: 'pg' });
-      const projectionBuilder = (TaskService as unknown as {
-        buildListProjection(db: Knex): Array<string | Knex.Raw>;
-      }).buildListProjection;
+      const projectionBuilder = (
+        TaskService as unknown as {
+          buildListProjection(db: Knex): Array<string | Knex.Raw>;
+        }
+      ).buildListProjection;
 
       try {
         const sql = database('tasks')
           .select(...projectionBuilder(database))
           .toSQL()
-          .sql
-          .replace(/\s+/gu, ' ')
+          .sql.replace(/\s+/gu, ' ')
           .toLowerCase();
 
         expect(sql).toContain('"workspaces"."name" as "department_name"');
         expect(sql).toContain('"home_folder"."id" as "folder_id"');
         expect(sql).toContain('"task_project"."name" as "project_name"');
-        expect(sql).toContain('json_build_object(\'id\', handoff_owner.id');
+        expect(sql).toContain("json_build_object('id', handoff_owner.id");
         expect(sql).toContain('as handoff_owner');
         expect(sql).toContain('as assignee');
       } finally {
@@ -272,40 +337,68 @@ describe('TaskService', () => {
 
   describe('create', () => {
     it('creates a task pending handoff with its creator as owner by default', async () => {
-      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
       qb.returning.mockResolvedValue([{ id: 'task-new', title: 'Internal check', status: 'todo' }]);
 
       await service.create({ projectId: 'proj-1', title: 'Internal check' });
 
-      expect(qb.insert).toHaveBeenCalledWith(expect.objectContaining({
-        handoff_required: true,
-        handoff_status: 'pending',
-        handoff_owner_id: 'u1',
-      }));
+      expect(qb.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          handoff_required: true,
+          handoff_status: 'pending',
+          handoff_owner_id: 'u1',
+        }),
+      );
     });
 
     it('allows an explicitly not-required task to start completed', async () => {
-      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
-      qb.returning.mockResolvedValue([{ id: 'task-new', title: 'Internal check', status: 'completed' }]);
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      qb.returning.mockResolvedValue([
+        { id: 'task-new', title: 'Internal check', status: 'completed' },
+      ]);
 
-      await expect(service.create({
-        projectId: 'proj-1',
-        title: 'Internal check',
-        handoffRequired: false,
-        status: TaskStatus.COMPLETED,
-      })).resolves.toMatchObject({ status: 'completed' });
+      await expect(
+        service.create({
+          projectId: 'proj-1',
+          title: 'Internal check',
+          handoffRequired: false,
+          status: TaskStatus.COMPLETED,
+        }),
+      ).resolves.toMatchObject({ status: 'completed' });
 
-      expect(qb.insert).toHaveBeenCalledWith(expect.objectContaining({
-        handoff_required: false,
-        handoff_status: 'not_required',
-        completed_at: expect.any(Date),
-      }));
+      expect(qb.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          handoff_required: false,
+          handoff_status: 'not_required',
+          completed_at: expect.any(Date),
+        }),
+      );
     });
 
     it('keeps the creator as handoff owner when self-assigning during creation', async () => {
-      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
       qb.first.mockResolvedValue({ user_id: 'u1' });
-      qb.returning.mockResolvedValue([{ id: 'task-new', title: 'Internal check', assignee_id: 'u1' }]);
+      qb.returning.mockResolvedValue([
+        { id: 'task-new', title: 'Internal check', assignee_id: 'u1' },
+      ]);
 
       await service.create({ projectId: 'proj-1', title: 'Internal check', assigneeId: 'u1' });
 
@@ -357,9 +450,7 @@ describe('TaskService', () => {
         projectName: 'General Tasks',
         isSystemProject: true,
       });
-      qb.returning.mockResolvedValue([
-        { id: 'task-quick', title: 'Quick task', status: 'todo' },
-      ]);
+      qb.returning.mockResolvedValue([{ id: 'task-quick', title: 'Quick task', status: 'todo' }]);
 
       const result = await service.create({
         departmentId: 'dept-1',
@@ -409,26 +500,75 @@ describe('TaskService', () => {
         assigneeIds: ['assignee-1'],
       });
 
-      expect(departmentAccess.assertCanSetVisibility).toHaveBeenCalledWith('resolved-dept');
+      expect(departmentAccess.assertCanSetVisibility).toHaveBeenCalledWith('resolved-dept', mockDb);
       expect(departmentAccess.assertCanAssignTo).toHaveBeenCalledWith(
         'resolved-dept',
         'assignee-1',
+        mockDb,
       );
     });
   });
 
   describe('update', () => {
+    it('locks and re-reads the task before authorizing a single update in the same transaction', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      const locked = {
+        id: 'task-1',
+        tenant_id: 't1',
+        department_id: 'dept-after-lock',
+        title: 'Old',
+        status: TaskStatus.TODO,
+        assignee_id: 'u1',
+      };
+      qb.first.mockResolvedValueOnce(locked);
+      qb.returning.mockResolvedValueOnce([{ ...locked, title: 'New' }]);
+      qb.then = (resolve: any) => resolve([]);
+      qb.catch = noop;
+
+      await service.update('task-1', { title: 'New' });
+
+      expect(qb.forUpdate).toHaveBeenCalledWith('tasks');
+      expect(departmentAccess.assertCanManageTask).toHaveBeenCalledWith(
+        'dept-after-lock',
+        'task-1',
+        mockDb,
+      );
+      expect(qb.forUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+        departmentAccess.assertCanManageTask.mock.invocationCallOrder[0]!,
+      );
+    });
+
     it('rejects generic completion until final handoff is confirmed', async () => {
-      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
       qb.first.mockResolvedValue({ id: 'task-1', status: TaskStatus.IN_PROGRESS, tenant_id: 't1' });
 
-      await expect(service.update('task-1', { status: TaskStatus.COMPLETED })).rejects.toMatchObject({
+      await expect(
+        service.update('task-1', { status: TaskStatus.COMPLETED }),
+      ).rejects.toMatchObject({
         response: { code: 'HANDOFF_CONFIRMATION_REQUIRED' },
       });
     });
 
     it('records the current actor as owner when assignments change', async () => {
-      tenantContext.enterWith({ tenantId: 't1', userId: 'manager-1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
       qb.first.mockResolvedValue({
         id: 'task-1',
         status: TaskStatus.TODO,
@@ -443,16 +583,29 @@ describe('TaskService', () => {
 
       await service.update('task-1', { assigneeIds: ['u2'] });
 
-      expect(qb.update).toHaveBeenCalledWith(expect.objectContaining({
-        assignee_id: 'u2',
-        handoff_owner_id: 'manager-1',
-      }));
+      expect(qb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          assignee_id: 'u2',
+          handoff_owner_id: 'manager-1',
+        }),
+      );
     });
 
     it('does not change the owner for a no-op assignment', async () => {
-      tenantContext.enterWith({ tenantId: 't1', userId: 'manager-1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
       qb.first.mockResolvedValue({
-        id: 'task-1', status: TaskStatus.TODO, title: 'Same', tenant_id: 't1', department_id: 'dept-1', assignee_id: 'u1',
+        id: 'task-1',
+        status: TaskStatus.TODO,
+        title: 'Same',
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        assignee_id: 'u1',
       });
       qb.then = (resolve: any) => resolve([{ user_id: 'u1' }]);
       qb.catch = noop;
@@ -462,20 +615,154 @@ describe('TaskService', () => {
       expect(qb.update).not.toHaveBeenCalled();
     });
 
+    it('resets handoff state when handoff is disabled', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      qb.first.mockResolvedValue({
+        id: 'task-1',
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        status: TaskStatus.COMPLETED,
+        handoff_required: true,
+        handoff_status: 'ready',
+        handoff_ready_at: new Date(),
+        handoff_confirmed_by: 'u2',
+        handoff_confirmed_at: new Date(),
+      });
+      qb.returning.mockResolvedValue([
+        { id: 'task-1', handoff_required: false, handoff_status: 'not_required' },
+      ]);
+
+      await service.update('task-1', { handoffRequired: false });
+
+      expect(qb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          handoff_required: false,
+          handoff_status: 'not_required',
+          handoff_ready_at: null,
+          handoff_confirmed_by: null,
+          handoff_confirmed_at: null,
+        }),
+      );
+    });
+
+    it('resets handoff state to pending when handoff is enabled', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      qb.first.mockResolvedValue({
+        id: 'task-1',
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        status: TaskStatus.IN_PROGRESS,
+        handoff_required: false,
+        handoff_status: 'not_required',
+      });
+      qb.returning.mockResolvedValue([
+        { id: 'task-1', handoff_required: true, handoff_status: 'pending' },
+      ]);
+
+      await service.update('task-1', { handoffRequired: true });
+
+      expect(qb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          handoff_required: true,
+          handoff_status: 'pending',
+          handoff_ready_at: null,
+          handoff_confirmed_by: null,
+          handoff_confirmed_at: null,
+        }),
+      );
+    });
+
+    it('rejects enabling handoff on a task that remains completed', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      qb.first.mockResolvedValue({
+        id: 'task-1',
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        status: TaskStatus.COMPLETED,
+        handoff_required: false,
+        handoff_status: 'not_required',
+      });
+
+      await expect(service.update('task-1', { handoffRequired: true })).rejects.toMatchObject({
+        response: { code: 'HANDOFF_CONFIRMATION_REQUIRED' },
+      });
+      expect(qb.update).not.toHaveBeenCalled();
+    });
+
     it('keeps other PATCH fields while reopening clears handoff confirmation', async () => {
-      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
-      const completed = { id: 'task-1', title: 'Original', status: TaskStatus.COMPLETED, tenant_id: 't1', department_id: 'dept-1', assignee_id: 'u1', handoff_required: true };
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      const completed = {
+        id: 'task-1',
+        title: 'Original',
+        status: TaskStatus.COMPLETED,
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        assignee_id: 'u1',
+        handoff_required: true,
+      };
       qb.first.mockResolvedValue(completed);
-      taskCompletion.reopenInTransaction.mockResolvedValue({ ...completed, status: TaskStatus.IN_PROGRESS, handoff_status: 'pending', handoff_confirmed_by: null, handoff_confirmed_at: null });
-      qb.returning.mockResolvedValue([{ ...completed, title: 'Revised', status: TaskStatus.IN_PROGRESS, handoff_status: 'pending', handoff_confirmed_by: null, handoff_confirmed_at: null }]);
+      taskCompletion.reopenInTransaction.mockResolvedValue({
+        ...completed,
+        status: TaskStatus.IN_PROGRESS,
+        handoff_status: 'pending',
+        handoff_confirmed_by: null,
+        handoff_confirmed_at: null,
+      });
+      qb.returning.mockResolvedValue([
+        {
+          ...completed,
+          title: 'Revised',
+          status: TaskStatus.IN_PROGRESS,
+          handoff_status: 'pending',
+          handoff_confirmed_by: null,
+          handoff_confirmed_at: null,
+        },
+      ]);
       qb.then = (resolve: any) => resolve([]);
       qb.catch = noop;
 
-      const result = await service.update('task-1', { status: TaskStatus.IN_PROGRESS, title: 'Revised' });
+      const result = await service.update('task-1', {
+        status: TaskStatus.IN_PROGRESS,
+        title: 'Revised',
+      });
 
-      expect(taskCompletion.reopenInTransaction).toHaveBeenCalledWith(expect.anything(), completed, TaskStatus.IN_PROGRESS);
+      expect(taskCompletion.reopenInTransaction).toHaveBeenCalledWith(
+        expect.anything(),
+        completed,
+        TaskStatus.IN_PROGRESS,
+      );
       expect(qb.update).toHaveBeenCalledWith(expect.objectContaining({ title: 'Revised' }));
-      expect(result).toMatchObject({ title: 'Revised', status: TaskStatus.IN_PROGRESS, handoff_status: 'pending', handoff_confirmed_by: null, handoff_confirmed_at: null });
+      expect(result).toMatchObject({
+        title: 'Revised',
+        status: TaskStatus.IN_PROGRESS,
+        handoff_status: 'pending',
+        handoff_confirmed_by: null,
+        handoff_confirmed_at: null,
+      });
     });
     it('updates task with valid changes', async () => {
       tenantContext.enterWith({
@@ -514,30 +801,170 @@ describe('TaskService', () => {
   });
 
   describe('bulkUpdate', () => {
-    it('rejects generic bulk completion until final handoff is confirmed', async () => {
-      tenantContext.enterWith({ tenantId: 't1', userId: 'u1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+    it('enables handoff and clears stale confirmation state for every locked task', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      const existing = {
+        id: 'task-1',
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        status: TaskStatus.IN_PROGRESS,
+        handoff_required: false,
+        handoff_status: 'not_required',
+        handoff_ready_at: new Date(),
+        handoff_confirmed_by: 'u1',
+        handoff_confirmed_at: new Date(),
+      };
+      qb.then = (resolve: any) => resolve([existing]);
+      qb.catch = noop;
+      qb.returning.mockResolvedValue([
+        { ...existing, handoff_required: true, handoff_status: 'pending' },
+      ]);
 
-      await expect(service.bulkUpdate({ taskIds: ['task-1'], updates: { status: TaskStatus.COMPLETED } })).rejects.toMatchObject({
+      await service.bulkUpdate({ taskIds: ['task-1'], updates: { handoffRequired: true } });
+
+      expect(qb.forUpdate).toHaveBeenCalled();
+      expect(departmentAccess.assertCanManageTask).toHaveBeenCalledWith('dept-1', 'task-1', mockDb);
+      expect(qb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          handoff_required: true,
+          handoff_status: 'pending',
+          handoff_ready_at: null,
+          handoff_confirmed_by: null,
+          handoff_confirmed_at: null,
+        }),
+      );
+    });
+
+    it('disables handoff and clears stale confirmation state for every locked task', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      const existing = {
+        id: 'task-1',
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        status: TaskStatus.COMPLETED,
+        handoff_required: true,
+        handoff_status: 'confirmed',
+        handoff_ready_at: new Date(),
+        handoff_confirmed_by: 'u1',
+        handoff_confirmed_at: new Date(),
+      };
+      qb.then = (resolve: any) => resolve([existing]);
+      qb.catch = noop;
+      qb.returning.mockResolvedValue([
+        { ...existing, handoff_required: false, handoff_status: 'not_required' },
+      ]);
+
+      await service.bulkUpdate({ taskIds: ['task-1'], updates: { handoffRequired: false } });
+
+      expect(qb.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          handoff_required: false,
+          handoff_status: 'not_required',
+          handoff_ready_at: null,
+          handoff_confirmed_by: null,
+          handoff_confirmed_at: null,
+        }),
+      );
+    });
+
+    it('rejects enabling handoff on a locked task that remains completed', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      qb.then = (resolve: any) =>
+        resolve([
+          {
+            id: 'task-1',
+            tenant_id: 't1',
+            department_id: 'dept-1',
+            status: TaskStatus.COMPLETED,
+            handoff_required: false,
+            handoff_status: 'not_required',
+          },
+        ]);
+      qb.catch = noop;
+
+      await expect(
+        service.bulkUpdate({
+          taskIds: ['task-1'],
+          updates: { handoffRequired: true },
+        }),
+      ).rejects.toMatchObject({ response: { code: 'HANDOFF_CONFIRMATION_REQUIRED' } });
+      expect(qb.forUpdate).toHaveBeenCalled();
+      expect(qb.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects generic bulk completion until final handoff is confirmed', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'u1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+
+      await expect(
+        service.bulkUpdate({ taskIds: ['task-1'], updates: { status: TaskStatus.COMPLETED } }),
+      ).rejects.toMatchObject({
         response: { code: 'HANDOFF_CONFIRMATION_REQUIRED' },
       });
     });
 
     it('keeps the handoff owner when bulk assignment only removes people', async () => {
-      tenantContext.enterWith({ tenantId: 't1', userId: 'manager-1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
-      qb._data = [{
-        id: 'task-1', title: 'A', status: TaskStatus.TODO, tenant_id: 't1', department_id: 'dept-1', assignee_id: 'u1',
-      }];
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      qb._data = [
+        {
+          id: 'task-1',
+          title: 'A',
+          status: TaskStatus.TODO,
+          tenant_id: 't1',
+          department_id: 'dept-1',
+          assignee_id: 'u1',
+        },
+      ];
       qb.then = (resolve: any) => resolve(qb._data);
       qb.catch = noop;
       qb.returning.mockResolvedValue([{ id: 'task-1', assignee_id: null }]);
 
       await service.bulkUpdate({ taskIds: ['task-1'], updates: { assigneeIds: [] } });
 
-      expect(qb.update.mock.calls.some(([updates]: [Record<string, unknown>]) => 'handoff_owner_id' in updates)).toBe(false);
+      expect(
+        qb.update.mock.calls.some(
+          ([updates]: [Record<string, unknown>]) => 'handoff_owner_id' in updates,
+        ),
+      ).toBe(false);
     });
 
     it('does not rewrite or log a bulk assignment when every target already has it', async () => {
-      tenantContext.enterWith({ tenantId: 't1', userId: 'manager-1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
       const existingTask = {
         id: 'task-1',
         title: 'A',
@@ -551,9 +978,8 @@ describe('TaskService', () => {
       taskQb.catch = noop;
       taskQb.returning.mockResolvedValue([existingTask]);
       const assigneeQb = createQb();
-      assigneeQb.then = (resolve: any) => resolve([
-        { task_id: 'task-1', user_id: 'u1', is_primary: true },
-      ]);
+      assigneeQb.then = (resolve: any) =>
+        resolve([{ task_id: 'task-1', user_id: 'u1', is_primary: true }]);
       assigneeQb.catch = noop;
       const activityQb = createQb();
       const memberQb = createQb();
@@ -576,6 +1002,143 @@ describe('TaskService', () => {
       expect(assigneeQb.del).not.toHaveBeenCalled();
       expect(assigneeQb.insert).not.toHaveBeenCalled();
       expect(activityQb.insert).not.toHaveBeenCalled();
+    });
+
+    it('checks visibility and mutation authorization before returning an assignment no-op', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'manager',
+        permissions: ['task:write'],
+      });
+      const existingTask = {
+        id: 'task-peer',
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        assignee_id: 'manager-2',
+      };
+      const taskQb = createQb();
+      taskQb.then = (resolve: any) => resolve([existingTask]);
+      taskQb.catch = noop;
+      const assigneeQb = createQb();
+      assigneeQb.then = (resolve: any) => resolve([{ task_id: 'task-peer', user_id: 'manager-2' }]);
+      assigneeQb.catch = noop;
+      mockDb.mockImplementation((table: string) =>
+        table === 'tasks' ? taskQb : table === 'task_assignees' ? assigneeQb : createQb(),
+      );
+      const accessScope = jest.spyOn(visibilityScope, 'applyTaskAccessScope');
+      departmentAccess.assertCanManageTask.mockRejectedValueOnce(new Error('peer task denied'));
+
+      await expect(
+        service.bulkUpdate({
+          taskIds: ['task-peer'],
+          updates: { assigneeIds: ['manager-2'] },
+        }),
+      ).rejects.toThrow('peer task denied');
+
+      expect(accessScope).toHaveBeenCalledWith(
+        taskQb,
+        expect.objectContaining({ userId: 'manager-1' }),
+      );
+      expect(departmentAccess.assertCanManageTask).toHaveBeenCalledWith(
+        'dept-1',
+        'task-peer',
+        mockDb,
+      );
+      expect(taskQb.update).not.toHaveBeenCalled();
+    });
+
+    it('treats assignee ordering as an assignment no-op after authorization', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      const existingTask = {
+        id: 'task-1',
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        assignee_id: 'u1',
+      };
+      const taskQb = createQb();
+      taskQb.then = (resolve: any) => resolve([existingTask]);
+      taskQb.catch = noop;
+      const assigneeQb = createQb();
+      assigneeQb.then = (resolve: any) =>
+        resolve([
+          { task_id: 'task-1', user_id: 'u2' },
+          { task_id: 'task-1', user_id: 'u1' },
+        ]);
+      assigneeQb.catch = noop;
+      const memberQb = createQb();
+      memberQb.first.mockResolvedValue({ user_id: 'member' });
+      mockDb.mockImplementation((table: string) =>
+        table === 'tasks'
+          ? taskQb
+          : table === 'task_assignees'
+            ? assigneeQb
+            : table === 'workspace_members'
+              ? memberQb
+              : createQb(),
+      );
+
+      const result = await service.bulkUpdate({
+        taskIds: ['task-1'],
+        updates: { assigneeIds: ['u1', 'u2'] },
+      });
+
+      expect(result).toEqual([existingTask]);
+      expect(departmentAccess.assertCanManageTask).toHaveBeenCalledWith('dept-1', 'task-1', mockDb);
+      expect(taskQb.update).not.toHaveBeenCalled();
+      expect(assigneeQb.del).not.toHaveBeenCalled();
+    });
+
+    it('resets handoff state when completed tasks are reopened in bulk', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      const completed = {
+        id: 'task-1',
+        tenant_id: 't1',
+        department_id: 'dept-1',
+        assignee_id: 'u1',
+        status: TaskStatus.COMPLETED,
+        handoff_required: true,
+        handoff_status: 'confirmed',
+        handoff_ready_at: new Date(),
+        handoff_confirmed_by: 'u1',
+        handoff_confirmed_at: new Date(),
+      };
+      qb._data = [completed];
+      qb.then = (resolve: any) => resolve(qb._data);
+      qb.catch = noop;
+      qb.returning.mockResolvedValue([{ ...completed, status: TaskStatus.IN_PROGRESS }]);
+      taskCompletion.reopenInTransaction.mockResolvedValue({
+        ...completed,
+        status: TaskStatus.IN_PROGRESS,
+        handoff_status: 'pending',
+        handoff_ready_at: null,
+        handoff_confirmed_by: null,
+        handoff_confirmed_at: null,
+      });
+
+      await service.bulkUpdate({
+        taskIds: ['task-1'],
+        updates: { status: TaskStatus.IN_PROGRESS },
+      });
+
+      expect(taskCompletion.reopenInTransaction).toHaveBeenCalledWith(
+        expect.anything(),
+        completed,
+        TaskStatus.IN_PROGRESS,
+      );
     });
 
     it('updates multiple tasks', async () => {
@@ -620,8 +1183,46 @@ describe('TaskService', () => {
   });
 
   describe('addAssignee', () => {
+    it('locks and re-reads the task before authorizing and changing assignments', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      const locked = {
+        id: 'task-1',
+        tenant_id: 't1',
+        department_id: 'dept-after-lock',
+        assignee_id: 'u1',
+      };
+      qb.first.mockResolvedValueOnce(locked).mockResolvedValueOnce({ user_id: 'u2' });
+      qb.then = (resolve: any) => resolve([{ task_id: 'task-1', user_id: 'u1' }]);
+      qb.catch = noop;
+      jest.spyOn(service, 'findById').mockResolvedValue({ ...locked, assignees: [] } as any);
+
+      await service.addAssignee('task-1', 'u2');
+
+      expect(qb.forUpdate).toHaveBeenCalledWith('tasks');
+      expect(departmentAccess.assertCanManageTask).toHaveBeenCalledWith(
+        'dept-after-lock',
+        'task-1',
+        mockDb,
+      );
+      expect(qb.forUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+        departmentAccess.assertCanManageTask.mock.invocationCallOrder[0]!,
+      );
+    });
+
     it('returns the current task without rewriting or logging an existing assignment', async () => {
-      tenantContext.enterWith({ tenantId: 't1', userId: 'manager-1', membershipId: 'm1', role: 'admin', permissions: ['*'] });
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
       const visibleTask = {
         id: 'task-1',
         title: 'A',
@@ -634,9 +1235,7 @@ describe('TaskService', () => {
         ...visibleTask,
         assignees: [{ task_id: 'task-1', user_id: 'u1', assigned_by_id: 'original-manager' }],
       };
-      qb.first
-        .mockResolvedValueOnce(visibleTask)
-        .mockResolvedValueOnce({ user_id: 'u1' });
+      qb.first.mockResolvedValueOnce(visibleTask).mockResolvedValueOnce({ user_id: 'u1' });
       qb.then = (resolve: any) => resolve(authoritativeTask.assignees);
       qb.catch = noop;
       const findById = jest.spyOn(service, 'findById').mockResolvedValue(authoritativeTask as any);
@@ -654,7 +1253,108 @@ describe('TaskService', () => {
     });
   });
 
+  describe('removeAssignee', () => {
+    it('locks and re-reads assignments before authorizing removal in the same transaction', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'admin',
+        permissions: ['*'],
+      });
+      const locked = {
+        id: 'task-1',
+        tenant_id: 't1',
+        department_id: 'dept-after-lock',
+        assignee_id: 'u1',
+      };
+      qb.first.mockResolvedValueOnce(locked);
+      qb.then = (resolve: any) =>
+        resolve([
+          { task_id: 'task-1', user_id: 'u1' },
+          { task_id: 'task-1', user_id: 'u2' },
+        ]);
+      qb.catch = noop;
+      jest.spyOn(service, 'findById').mockResolvedValue({ ...locked, assignees: [] } as any);
+
+      await service.removeAssignee('task-1', 'u2');
+
+      expect(qb.forUpdate).toHaveBeenCalledWith('tasks');
+      expect(departmentAccess.assertCanManageTask).toHaveBeenCalledWith(
+        'dept-after-lock',
+        'task-1',
+        mockDb,
+      );
+      expect(departmentAccess.assertCanAssignTo).toHaveBeenCalledWith(
+        'dept-after-lock',
+        'u2',
+        mockDb,
+      );
+    });
+  });
+
   describe('findDepartmentTasksGrouped', () => {
+    it('uses the shared task scope and an active non-admin non-head member audience', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'member',
+        permissions: ['task:read'],
+      });
+      departmentAccess.assertCanViewGroupedTasks.mockResolvedValueOnce('manager');
+      qb.then = (resolve: any) => resolve([]);
+      qb.catch = noop;
+      const accessScope = jest.spyOn(visibilityScope, 'applyTaskAccessScope');
+
+      await service.findDepartmentTasksGrouped('dept-1');
+
+      expect(accessScope).toHaveBeenCalledWith(
+        qb,
+        expect.objectContaining({
+          tenantId: 't1',
+          userId: 'manager-1',
+          role: 'member',
+        }),
+      );
+      expect(qb.andWhere).toHaveBeenCalledWith('tenant_memberships.is_active', true);
+      expect(qb.whereNot).toHaveBeenCalledWith('tenant_memberships.role', 'admin');
+      expect(qb.whereNotExists).toHaveBeenCalled();
+    });
+
+    it('keeps both employee and peer-manager groups in the effective audience', async () => {
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'm1',
+        role: 'member',
+        permissions: ['task:read'],
+      });
+      departmentAccess.assertCanViewGroupedTasks.mockResolvedValueOnce('manager');
+      const membersQb = createQb();
+      membersQb.then = (resolve: any) =>
+        resolve([
+          { user_id: 'manager-1', display_name: 'Me', role: 'manager' },
+          { user_id: 'manager-2', display_name: 'Peer', role: 'manager' },
+          { user_id: 'employee-1', display_name: 'Employee', role: 'employee' },
+        ]);
+      membersQb.catch = noop;
+      const tasksQb = createQb();
+      tasksQb.then = (resolve: any) => resolve([]);
+      tasksQb.catch = noop;
+      mockDb.mockImplementation((table: string) =>
+        table === 'workspace_members' ? membersQb : tasksQb,
+      );
+
+      const result = await service.findDepartmentTasksGrouped('dept-1');
+
+      expect(result.managerGroups.map((group) => group.user.user_id)).toEqual([
+        'manager-1',
+        'manager-2',
+      ]);
+      expect(result.employeeGroups.map((group) => group.user.user_id)).toEqual(['employee-1']);
+    });
+
     it('hydrates canonical home and project metadata for grouped tasks', async () => {
       tenantContext.enterWith({
         tenantId: 't1',
@@ -744,6 +1444,41 @@ describe('TaskService', () => {
   });
 
   describe('getDashboardStats', () => {
+    it('scopes aggregate counts and cache entries to the current viewer', async () => {
+      const accessScope = jest.spyOn(visibilityScope, 'applyTaskAccessScope');
+      qb.first
+        .mockResolvedValueOnce({ count: '10' })
+        .mockResolvedValueOnce({ count: '2' })
+        .mockResolvedValueOnce({ count: '1' })
+        .mockResolvedValueOnce({ count: '0' });
+
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'manager-1',
+        membershipId: 'manager-membership',
+        role: 'manager',
+        permissions: ['task:read'],
+      });
+      const managerStats = await service.getDashboardStats();
+
+      tenantContext.enterWith({
+        tenantId: 't1',
+        userId: 'employee-1',
+        membershipId: 'employee-membership',
+        role: 'employee',
+        permissions: ['task:read'],
+      });
+      const employeeStats = await service.getDashboardStats();
+
+      expect(managerStats.total).toBe(10);
+      expect(employeeStats.total).toBe(1);
+      expect(accessScope).toHaveBeenCalledTimes(2);
+      expect(accessScope.mock.calls.map(([, context]) => context.userId)).toEqual([
+        'manager-1',
+        'employee-1',
+      ]);
+    });
+
     it('calculates aggregate total, status counts, and overdue count with 60s caching', async () => {
       tenantContext.enterWith({
         tenantId: 't1',
@@ -752,9 +1487,7 @@ describe('TaskService', () => {
         role: 'admin',
         permissions: ['*'],
       });
-      qb.first
-        .mockResolvedValueOnce({ count: '10' })
-        .mockResolvedValueOnce({ count: '2' });
+      qb.first.mockResolvedValueOnce({ count: '10' }).mockResolvedValueOnce({ count: '2' });
       qb.select.mockReturnValueOnce(qb);
 
       const stats1 = await service.getDashboardStats();
@@ -775,7 +1508,6 @@ describe('TaskService', () => {
       expect(stats2).toEqual(stats1);
     });
   });
-
 });
 
 function expectCanonicalLocationJoin(qb: any) {
@@ -795,11 +1527,7 @@ function expectCanonicalLocationJoin(qb: any) {
   homeJoin[1].call(joinClause);
 
   expect(joinClause.on).toHaveBeenCalledWith('home_link.task_id', '=', 'tasks.id');
-  expect(joinClause.andOn).toHaveBeenCalledWith(
-    'home_link.tenant_id',
-    '=',
-    'tasks.tenant_id',
-  );
+  expect(joinClause.andOn).toHaveBeenCalledWith('home_link.tenant_id', '=', 'tasks.tenant_id');
   expect(joinClause.andOnVal).toHaveBeenCalledWith('home_link.is_home', '=', true);
   expect(qb.leftJoin).toHaveBeenCalledWith(
     { task_project: 'projects' },
@@ -815,8 +1543,7 @@ function expectCanonicalLocationJoin(qb: any) {
 
 function expectTenantSafeHandoffOwnerJoin(qb: any) {
   const membershipJoin = qb.leftJoin.mock.calls.find(
-    ([table]: [Record<string, string>]) =>
-      table?.handoff_owner_membership === 'tenant_memberships',
+    ([table]: [Record<string, string>]) => table?.handoff_owner_membership === 'tenant_memberships',
   );
   expect(membershipJoin).toBeDefined();
 

@@ -54,9 +54,9 @@ describe('buildManagerAudience', () => {
     { userId: 'admin-1', role: 'admin', isDepartmentHead: false },
   ];
 
-  it('includes self and employees but excludes heads, admins, and other managers', () => {
+  it('includes self, employees, and peer managers but excludes heads and admins', () => {
     expect(buildManagerAudience('manager-1', members)).toEqual({
-      userIds: ['manager-1', 'employee-1'],
+      userIds: ['manager-1', 'manager-2', 'employee-1'],
       includeUnassigned: true,
     });
   });
@@ -68,6 +68,7 @@ describe('ReportService department-member audience query', () => {
     let compiledMemberQuery: Knex.Sql | undefined;
     const effectiveMembers: ReportDepartmentMember[] = [
       { userId: 'admin-1', role: 'admin', isDepartmentHead: false },
+      { userId: 'manager-2', role: 'manager', isDepartmentHead: false },
       { userId: 'employee-1', role: 'employee', isDepartmentHead: false },
     ];
     const db = ((tableName: string) => {
@@ -113,8 +114,12 @@ describe('ReportService department-member audience query', () => {
       expect(compiledMemberQuery!.bindings).toEqual(
         expect.arrayContaining(['tenant-1', 'department-1', true]),
       );
-      expect(audience.userIds).toEqual(['manager-1', 'employee-1']);
-      expect(audience.allowedTargetUserIds).toEqual(['manager-1', 'employee-1']);
+      expect(audience.userIds).toEqual(['manager-1', 'manager-2', 'employee-1']);
+      expect(audience.allowedTargetUserIds).toEqual([
+        'manager-1',
+        'manager-2',
+        'employee-1',
+      ]);
     } finally {
       await queryCompiler.destroy();
     }

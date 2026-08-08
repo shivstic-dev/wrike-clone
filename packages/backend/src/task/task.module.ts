@@ -15,4 +15,3 @@ import { NotificationModule } from '../notification/notification.module';
   exports: [TaskService, TaskCompletionService, TaskLocationService],
 })
 export class TaskModule {}
-

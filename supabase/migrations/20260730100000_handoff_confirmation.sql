@@ -7,17 +7,11 @@ ALTER TABLE tasks
   ADD COLUMN IF NOT EXISTS handoff_confirmed_by UUID REFERENCES users(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS handoff_confirmed_at TIMESTAMPTZ;
 
-WITH completed_tasks AS (
-  SELECT id
-  FROM tasks
-  WHERE status = 'completed'
-)
 UPDATE tasks
 SET handoff_required = false,
     handoff_status = 'not_required',
     handoff_owner_id = created_by_id
-FROM completed_tasks
-WHERE tasks.id = completed_tasks.id;
+WHERE status = 'completed';
 
 UPDATE tasks
 SET handoff_owner_id = created_by_id

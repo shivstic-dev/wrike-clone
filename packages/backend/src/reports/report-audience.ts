@@ -34,7 +34,12 @@ export function buildManagerAudience(
     userIds: [
       currentUserId,
       ...members
-        .filter((member) => member.role === 'employee' && !member.isDepartmentHead)
+        .filter(
+          (member) =>
+            (member.role === 'employee' || member.role === 'manager') &&
+            !member.isDepartmentHead &&
+            member.userId !== currentUserId,
+        )
         .map((member) => member.userId),
     ],
     includeUnassigned: true,

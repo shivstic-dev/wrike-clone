@@ -65,6 +65,7 @@ function createService(overrides: Partial<typeof task> = {}) {
     first,
     departmentAccess,
     notifications,
+    activity: activityQuery.insert,
   };
 }
 
@@ -78,6 +79,7 @@ describe('TaskCompletionService', () => {
       'department-1',
       'task-1',
       'completer-1',
+      expect.any(Function),
     );
     expect(update).toHaveBeenCalledWith(expect.objectContaining({
       status: 'completed',
@@ -136,6 +138,24 @@ describe('TaskCompletionService', () => {
 
     expect(result).toMatchObject(confirmedTask);
     expect(update).not.toHaveBeenCalled();
+    expect(notifications.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps an already-ready incomplete task unchanged when Not yet is retried', async () => {
+    const readyTask = {
+      status: 'in_progress',
+      handoff_status: 'ready',
+      handoff_ready_at: new Date('2026-07-30T00:00:00.000Z'),
+    } as any;
+    const { service, update, notifications, activity } = createService(readyTask);
+
+    const result = await tenantContext.run(context, () =>
+      service.complete('task-1', { outcome: 'not_yet' }),
+    );
+
+    expect(result).toMatchObject(readyTask);
+    expect(update).not.toHaveBeenCalled();
+    expect(activity).not.toHaveBeenCalled();
     expect(notifications.create).not.toHaveBeenCalled();
   });
 
@@ -203,6 +223,26 @@ describe('TaskCompletionService', () => {
     expect(update).toHaveBeenCalledWith(expect.objectContaining({
       status: 'in_progress',
       handoff_status: 'pending',
+      handoff_ready_at: null,
+      handoff_confirmed_by: null,
+      handoff_confirmed_at: null,
+    }));
+  });
+
+  it('reopens a not-required task with cleared handoff metadata', async () => {
+    const { service, update } = createService({ status: 'completed', handoff_required: false, handoff_status: 'not_required' });
+    const transaction = (service as any).db;
+
+    await tenantContext.run(context, () => service.reopenInTransaction(
+      transaction,
+      { ...task, handoff_required: false },
+      'in_progress' as any,
+    ));
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'in_progress',
+      handoff_status: 'not_required',
+      handoff_ready_at: null,
       handoff_confirmed_by: null,
       handoff_confirmed_at: null,
     }));

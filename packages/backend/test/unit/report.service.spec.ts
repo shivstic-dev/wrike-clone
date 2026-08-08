@@ -1,4 +1,3 @@
-import { ForbiddenException } from '@nestjs/common';
 import { TaskPriority, TaskStatus } from '@wrike-clone/shared';
 import type { Knex } from 'knex';
 import { tenantContext } from '../../src/common/tenant-context';
@@ -544,13 +543,14 @@ describe('ReportService report rows', () => {
     );
   }
 
-  it('manager combined includes self, employees and unassigned without leaking management tasks', async () => {
+  it('manager combined includes self, peer managers, employees, and unassigned tasks', async () => {
     const report = await runReport('manager', { departmentId: 'dept-1' });
 
     expect(report.tasks.map((task) => task.title)).toEqual([
       'Manager task',
       'Employee task',
       'Unassigned task',
+      'Other manager task',
     ]);
     expect(report.scope).toEqual({
       departmentId: 'dept-1',
@@ -671,12 +671,13 @@ describe('ReportService report rows', () => {
     expect(report.filters.assigneeId).toBe('employee-1');
   });
 
-  it('rejects an explicit assignee outside the manager report audience', async () => {
-    await expect(
-      runReport('manager', {
-        departmentId: 'dept-1',
-        assigneeId: 'manager-2',
-      }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+  it('allows an exact peer-manager assignee filter inside the department', async () => {
+    const report = await runReport('manager', {
+      departmentId: 'dept-1',
+      assigneeId: 'manager-2',
+    });
+
+    expect(report.tasks.map((task) => task.title)).toEqual(['Other manager task']);
+    expect(report.filters.assigneeId).toBe('manager-2');
   });
 });

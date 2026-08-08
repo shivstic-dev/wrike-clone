@@ -1,4 +1,10 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   type CreateDependencyInput,
   type TaskDependency,
@@ -29,13 +35,12 @@ export class DependencyService {
   async create(input: CreateDependencyInput): Promise<TaskDependency> {
     const ctx = requireTenantContext();
     return this.db.transaction(async (trx) => {
-      const [task, predecessor] = await Promise.all([
-        this.findTask(trx, input.taskId),
-        this.findTask(trx, input.dependsOnTaskId),
-      ]);
+      const tasks = await this.findTasksInLockOrder(trx, [input.taskId, input.dependsOnTaskId]);
+      const task = tasks.get(input.taskId);
+      const predecessor = tasks.get(input.dependsOnTaskId);
       if (!task || !predecessor) throw new NotFoundException('Task not found');
-      await this.assertCanManage(task.department_id);
-      await this.assertCanManage(predecessor.department_id);
+      await this.assertCanManage(task.department_id, task.id, trx);
+      await this.assertCanManage(predecessor.department_id, predecessor.id, trx);
 
       const candidate: DependencyEdge = {
         taskId: input.taskId,
@@ -44,11 +49,22 @@ export class DependencyService {
         lagDays: input.lagDays,
       };
       const edges = await this.edges(trx);
-      if (edges.some((edge) => edge.taskId === candidate.taskId && edge.dependsOnTaskId === candidate.dependsOnTaskId)) {
-        throw new ConflictException({ code: 'DEPENDENCY_EXISTS', message: 'These tasks are already linked.' });
+      if (
+        edges.some(
+          (edge) =>
+            edge.taskId === candidate.taskId && edge.dependsOnTaskId === candidate.dependsOnTaskId,
+        )
+      ) {
+        throw new ConflictException({
+          code: 'DEPENDENCY_EXISTS',
+          message: 'These tasks are already linked.',
+        });
       }
       if (wouldCreateCycle(edges, candidate)) {
-        throw new ConflictException({ code: 'DEPENDENCY_CYCLE', message: 'This dependency would create a cycle.' });
+        throw new ConflictException({
+          code: 'DEPENDENCY_CYCLE',
+          message: 'This dependency would create a cycle.',
+        });
       }
 
       const [row] = await trx('task_dependencies')
@@ -69,23 +85,29 @@ export class DependencyService {
     return this.db.transaction(async (trx) => {
       const dependency = await this.findDependency(trx, id);
       if (!dependency) throw new NotFoundException('Dependency not found');
-      const [task, predecessor] = await Promise.all([
-        this.findTask(trx, dependency.task_id),
-        this.findTask(trx, dependency.depends_on_task_id),
+      const tasks = await this.findTasksInLockOrder(trx, [
+        dependency.task_id,
+        dependency.depends_on_task_id,
       ]);
+      const task = tasks.get(dependency.task_id);
+      const predecessor = tasks.get(dependency.depends_on_task_id);
       if (!task || !predecessor) throw new NotFoundException('Task not found');
-      await this.assertCanManage(task.department_id);
-      await this.assertCanManage(predecessor.department_id);
+      await this.assertCanManage(task.department_id, task.id, trx);
+      await this.assertCanManage(predecessor.department_id, predecessor.id, trx);
 
       const candidate: DependencyEdge = {
         taskId: dependency.task_id,
         dependsOnTaskId: dependency.depends_on_task_id,
-        dependencyType: input.dependencyType ?? (dependency.dependency_type as DependencyEdge['dependencyType']),
+        dependencyType:
+          input.dependencyType ?? (dependency.dependency_type as DependencyEdge['dependencyType']),
         lagDays: input.lagDays ?? Number(dependency.lag_days),
       };
       const edges = (await this.edges(trx)).filter((edge) => edge.id !== id);
       if (wouldCreateCycle(edges, candidate)) {
-        throw new ConflictException({ code: 'DEPENDENCY_CYCLE', message: 'This dependency would create a cycle.' });
+        throw new ConflictException({
+          code: 'DEPENDENCY_CYCLE',
+          message: 'This dependency would create a cycle.',
+        });
       }
 
       const [row] = await trx('task_dependencies')
@@ -107,8 +129,10 @@ export class DependencyService {
       if (!dependency) throw new NotFoundException('Dependency not found');
       const task = await this.findTask(trx, dependency.task_id);
       if (!task) throw new NotFoundException('Task not found');
-      await this.assertCanManage(task.department_id);
-      await trx('task_dependencies').where({ id, tenant_id: requireTenantContext().tenantId }).del();
+      await this.assertCanManage(task.department_id, task.id, trx);
+      await trx('task_dependencies')
+        .where({ id, tenant_id: requireTenantContext().tenantId })
+        .del();
     });
   }
 
@@ -116,12 +140,26 @@ export class DependencyService {
     return trx('tasks')
       .where({ id, tenant_id: requireTenantContext().tenantId })
       .whereNull('deleted_at')
+      .forUpdate()
       .first();
+  }
+
+  private async findTasksInLockOrder(
+    trx: Knex,
+    ids: string[],
+  ): Promise<Map<string, Record<string, any>>> {
+    const tasks = new Map<string, Record<string, any>>();
+    for (const id of [...new Set(ids)].sort()) {
+      const task = await this.findTask(trx, id);
+      if (task) tasks.set(id, task);
+    }
+    return tasks;
   }
 
   private async findDependency(trx: Knex, id: string): Promise<DependencyRow | undefined> {
     return trx('task_dependencies')
       .where({ id, tenant_id: requireTenantContext().tenantId })
+      .forUpdate()
       .first();
   }
 
@@ -138,12 +176,19 @@ export class DependencyService {
     }));
   }
 
-  private async assertCanManage(departmentId: string): Promise<void> {
+  private async assertCanManage(
+    departmentId: string,
+    taskId: string,
+    executor: Knex | Knex.Transaction,
+  ): Promise<void> {
     try {
-      await this.departmentAccess.assertCanManageTask(departmentId);
+      await this.departmentAccess.assertCanManageTask(departmentId, taskId, executor);
     } catch (error) {
       if (error instanceof ForbiddenException) {
-        throw new ForbiddenException({ code: 'FORBIDDEN', message: 'Dependency management is not permitted.' });
+        throw new ForbiddenException({
+          code: 'FORBIDDEN',
+          message: 'Dependency management is not permitted.',
+        });
       }
       throw error;
     }

@@ -7,7 +7,7 @@ import { Knex } from 'knex';
 import { v4 as uuidv4 } from 'uuid';
 import { DATABASE_PROVIDER } from '../database/database.module';
 import { requireTenantContext } from '../common/tenant-context';
-import { applyVisibilityScope } from '../common/visibility.scope';
+import { applyTaskAccessScope, applyVisibilityScope } from '../common/visibility.scope';
 import type {
   CreateProjectInput,
   UpdateProjectRequest,
@@ -79,11 +79,15 @@ export class ProjectService {
     if (!project) throw new NotFoundException('Project not found');
 
     // Get task counts by status
-    const taskCounts = await this.db('tasks')
-      .where({ project_id: id, deleted_at: null })
-      .select('status')
-      .count('* as count')
-      .groupBy('status');
+    let taskCountQuery = this.db('tasks').where({
+      project_id: id,
+      tenant_id: ctx.tenantId,
+      deleted_at: null,
+    });
+    if (ctx.role !== 'admin') {
+      taskCountQuery = applyTaskAccessScope(taskCountQuery, ctx);
+    }
+    const taskCounts = await taskCountQuery.select('status').count('* as count').groupBy('status');
 
     return { ...project, taskCounts };
   }

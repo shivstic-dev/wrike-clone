@@ -30,7 +30,9 @@ async function renderManager(queryClient = new QueryClient({ defaultOptions: { q
   for (let attempt = 0; attempt < 10; attempt += 1) {
     if (container.textContent?.includes('Grant request')) return queryClient;
     await act(async () => {
-      await Promise.resolve();
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
     });
   }
   throw new Error('Request forms did not render');
@@ -49,6 +51,7 @@ beforeEach(() => {
     return Promise.resolve({ data: [{ id: 'folder-1', name: 'Intake' }] });
   });
   apiMocks.post.mockReset();
+  apiMocks.patch.mockReset();
   apiMocks.patch.mockResolvedValue({ data: { id: 'form-1', is_public: true } });
   container = document.createElement('div');
   document.body.append(container);

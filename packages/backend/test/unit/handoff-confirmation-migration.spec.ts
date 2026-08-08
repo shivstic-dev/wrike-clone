@@ -17,7 +17,7 @@ describe('handoff confirmation migration', () => {
     expect(sql).toContain('handoff_owner_id UUID');
     expect(sql).toContain('handoff_confirmed_by UUID');
     expect(sql).toContain('idx_tasks_tenant_handoff_ready');
-    expect(sql).toMatch(/status = 'completed'[\s\S]*handoff_status = 'not_required'/);
+    expect(sql).toMatch(/SET[\s\S]*handoff_status = 'not_required'[\s\S]*WHERE status = 'completed'/);
   });
 
   it('adds and removes the confirmation constraint in the Knex representation', async () => {

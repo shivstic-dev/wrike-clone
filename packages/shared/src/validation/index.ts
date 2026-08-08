@@ -475,7 +475,6 @@ export const updateTaskScheduleSchema = z
   );
 
 const MAX_TIMELINE_RANGE_MS = 730 * 24 * 60 * 60 * 1000;
-
 export const timelineQuerySchema = z
   .object({
     projectId: uuidField.optional(),

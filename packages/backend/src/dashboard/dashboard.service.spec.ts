@@ -87,7 +87,7 @@ describe('buildDashboardRowsQuery', () => {
     expect(bindings.filter((value) => value === baseScope.userId).length).toBeGreaterThanOrEqual(3);
   });
 
-  it('limits managers to self, active employees, and truly unassigned tasks', () => {
+  it('includes active peer managers while excluding admins, heads, and assigned tasks outside scope', () => {
     const scope: DashboardQueryScope = {
       ...baseScope,
       role: 'manager',
@@ -97,13 +97,13 @@ describe('buildDashboardRowsQuery', () => {
 
     expect(sql).toContain('"dashboard_member_tenant"."is_active" = ?');
     expect(sql).toContain('"dashboard_member_tenant"."role" <> ?');
-    expect(sql).toContain('"dashboard_member_workspace"."role" <> ?');
+    expect(sql).not.toContain('"dashboard_member_workspace"."role" <> ?');
     expect(sql).toContain('from "department_heads" as "dashboard_member_head"');
     expect(sql).toContain('"tasks"."assignee_id" is null');
     expect(sql).toContain('from "task_assignees" as "dashboard_any_ta"');
     expect(bindings).toContain(true);
     expect(bindings).toContain('admin');
-    expect(bindings).toContain('manager');
+    expect(bindings).not.toContain('manager');
   });
 
   it('deduplicates legacy and junction assignees inside the single task row query', () => {

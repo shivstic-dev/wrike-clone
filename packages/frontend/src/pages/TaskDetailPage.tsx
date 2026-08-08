@@ -160,7 +160,11 @@ export default function TaskDetailPage() {
     if (completedTask.handoffStatus === 'ready') {
       toast.success('Saved in Ready for handoff');
     } else {
-      toast.success('Handoff confirmed and task completed');
+      toast.success(
+        taskToComplete.handoffRequired
+          ? 'Handoff confirmed and task completed'
+          : 'Task completed',
+      );
     }
     return true;
   };
@@ -418,6 +422,21 @@ export default function TaskDetailPage() {
               </div>
             </div>
           </div>
+
+          {task.handoffConfirmedBy && (
+            <div className="card mb-6 p-4">
+              <h3 className="text-sm font-semibold text-slate-700">Final handoff</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Confirmed by{' '}
+                <span className="font-medium text-slate-800">
+                  {handoffConfirmer?.displayName || handoffConfirmer?.email || 'Team member'}
+                </span>
+                {task.handoffConfirmedAt
+                  ? ` on ${format(new Date(task.handoffConfirmedAt), 'MMM d, yyyy')}`
+                  : ''}
+              </p>
+            </div>
+          )}
 
           {canManage && <TaskLocationEditor key={task.id} task={task} />}
 
