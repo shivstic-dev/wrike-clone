@@ -29,6 +29,12 @@ const TimelineView = lazy(() =>
   })),
 );
 
+const DashboardBoard = lazy(() =>
+  import('../components/Dashboard/DashboardBoard').then((module) => ({
+    default: module.DashboardBoard,
+  })),
+);
+
 function AssigneeChips({ task }: { task: Task }) {
   if (!task.assignees?.length) {
     return <span className="text-xs text-slate-500">Unassigned</span>;
@@ -162,7 +168,9 @@ export default function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedBucket, setSelectedBucket] = useState<DashboardTaskBucket | null>(null);
   const departmentId = searchParams.get('department') || '';
-  const view = searchParams.get('view') === 'timeline' ? 'timeline' : 'overview';
+  const requestedView = searchParams.get('view');
+  const view =
+    requestedView === 'timeline' || requestedView === 'board' ? requestedView : 'overview';
   const { membership, user } = useAuth();
   const departments = useWorkspaces();
   const departmentList = departments.data ?? [];
@@ -174,11 +182,14 @@ export default function DashboardPage() {
     departmentRole === 'admin' ||
     departmentRole === 'department_head' ||
     departmentRole === 'manager';
+  const boardPrincipalKey = [
+    membership?.tenantId || user?.tenantId || 'no-tenant',
+    membership?.id || 'no-membership',
+    user?.id || 'no-user',
+  ].join(':');
 
   const grouped = useGroupedDepartmentTasks(departmentId, managementView && !!departmentId);
-  const mine = useMyTasks(
-    { departmentId: departmentId || undefined, perPage: 100 },
-  );
+  const mine = useMyTasks({ departmentId: departmentId || undefined, perPage: 100 });
   const overviewEnabled = tenantAdmin || !!departmentId;
   const overview = useDashboardStats(
     { departmentId: departmentId || undefined, days: 30 },
@@ -223,12 +234,12 @@ export default function DashboardPage() {
     );
   }
 
-  function selectView(nextView: 'overview' | 'timeline') {
+  function selectView(nextView: 'overview' | 'board' | 'timeline') {
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
-        if (nextView === 'timeline') next.set('view', 'timeline');
-        else next.delete('view');
+        if (nextView === 'overview') next.delete('view');
+        else next.set('view', nextView);
         return next;
       },
       { replace: true },
@@ -274,8 +285,7 @@ export default function DashboardPage() {
     : null;
 
   const usableGrouped = grouped.error ? undefined : grouped.data;
-  const showGroupedFallback =
-    managementView && !!departmentId && !overview.data && !!usableGrouped;
+  const showGroupedFallback = managementView && !!departmentId && !overview.data && !!usableGrouped;
   const showPersonalTasks = !managementView || !departmentId || !usableGrouped;
 
   return (
@@ -347,7 +357,7 @@ export default function DashboardPage() {
             className="inline-flex w-fit rounded-xl border border-atlas-mist bg-white p-1 shadow-sm"
             role="group"
           >
-            {(['overview', 'timeline'] as const).map((option) => (
+            {(['overview', 'board', 'timeline'] as const).map((option) => (
               <button
                 key={option}
                 aria-pressed={view === option}
@@ -359,7 +369,7 @@ export default function DashboardPage() {
                 onClick={() => selectView(option)}
                 type="button"
               >
-                {option === 'overview' ? 'Overview' : 'Timeline'}
+                {option === 'overview' ? 'Overview' : option === 'board' ? 'Board' : 'Timeline'}
               </button>
             ))}
           </div>
@@ -401,9 +411,23 @@ export default function DashboardPage() {
             </Suspense>
           )}
 
-          {view === 'overview' && overviewEnabled && overview.isLoading && (
-            <DashboardSkeleton />
+          {view === 'board' && overviewEnabled && (
+            <Suspense fallback={<LoadingSpinner className="py-16" size="lg" />}>
+              <DashboardBoard
+                currentUserId={user?.id}
+                departmentId={departmentId || undefined}
+                departmentRole={departmentRole}
+                members={members.data || []}
+                membersError={members.error}
+                membersReady={!members.isLoading && !members.error}
+                onRetryMembers={() => void members.refetch()}
+                principalKey={boardPrincipalKey}
+                tenantRole={membership?.role}
+              />
+            </Suspense>
           )}
+
+          {view === 'overview' && overviewEnabled && overview.isLoading && <DashboardSkeleton />}
 
           {view === 'overview' && overviewEnabled && overview.error && (
             <ErrorDisplay
@@ -421,19 +445,22 @@ export default function DashboardPage() {
             />
           )}
 
-          {view === 'overview' && ((managementView && !!departmentId && grouped.error) ||
-            (showPersonalTasks && mine.error)) && (
-            <ErrorDisplay
-              title="Task lanes are unavailable"
-              message="The live overview remains available while task lanes are retried."
-              onRetry={() => {
-                if (managementView && departmentId) void grouped.refetch();
-                if (showPersonalTasks) void mine.refetch();
-              }}
-            />
-          )}
+          {view === 'overview' &&
+            ((managementView && !!departmentId && grouped.error) ||
+              (showPersonalTasks && mine.error)) && (
+              <ErrorDisplay
+                title="Task lanes are unavailable"
+                message="The live overview remains available while task lanes are retried."
+                onRetry={() => {
+                  if (managementView && departmentId) void grouped.refetch();
+                  if (showPersonalTasks) void mine.refetch();
+                }}
+              />
+            )}
 
-          {view === 'overview' && showPersonalTasks && mine.isLoading && <LoadingSpinner className="py-10" size="md" />}
+          {view === 'overview' && showPersonalTasks && mine.isLoading && (
+            <LoadingSpinner className="py-10" size="md" />
+          )}
           {view === 'overview' && showPersonalTasks && mine.data && (
             <TaskSection title="My tasks" tasks={mine.data.data} />
           )}
@@ -441,7 +468,9 @@ export default function DashboardPage() {
           {view === 'overview' && managementView && !!departmentId && grouped.isLoading && (
             <LoadingSpinner className="py-10" size="md" />
           )}
-          {view === 'overview' && showGroupedFallback && <GroupedTaskLedger grouped={usableGrouped!} />}
+          {view === 'overview' && showGroupedFallback && (
+            <GroupedTaskLedger grouped={usableGrouped!} />
+          )}
 
           {view === 'overview' && tenantAdmin && !departmentId && (
             <section className="workboard-card rounded-2xl border border-atlas-mist bg-white px-5 py-5">

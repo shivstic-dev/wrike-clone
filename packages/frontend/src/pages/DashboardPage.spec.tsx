@@ -63,6 +63,7 @@ const mocks = vi.hoisted(() => ({
   myTaskCalls: [] as unknown[][],
   dashboardTaskCalls: [] as unknown[][],
   timelineScopes: [] as unknown[],
+  boardProps: [] as unknown[],
   auth: {
     membership: { role: 'member' as 'member' | 'admin' },
     user: { displayName: 'Harper Head', email: 'harper@example.com' },
@@ -75,15 +76,32 @@ const overview: DashboardOverview = {
   scope: { departmentId: 'department-1', role: 'department_head' },
   totals: { active: 8, completed: 3, overdue: 2, blocked: 1, unassigned: 0, readyForHandoff: 1 },
   comparison: { completedPercentChange: 0, createdPercentChange: 0 },
-  daily: [], byStatus: {}, byPriority: {}, capacity: [], attention: [], departments: [],
+  daily: [],
+  byStatus: {},
+  byPriority: {},
+  capacity: [],
+  attention: [],
+  departments: [],
 };
 
 const dashboardTasks: DashboardTaskListResponse = {
-  generatedAt: '2026-07-30T12:00:00.000Z', bucket: 'overdue', data: [{
-    id: 'task-self-assigned', title: 'Self assigned follow-up', projectId: 'project-1', projectName: 'Community launch',
-    departmentId: 'department-1', status: TaskStatus.IN_PROGRESS, handoffStatus: HandoffStatus.PENDING, handoffOwner: null,
-    assignees: [{ userId: 'user-1', name: 'Harper Head' }], dueDate: null, handoffReadyAt: null,
-  }],
+  generatedAt: '2026-07-30T12:00:00.000Z',
+  bucket: 'overdue',
+  data: [
+    {
+      id: 'task-self-assigned',
+      title: 'Self assigned follow-up',
+      projectId: 'project-1',
+      projectName: 'Community launch',
+      departmentId: 'department-1',
+      status: TaskStatus.IN_PROGRESS,
+      handoffStatus: HandoffStatus.PENDING,
+      handoffOwner: null,
+      assignees: [{ userId: 'user-1', name: 'Harper Head' }],
+      dueDate: null,
+      handoffReadyAt: null,
+    },
+  ],
 };
 
 vi.mock('react-hot-toast', () => ({
@@ -98,6 +116,13 @@ vi.mock('../components/Gantt/TimelineView', () => ({
   TimelineView: ({ scope }: { scope: unknown }) => {
     mocks.timelineScopes.push(scope);
     return <section aria-label="Dashboard timeline">Timeline content</section>;
+  },
+}));
+
+vi.mock('../components/Dashboard/DashboardBoard', () => ({
+  DashboardBoard: (props: unknown) => {
+    mocks.boardProps.push(props);
+    return <section aria-label="Dashboard board">Board content</section>;
   },
 }));
 
@@ -210,6 +235,7 @@ beforeEach(() => {
   mocks.myTaskCalls.length = 0;
   mocks.dashboardTaskCalls.length = 0;
   mocks.timelineScopes.length = 0;
+  mocks.boardProps.length = 0;
   mocks.auth.membership.role = 'member';
   container = document.createElement('div');
   document.body.append(container);
@@ -282,10 +308,16 @@ describe('DashboardPage personal tasks', () => {
     expect(metric).toBeTruthy();
     act(() => metric?.click());
 
-    expect(mocks.dashboardTaskCalls.some((call) => {
-      const [filters, enabled] = call as [{ bucket?: string; departmentId?: string }, boolean];
-      return filters.bucket === 'overdue' && filters.departmentId === 'department-1' && enabled === true;
-    })).toBe(true);
+    expect(
+      mocks.dashboardTaskCalls.some((call) => {
+        const [filters, enabled] = call as [{ bucket?: string; departmentId?: string }, boolean];
+        return (
+          filters.bucket === 'overdue' &&
+          filters.departmentId === 'department-1' &&
+          enabled === true
+        );
+      }),
+    ).toBe(true);
     expect(container.querySelector('[role="dialog"]')?.textContent).toContain('Overdue');
     expect(container.textContent).toContain('Self assigned follow-up');
   });
@@ -398,9 +430,7 @@ describe('DashboardPage personal tasks', () => {
 
 describe('DashboardPage timeline', () => {
   it('preserves range and zoom parameters and passes the authorized department scope', async () => {
-    await renderPage(
-      '/dashboard?department=department-1&from=2026-07-01&to=2026-08-31&zoom=week',
-    );
+    await renderPage('/dashboard?department=department-1&from=2026-07-01&to=2026-08-31&zoom=week');
 
     const timelineButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
       (button) => button.textContent === 'Timeline',
@@ -450,5 +480,26 @@ describe('DashboardPage timeline', () => {
       kind: 'dashboard',
       departmentId: undefined,
     });
+  });
+});
+
+describe('DashboardPage board', () => {
+  it('offers Board and preserves the authorized department scope', async () => {
+    await renderPage('/dashboard?department=department-1');
+    const buttons = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[aria-label="Dashboard view"] button'),
+    );
+    expect(buttons.map((button) => button.textContent)).toEqual(['Overview', 'Board', 'Timeline']);
+    await act(async () => {
+      buttons[1]?.click();
+      await Promise.resolve();
+    });
+    expect(container.querySelector('[aria-label="Dashboard board"]')).not.toBeNull();
+    expect(mocks.boardProps).toContainEqual(
+      expect.objectContaining({ departmentId: 'department-1' }),
+    );
+    expect(container.querySelector('[data-testid="location"]')?.textContent).toContain(
+      'view=board',
+    );
   });
 });

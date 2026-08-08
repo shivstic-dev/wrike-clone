@@ -22,6 +22,8 @@ import { HandoffCompletionDialog } from '../Task/HandoffCompletionDialog';
 
 interface KanbanBoardProps {
   tasks: Task[];
+  canMoveTask?: (task: Task) => boolean;
+  getReadOnlyReason?: (task: Task) => string;
 }
 
 const COLUMNS: { status: string; title: string; color: string }[] = [
@@ -31,7 +33,23 @@ const COLUMNS: { status: string; title: string; color: string }[] = [
   { status: TASK_STATUS.BLOCKED, title: 'Blocked', color: 'bg-red-500' },
 ];
 
-export function KanbanBoard({ tasks }: KanbanBoardProps) {
+const allowTaskMovement = () => true;
+
+function taskMoveErrorMessage(error: unknown): string {
+  const status =
+    typeof error === 'object' && error !== null && 'response' in error
+      ? (error as { response?: { status?: number } }).response?.status
+      : undefined;
+  return status === 403
+    ? 'You do not have permission to move this task'
+    : 'Failed to update task status';
+}
+
+export function KanbanBoard({
+  tasks,
+  canMoveTask = allowTaskMovement,
+  getReadOnlyReason,
+}: KanbanBoardProps) {
   const updateTask = useUpdateTask();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const { requestCompletion, dialogProps } = useTaskCompletionFlow();
@@ -43,7 +61,9 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
     if (completedTask.handoffStatus === 'ready') {
       toast.success('Saved in Ready for handoff');
     } else {
-      toast.success(task.handoffRequired ? 'Handoff confirmed and task completed' : 'Moved to completed');
+      toast.success(
+        task.handoffRequired ? 'Handoff confirmed and task completed' : 'Moved to completed',
+      );
     }
   };
 
@@ -68,9 +88,9 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
     (event: DragStartEvent) => {
       const taskId = event.active.id as string;
       const task = tasks.find((t) => t.id === taskId);
-      if (task) setActiveTask(task);
+      if (task && canMoveTask(task)) setActiveTask(task);
     },
-    [tasks],
+    [canMoveTask, tasks],
   );
 
   const handleDragEnd = useCallback(
@@ -84,7 +104,7 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
       const targetStatus = over.id as Task['status'];
       const task = tasks.find((t) => t.id === taskId);
 
-      if (!task || task.status === targetStatus) return;
+      if (!task || !canMoveTask(task) || task.status === targetStatus) return;
 
       try {
         if (targetStatus === TASK_STATUS.COMPLETED) {
@@ -93,20 +113,20 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
         }
         await updateTask.mutateAsync({ id: taskId, status: targetStatus });
         toast.success(`Moved to ${targetStatus.replace('_', ' ')}`);
-      } catch {
-        toast.error('Failed to update task status');
+      } catch (error) {
+        toast.error(taskMoveErrorMessage(error));
       }
     },
-    [tasks, updateTask, requestCompletion],
+    [canMoveTask, tasks, updateTask, requestCompletion],
   );
 
   return (
     <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
       <div className="flex gap-4 overflow-x-auto pb-4">
         {columns.map((col) => (
           <div key={col.status} className="min-w-[280px] flex-1">
@@ -115,6 +135,8 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
               title={col.title}
               tasks={col.tasks}
               color={col.color}
+              canMoveTask={canMoveTask}
+              getReadOnlyReason={getReadOnlyReason}
             />
           </div>
         ))}

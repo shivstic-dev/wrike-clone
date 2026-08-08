@@ -21,11 +21,13 @@ import {
   useCreateTask,
   useDeleteTask,
   useRemoveTaskAssignee,
+  fetchAllTasks,
 } from './tasks';
 import { useUpdateTask } from '../hooks/useUpdateTask';
 import { useMoveTaskLocation } from './task-locations';
 
 const apiMocks = vi.hoisted(() => ({
+  get: vi.fn(),
   post: vi.fn(),
   patch: vi.fn(),
   delete: vi.fn(),
@@ -89,6 +91,7 @@ beforeEach(() => {
     }
   ).IS_REACT_ACT_ENVIRONMENT = true;
   apiMocks.post.mockReset();
+  apiMocks.get.mockReset();
   apiMocks.patch.mockReset();
   apiMocks.delete.mockReset();
 });
@@ -133,11 +136,7 @@ function mountMutation<TInput>(
   mountedRoots.push({ root, container });
   act(() => {
     root.render(
-      createElement(
-        QueryClientProvider,
-        { client: queryClient },
-        createElement(Harness),
-      ),
+      createElement(QueryClientProvider, { client: queryClient }, createElement(Harness)),
     );
   });
 
@@ -158,6 +157,28 @@ function expectTaskDependentCachesInvalidated(queryClient: QueryClient): void {
 }
 
 describe('task API contract helpers', () => {
+  it('loads every authorized board page at the maximum page size', async () => {
+    apiMocks.get
+      .mockResolvedValueOnce({
+        data: { data: [returnedTask], meta: { page: 1, perPage: 1000, total: 2, totalPages: 2 } },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          data: [{ ...returnedTask, id: 'task-2' }],
+          meta: { page: 2, perPage: 1000, total: 2, totalPages: 2 },
+        },
+      });
+    await expect(fetchAllTasks({ departmentId: 'department-1' })).resolves.toHaveLength(2);
+    expect(apiMocks.get).toHaveBeenNthCalledWith(
+      1,
+      '/tasks?departmentId=department-1&page=1&perPage=1000',
+    );
+    expect(apiMocks.get).toHaveBeenNthCalledWith(
+      2,
+      '/tasks?departmentId=department-1&page=2&perPage=1000',
+    );
+  });
+
   it('uses the canonical home folder when requesting folder tasks', () => {
     const params = buildTaskSearchParams({ folderId: 'folder-1', perPage: 100 });
 

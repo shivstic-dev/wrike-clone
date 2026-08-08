@@ -61,7 +61,14 @@ vi.mock('../../hooks/useUpdateTask', () => ({
 vi.mock('../Task/useTaskCompletionFlow', () => ({
   useTaskCompletionFlow: () => ({
     requestCompletion: mocks.requestCompletion,
-    dialogProps: { open: false, task: null, isPending: false, onConfirm: vi.fn(), onNotYet: vi.fn(), onCancel: vi.fn() },
+    dialogProps: {
+      open: false,
+      task: null,
+      isPending: false,
+      onConfirm: vi.fn(),
+      onNotYet: vi.fn(),
+      onCancel: vi.fn(),
+    },
   }),
 }));
 
@@ -78,12 +85,24 @@ vi.mock('./TaskCard', () => ({
 }));
 
 vi.mock('@dnd-kit/core', () => ({
-  DndContext: ({ children, onDragEnd }: { children: React.ReactNode; onDragEnd: (event: unknown) => void }) => (
+  DndContext: ({
+    children,
+    onDragEnd,
+  }: {
+    children: React.ReactNode;
+    onDragEnd: (event: unknown) => void;
+  }) => (
     <div>
-      <button type="button" onClick={() => onDragEnd({ active: { id: 'task-1' }, over: { id: 'completed' } })}>
+      <button
+        type="button"
+        onClick={() => onDragEnd({ active: { id: 'task-1' }, over: { id: 'completed' } })}
+      >
         Drop in Completed
       </button>
-      <button type="button" onClick={() => onDragEnd({ active: { id: 'task-1' }, over: { id: 'in_progress' } })}>
+      <button
+        type="button"
+        onClick={() => onDragEnd({ active: { id: 'task-1' }, over: { id: 'in_progress' } })}
+      >
         Drop in In progress
       </button>
       {children}
@@ -109,7 +128,9 @@ function getByRole<T extends HTMLElement>(role: 'button', name: string): T {
 }
 
 beforeEach(() => {
-  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  (
+    globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+  ).IS_REACT_ACT_ENVIRONMENT = true;
   task.status = TaskStatus.IN_PROGRESS;
   mocks.updateTask.mockReset();
   mocks.updateTask.mockResolvedValue(task);
@@ -214,5 +235,31 @@ describe('KanbanBoard handoff completion', () => {
     });
 
     expect(mocks.toastError).toHaveBeenCalledWith('Failed to update task status');
+  });
+
+  it('does not mutate a view-only task', async () => {
+    act(() => {
+      root = createRoot(container);
+      root.render(<KanbanBoard tasks={[task]} canMoveTask={() => false} />);
+    });
+    await act(async () => {
+      getByRole<HTMLButtonElement>('button', 'Drop in Completed').click();
+      await Promise.resolve();
+    });
+    expect(mocks.requestCompletion).not.toHaveBeenCalled();
+    expect(mocks.updateTask).not.toHaveBeenCalled();
+  });
+
+  it('explains when task movement is denied', async () => {
+    mocks.requestCompletion.mockRejectedValue({ response: { status: 403 } });
+    act(() => {
+      root = createRoot(container);
+      root.render(<KanbanBoard tasks={[task]} />);
+    });
+    await act(async () => {
+      getByRole<HTMLButtonElement>('button', 'Drop in Completed').click();
+      await Promise.resolve();
+    });
+    expect(mocks.toastError).toHaveBeenCalledWith('You do not have permission to move this task');
   });
 });

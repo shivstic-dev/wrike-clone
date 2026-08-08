@@ -1,9 +1,4 @@
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  type QueryClient,
-} from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import apiClient from './client';
 import type {
   Task,
@@ -24,6 +19,8 @@ export const taskKeys = {
   detail: (id: string) => [...taskKeys.details(), id] as const,
   mine: (filters: TaskFilterParams) => [...taskKeys.all, 'mine', filters] as const,
   grouped: (departmentId: string) => [...taskKeys.all, 'grouped', departmentId] as const,
+  allList: (filters: TaskFilterParams, principalKey = 'anonymous') =>
+    [...taskKeys.all, 'all-list', principalKey, filters] as const,
 };
 
 export const taskDependentQueryKeys = [
@@ -98,6 +95,34 @@ export function useTasks(filters: TaskFilterParams = {}, enabled = true) {
       const { data } = await apiClient.get<PaginatedResponse<Task>>(`/tasks?${params.toString()}`);
       return data;
     },
+    enabled,
+  });
+}
+
+export async function fetchAllTasks(filters: TaskFilterParams = {}): Promise<Task[]> {
+  const collected: Task[] = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const params = buildTaskSearchParams(filters);
+    params.set('page', String(page));
+    params.set('perPage', '1000');
+    const { data } = await apiClient.get<PaginatedResponse<Task>>(`/tasks?${params.toString()}`);
+    collected.push(...data.data);
+    totalPages = data.meta.totalPages;
+    page += 1;
+  } while (page <= totalPages);
+  return collected;
+}
+
+export function useAllTasks(
+  filters: TaskFilterParams = {},
+  enabled = true,
+  principalKey = 'anonymous',
+) {
+  return useQuery({
+    queryKey: taskKeys.allList(filters, principalKey),
+    queryFn: () => fetchAllTasks(filters),
     enabled,
   });
 }
@@ -184,7 +209,10 @@ export function useCreateTask() {
   });
 }
 
-export async function updateTask({ id, ...input }: UpdateTaskRequest & { id: string }): Promise<Task> {
+export async function updateTask({
+  id,
+  ...input
+}: UpdateTaskRequest & { id: string }): Promise<Task> {
   const { data } = await apiClient.patch<Task>(`/tasks/${id}`, input);
   return data;
 }
@@ -193,18 +221,14 @@ export function useCompleteTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      taskId,
-      outcome,
-    }: {
-      taskId: string;
-      outcome: TaskCompletionOutcome;
-    }) => {
+    mutationFn: async ({ taskId, outcome }: { taskId: string; outcome: TaskCompletionOutcome }) => {
       const { data } = await apiClient.post<Task>(`/tasks/${taskId}/completion`, { outcome });
       return data;
     },
     onSuccess: (task) => {
       queryClient.setQueryData(taskKeys.detail(task.id), task);
+    },
+    onSettled: () => {
       invalidateTaskDependentQueries(queryClient);
     },
   });
@@ -245,4 +269,3 @@ export function useDeleteTask() {
     },
   });
 }
-

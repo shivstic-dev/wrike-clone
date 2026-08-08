@@ -9,6 +9,8 @@ interface KanbanColumnProps {
   title: string;
   tasks: Task[];
   color: string;
+  canMoveTask?: (task: Task) => boolean;
+  getReadOnlyReason?: (task: Task) => string;
 }
 
 const columnColors: Record<string, string> = {
@@ -25,7 +27,16 @@ const columnBg: Record<string, string> = {
   blocked: 'bg-red-50/50',
 };
 
-export function KanbanColumn({ status, title, tasks, color }: KanbanColumnProps) {
+const allowTaskMovement = () => true;
+
+export function KanbanColumn({
+  status,
+  title,
+  tasks,
+  color,
+  canMoveTask = allowTaskMovement,
+  getReadOnlyReason,
+}: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
     data: { status },
@@ -58,7 +69,14 @@ export function KanbanColumn({ status, title, tasks, color }: KanbanColumnProps)
           {tasks.length === 0 ? (
             <p className="py-8 text-center text-xs text-slate-400">Drop tasks here</p>
           ) : (
-            tasks.map((task) => <TaskCard key={task.id} task={task} />)
+            tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                readOnly={!canMoveTask(task)}
+                readOnlyReason={getReadOnlyReason?.(task)}
+              />
+            ))
           )}
         </div>
       </SortableContext>
