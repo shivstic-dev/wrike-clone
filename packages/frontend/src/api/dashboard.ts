@@ -59,6 +59,7 @@ export const dashboardKeys = {
     [...dashboardKeys.tasks(), buildDashboardTaskParams(filters).toString()] as const,
   analytics: (filters: DashboardAnalyticsFilters) =>
     [...dashboardKeys.all, 'analytics', buildDashboardAnalyticsParams(filters).toString()] as const,
+  metabase: () => [...dashboardKeys.all, 'metabase'] as const,
 };
 
 export async function requestDashboardOverview(
@@ -134,4 +135,18 @@ export async function requestDashboardAnalyticsExport(
     responseType: 'blob',
   });
   return data;
+}
+
+export async function requestMetabaseLaunch(): Promise<{ url: string }> {
+  const { data } = await apiClient.get<{ url: string }>('/dashboard/metabase');
+  return data;
+}
+
+export function useMetabaseLaunch(enabled: boolean) {
+  return useQuery({
+    queryKey: dashboardKeys.metabase(),
+    queryFn: requestMetabaseLaunch,
+    enabled,
+    retry: false,
+  });
 }

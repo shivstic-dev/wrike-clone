@@ -2,6 +2,7 @@ import {
   loadAppConfig,
   loadCorsOrigins,
   loadDatabaseConfig,
+  loadMetabaseSiteUrl,
   parseCorsOrigins,
   validateProductionConfig,
 } from './app.config';
@@ -106,6 +107,28 @@ describe('application configuration', () => {
       ALLOW_PUBLIC_REGISTRATION: 'false',
     };
     expect(validateProductionConfig).not.toThrow();
+  });
+
+  it('normalizes a configured Metabase site URL', () => {
+    process.env.NODE_ENV = 'development';
+    process.env.METABASE_SITE_URL = 'http://localhost:3000///';
+
+    expect(loadMetabaseSiteUrl()).toBe('http://localhost:3000');
+  });
+
+  it('rejects an insecure Metabase site URL in production', () => {
+    process.env = {
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://pooler/runtime',
+      JWT_SECRET: 'j'.repeat(64),
+      CORS_ORIGINS: 'https://app.example.com',
+      APP_PUBLIC_URL: 'https://app.example.com',
+      METABASE_SITE_URL: 'http://analytics.example.com',
+      DB_SSL: 'true',
+      ALLOW_PUBLIC_REGISTRATION: 'false',
+    };
+
+    expect(validateProductionConfig).toThrow('METABASE_SITE_URL must be an HTTPS URL');
   });
 
   it('requires public registration to be disabled in production', () => {

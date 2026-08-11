@@ -11,6 +11,33 @@ const context = {
 };
 
 describe('DepartmentAccessService workflow rules', () => {
+  it.each([
+    ['admin', undefined, 'admin'],
+    ['member', { user_id: context.userId }, 'department_head'],
+    ['member', undefined, 'none'],
+  ] as const)(
+    'resolves organization analytics access for %s membership',
+    async (membershipRole, headRow, expected) => {
+      const membershipQuery = {
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue({ role: membershipRole }),
+      };
+      const headQuery = {
+        where: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(headRow),
+      };
+      const db = jest.fn((table: string) =>
+        table === 'tenant_memberships' ? membershipQuery : headQuery,
+      );
+      const service = new DepartmentAccessService(db as never);
+
+      await expect(
+        tenantContext.run(context, () => service.getAdvancedAnalyticsRole()),
+      ).resolves.toBe(expected);
+      if (membershipRole === 'admin') expect(headQuery.first).not.toHaveBeenCalled();
+    },
+  );
+
   it('rejects a manager mutating a task assigned to another manager', async () => {
     const assignments = {
       join: jest.fn().mockReturnThis(),

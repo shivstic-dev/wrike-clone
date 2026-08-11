@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, HttpStatus } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpStatus,
+  NotFoundException,
+} from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import type {
   DashboardAnalyticsResponse,
@@ -174,6 +179,7 @@ describe('DashboardService', () => {
   const workspaceExists = jest.fn<Promise<{ id: string } | undefined>, []>();
   const departmentAccess = {
     getReportScope: jest.fn(),
+    getAdvancedAnalyticsRole: jest.fn(),
   };
   let db: jest.MockedFunction<Knex>;
   let workspaceQuery: {
@@ -190,6 +196,7 @@ describe('DashboardService', () => {
     activityRows.mockResolvedValue([]);
     workspaceExists.mockReset();
     departmentAccess.getReportScope.mockReset();
+    departmentAccess.getAdvancedAnalyticsRole.mockReset();
 
     const taskRowsQuery = {
       join: jest.fn().mockReturnThis(),
@@ -231,6 +238,39 @@ describe('DashboardService', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+    delete process.env['METABASE_SITE_URL'];
+  });
+
+  it.each(['admin', 'department_head'] as const)(
+    'returns the configured Metabase URL to %s users',
+    async (role) => {
+      process.env['METABASE_SITE_URL'] = 'https://analytics.example.com/';
+      departmentAccess.getAdvancedAnalyticsRole.mockResolvedValue(role);
+
+      await expect(
+        tenantContext.run(context, () => service.metabaseLaunch()),
+      ).resolves.toEqual({ url: 'https://analytics.example.com' });
+    },
+  );
+
+  it.each(['manager', 'employee'] as const)(
+    'denies the Metabase launch URL to %s users',
+    async (role) => {
+      process.env['METABASE_SITE_URL'] = 'https://analytics.example.com';
+      departmentAccess.getAdvancedAnalyticsRole.mockResolvedValue('none');
+
+      await expect(
+        tenantContext.run(context, () => service.metabaseLaunch()),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    },
+  );
+
+  it('returns not found when advanced analytics is not configured', async () => {
+    departmentAccess.getAdvancedAnalyticsRole.mockResolvedValue('admin');
+
+    await expect(
+      tenantContext.run(context, () => service.metabaseLaunch()),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('uses access-service employee self scope instead of the client role', async () => {
@@ -670,5 +710,20 @@ describe('DashboardController', () => {
     );
     expect(response.setHeader).toHaveBeenCalledWith('Cache-Control', 'private, no-store');
     expect(response.send).toHaveBeenCalledWith(Buffer.from('%PDF'));
+  });
+
+  it('exposes the protected management analytics launch endpoint', async () => {
+    const metabaseLaunch = jest.fn().mockResolvedValue({
+      url: 'https://analytics.example.com',
+    });
+    const controller = new DashboardController({ metabaseLaunch } as never);
+
+    await expect(controller.metabase()).resolves.toEqual({
+      url: 'https://analytics.example.com',
+    });
+    expect(metabaseLaunch).toHaveBeenCalledTimes(1);
+    expect(
+      Reflect.getMetadata(PERMISSIONS_KEY, DashboardController.prototype.metabase),
+    ).toEqual(['task:read']);
   });
 });

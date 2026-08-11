@@ -16,6 +16,7 @@ import toast from 'react-hot-toast';
 import {
   requestDashboardAnalyticsExport,
   useDashboardAnalytics,
+  useMetabaseLaunch,
   type DashboardAnalyticsFilters,
 } from '../../api/dashboard';
 import { ErrorDisplay } from '../common/ErrorDisplay';
@@ -54,10 +55,12 @@ export function DashboardAnalyticsPanel({
   data,
   exporting,
   onExport,
+  metabaseUrl,
 }: {
   data: DashboardAnalyticsResponse;
   exporting: 'pdf' | 'xlsx' | null;
   onExport: (format: 'pdf' | 'xlsx') => void;
+  metabaseUrl?: string;
 }) {
   const departments = [...new Map(
     data.overdueOutcome.flatMap((point) => point.departments).map((item) => [item.id, item]),
@@ -98,6 +101,30 @@ export function DashboardAnalyticsPanel({
           </div>
         </div>
       </div>
+
+      {metabaseUrl && ['admin', 'department_head'].includes(data.scope.role) && (
+        <article className="flex flex-col gap-4 rounded-2xl border border-sky-200 bg-sky-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-atlasMono text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-sky-700">
+              Management reporting
+            </p>
+            <h2 className="mt-1 font-atlasDisplay text-lg font-semibold text-atlas-ink">
+              Explore deeper trends in Metabase
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Build filtered charts and board reports from the protected read-only analytics model.
+            </p>
+          </div>
+          <a
+            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-800"
+            href={metabaseUrl}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Open advanced analytics
+          </a>
+        </article>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Average completion time" value={displayMetric(data.kpis.averageCompletionHours, ' h')} note="Created-to-completed time for work finished in this period." />
@@ -167,6 +194,8 @@ export function DashboardAnalyticsPanel({
 export function DashboardAnalytics({ departmentId }: { departmentId?: string }) {
   const filters: DashboardAnalyticsFilters = { departmentId, groupBy: 'month' };
   const query = useDashboardAnalytics(filters, true);
+  const canUseMetabase = ['admin', 'department_head'].includes(query.data?.scope.role ?? '');
+  const metabase = useMetabaseLaunch(canUseMetabase);
   const [exporting, setExporting] = useState<'pdf' | 'xlsx' | null>(null);
 
   async function download(format: 'pdf' | 'xlsx') {
@@ -189,7 +218,7 @@ export function DashboardAnalytics({ departmentId }: { departmentId?: string }) 
   if (query.isLoading) return <LoadingSpinner className="py-20" size="lg" />;
   if (query.error) return <ErrorDisplay title="Analytics are unavailable" message="The role-scoped analytics could not be loaded." onRetry={() => void query.refetch()} />;
   if (!query.data) return null;
-  return <DashboardAnalyticsPanel data={query.data} exporting={exporting} onExport={(format) => void download(format)} />;
+  return <DashboardAnalyticsPanel data={query.data} exporting={exporting} metabaseUrl={metabase.data?.url} onExport={(format) => void download(format)} />;
 }
 
 export default DashboardAnalytics;

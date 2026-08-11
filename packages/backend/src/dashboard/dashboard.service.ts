@@ -1,4 +1,9 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type {
   DashboardAnalyticsQuery,
   DashboardAnalyticsResponse,
@@ -13,6 +18,7 @@ import { requireTenantContext } from '../common/tenant-context';
 import { MemoryCacheService } from '../common/cache/memory-cache.service';
 import { DATABASE_PROVIDER } from '../database/database.module';
 import { DepartmentAccessService } from '../rbac/department-access.service';
+import { loadMetabaseSiteUrl } from '../config/app.config';
 import {
   buildDashboardMetrics,
   taskMatchesDashboardBucket,
@@ -412,6 +418,19 @@ export class DashboardService {
         departmentId,
       },
     };
+  }
+
+  async metabaseLaunch(): Promise<{ url: string }> {
+    const role = await this.departmentAccess.getAdvancedAnalyticsRole();
+    if (role !== 'admin' && role !== 'department_head') {
+      throw new ForbiddenException('Advanced analytics access denied');
+    }
+
+    const url = loadMetabaseSiteUrl();
+    if (!url) {
+      throw new NotFoundException('Advanced analytics is not configured');
+    }
+    return { url };
   }
 
   async overview(input: {
