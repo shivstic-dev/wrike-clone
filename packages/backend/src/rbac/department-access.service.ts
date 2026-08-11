@@ -22,26 +22,6 @@ export class DepartmentAccessService {
     return !!membership;
   }
 
-  async getAdvancedAnalyticsRole(
-    executor: Knex | Knex.Transaction = this.db,
-  ): Promise<'admin' | 'department_head' | 'none'> {
-    const ctx = requireTenantContext();
-    const membership = await executor('tenant_memberships')
-      .where({
-        tenant_id: ctx.tenantId,
-        user_id: ctx.userId,
-        is_active: true,
-      })
-      .first('role');
-    if (!membership) return 'none';
-    if (membership.role === 'admin') return 'admin';
-
-    const departmentHead = await executor('department_heads')
-      .where({ tenant_id: ctx.tenantId, user_id: ctx.userId })
-      .first('user_id');
-    return departmentHead ? 'department_head' : 'none';
-  }
-
   async getRole(
     departmentId: string,
     userId?: string,

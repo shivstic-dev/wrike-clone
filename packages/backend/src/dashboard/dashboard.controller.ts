@@ -24,12 +24,6 @@ import { DashboardService } from './dashboard.service';
 export class DashboardController {
   constructor(private readonly dashboard: DashboardService) {}
 
-  @Get('metabase')
-  @Permissions('task:read')
-  async metabase() {
-    return this.dashboard.metabaseLaunch();
-  }
-
   @Get('overview')
   @Permissions('task:read')
   async overview(@Query() query: unknown) {

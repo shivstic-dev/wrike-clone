@@ -13,7 +13,6 @@ import {
   requestDashboardTasks,
   requestDashboardAnalytics,
   requestDashboardAnalyticsExport,
-  requestMetabaseLaunch,
   useDashboardTasks,
   useDashboardOverview,
 } from './dashboard';
@@ -178,14 +177,5 @@ describe('dashboard API', () => {
     expect(getMock).toHaveBeenCalledWith('/dashboard/analytics/export', expect.any(Object));
     expect(config?.params?.toString()).toBe('groupBy=month&format=pdf');
     expect(config?.responseType).toBe('blob');
-  });
-
-  it('requests the protected Metabase launch URL without client-supplied scope', async () => {
-    const response = { url: 'https://analytics.example.com' };
-    getMock.mockResolvedValueOnce({ data: response });
-
-    await expect(requestMetabaseLaunch()).resolves.toBe(response);
-    expect(getMock).toHaveBeenCalledWith('/dashboard/metabase');
-    expect(dashboardKeys.metabase()).toEqual(['dashboard', 'metabase']);
   });
 });

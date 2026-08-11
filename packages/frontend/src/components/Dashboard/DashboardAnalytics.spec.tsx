@@ -61,27 +61,4 @@ describe('DashboardAnalyticsPanel', () => {
     );
     expect(html.match(/Not available/g)?.length).toBe(3);
   });
-
-  it('offers advanced analytics only when an eligible role has a configured URL', () => {
-    const eligible = renderToStaticMarkup(
-      <DashboardAnalyticsPanel
-        data={{ ...analytics, scope: { ...analytics.scope, role: 'department_head' } }}
-        exporting={null}
-        metabaseUrl="https://analytics.example.com"
-        onExport={vi.fn()}
-      />,
-    );
-    const manager = renderToStaticMarkup(
-      <DashboardAnalyticsPanel
-        data={analytics}
-        exporting={null}
-        metabaseUrl="https://analytics.example.com"
-        onExport={vi.fn()}
-      />,
-    );
-
-    expect(eligible).toContain('Open advanced analytics');
-    expect(eligible).toContain('https://analytics.example.com');
-    expect(manager).not.toContain('Open advanced analytics');
-  });
 });

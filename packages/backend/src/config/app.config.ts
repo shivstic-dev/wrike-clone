@@ -82,25 +82,6 @@ export function loadCorsOrigins(
     : origins;
 }
 
-export function loadMetabaseSiteUrl(
-  rawValue = process.env['METABASE_SITE_URL'],
-): string | undefined {
-  const value = rawValue?.trim().replace(/\/+$/, '');
-  if (!value) return undefined;
-
-  try {
-    const url = new URL(value);
-    const localHttp =
-      process.env['NODE_ENV'] !== 'production' &&
-      url.protocol === 'http:' &&
-      ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
-    if (url.protocol !== 'https:' && !localHttp) return undefined;
-    return url.toString().replace(/\/+$/, '');
-  } catch {
-    return undefined;
-  }
-}
-
 export function loadAppConfig(): AppConfig {
   return {
     nodeEnv: process.env['NODE_ENV'] || 'development',
@@ -147,9 +128,6 @@ export function validateProductionConfig(): void {
   if (process.env['DB_SSL'] !== 'true') problems.push('DB_SSL must be true');
   if (process.env['APP_PUBLIC_URL'] && !process.env['APP_PUBLIC_URL']?.startsWith('https://')) {
     problems.push('APP_PUBLIC_URL must be an HTTPS URL');
-  }
-  if (process.env['METABASE_SITE_URL'] && !loadMetabaseSiteUrl()) {
-    problems.push('METABASE_SITE_URL must be an HTTPS URL');
   }
 
   if (problems.length > 0) {
