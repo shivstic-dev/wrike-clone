@@ -7,7 +7,7 @@
  * frontend (form validation), so rules never diverge.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.timelineQuerySchema = exports.updateTaskScheduleSchema = exports.updateDependencySchema = exports.dashboardTasksQuerySchema = exports.dashboardOverviewQuerySchema = exports.departmentReportFilterSchema = exports.paginationSchema = exports.addTaskAssigneeSchema = exports.changeDepartmentMemberRoleSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.createDependencySchema = exports.bulkTaskUpdateSchema = exports.bulkTaskCompletionSchema = exports.taskCompletionSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.moveTaskLocationSchema = exports.taskLocationInputSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
+exports.timelineQuerySchema = exports.updateTaskScheduleSchema = exports.updateDependencySchema = exports.dashboardAnalyticsExportQuerySchema = exports.dashboardAnalyticsQuerySchema = exports.dashboardTasksQuerySchema = exports.dashboardOverviewQuerySchema = exports.departmentReportFilterSchema = exports.paginationSchema = exports.addTaskAssigneeSchema = exports.changeDepartmentMemberRoleSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.createDependencySchema = exports.bulkTaskUpdateSchema = exports.bulkTaskCompletionSchema = exports.taskCompletionSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.moveTaskLocationSchema = exports.taskLocationInputSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
 const zod_1 = require("zod");
 const enums_1 = require("../enums");
 // ── Helpers ────────────────────────────────────────────────────
@@ -367,6 +367,51 @@ exports.dashboardTasksQuerySchema = zod_1.z.object({
         'ready_for_handoff',
     ]),
 });
+const dashboardAnalyticsDate = zod_1.z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a calendar date in YYYY-MM-DD format')
+    .refine((value) => {
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}, 'Invalid calendar date');
+const dashboardAnalyticsBaseQuerySchema = zod_1.z
+    .object({
+    departmentId: exports.uuidField.optional(),
+    projectId: exports.uuidField.optional(),
+    dateFrom: dashboardAnalyticsDate.optional(),
+    dateTo: dashboardAnalyticsDate.optional(),
+    groupBy: zod_1.z.literal('month').default('month'),
+})
+    .superRefine((value, context) => {
+    if (!!value.dateFrom !== !!value.dateTo) {
+        context.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: [value.dateFrom ? 'dateTo' : 'dateFrom'],
+            message: 'dateFrom and dateTo must be supplied together',
+        });
+        return;
+    }
+    if (!value.dateFrom || !value.dateTo)
+        return;
+    const from = Date.parse(`${value.dateFrom}T00:00:00.000Z`);
+    const to = Date.parse(`${value.dateTo}T23:59:59.999Z`);
+    if (from > to) {
+        context.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: ['dateTo'],
+            message: 'dateFrom must be before or equal to dateTo',
+        });
+    }
+    else if (to - from > 366 * 24 * 60 * 60 * 1_000) {
+        context.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: ['dateTo'],
+            message: 'Analytics range cannot exceed twelve months',
+        });
+    }
+});
+exports.dashboardAnalyticsQuerySchema = dashboardAnalyticsBaseQuerySchema;
+exports.dashboardAnalyticsExportQuerySchema = dashboardAnalyticsBaseQuerySchema.and(zod_1.z.object({ format: zod_1.z.enum(['pdf', 'xlsx']) }));
 exports.updateDependencySchema = zod_1.z.object({
     dependencyType: zod_1.z.nativeEnum(enums_1.DependencyType).optional(),
     lagDays: zod_1.z.number().int().min(0).max(3650).optional(),

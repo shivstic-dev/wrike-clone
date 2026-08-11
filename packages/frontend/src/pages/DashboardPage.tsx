@@ -35,6 +35,12 @@ const DashboardBoard = lazy(() =>
   })),
 );
 
+const DashboardAnalytics = lazy(() =>
+  import('../components/Dashboard/DashboardAnalytics').then((module) => ({
+    default: module.DashboardAnalytics,
+  })),
+);
+
 function AssigneeChips({ task }: { task: Task }) {
   if (!task.assignees?.length) {
     return <span className="text-xs text-slate-500">Unassigned</span>;
@@ -170,7 +176,9 @@ export default function DashboardPage() {
   const departmentId = searchParams.get('department') || '';
   const requestedView = searchParams.get('view');
   const view =
-    requestedView === 'timeline' || requestedView === 'board' ? requestedView : 'overview';
+    requestedView === 'timeline' || requestedView === 'board' || requestedView === 'analytics'
+      ? requestedView
+      : 'overview';
   const { membership, user } = useAuth();
   const departments = useWorkspaces();
   const departmentList = departments.data ?? [];
@@ -234,7 +242,7 @@ export default function DashboardPage() {
     );
   }
 
-  function selectView(nextView: 'overview' | 'board' | 'timeline') {
+  function selectView(nextView: 'overview' | 'board' | 'timeline' | 'analytics') {
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
@@ -357,7 +365,7 @@ export default function DashboardPage() {
             className="inline-flex w-fit rounded-xl border border-atlas-mist bg-white p-1 shadow-sm"
             role="group"
           >
-            {(['overview', 'board', 'timeline'] as const).map((option) => (
+            {(['overview', 'board', 'timeline', 'analytics'] as const).map((option) => (
               <button
                 key={option}
                 aria-pressed={view === option}
@@ -369,7 +377,13 @@ export default function DashboardPage() {
                 onClick={() => selectView(option)}
                 type="button"
               >
-                {option === 'overview' ? 'Overview' : option === 'board' ? 'Board' : 'Timeline'}
+                {option === 'overview'
+                  ? 'Overview'
+                  : option === 'board'
+                    ? 'Board'
+                    : option === 'timeline'
+                      ? 'Timeline'
+                      : 'Analytics'}
               </button>
             ))}
           </div>
@@ -424,6 +438,12 @@ export default function DashboardPage() {
                 principalKey={boardPrincipalKey}
                 tenantRole={membership?.role}
               />
+            </Suspense>
+          )}
+
+          {view === 'analytics' && overviewEnabled && (
+            <Suspense fallback={<LoadingSpinner className="py-16" size="lg" />}>
+              <DashboardAnalytics departmentId={departmentId || undefined} />
             </Suspense>
           )}
 

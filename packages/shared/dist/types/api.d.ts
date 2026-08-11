@@ -370,6 +370,78 @@ export interface DashboardOverview {
         completionRate: number;
     }>;
 }
+export interface DashboardAnalyticsQuery {
+    departmentId?: string;
+    projectId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    groupBy: 'month';
+}
+export interface DashboardAnalyticsResponse {
+    generatedAt: string;
+    period: {
+        from: string;
+        to: string;
+        months: number;
+    };
+    scope: {
+        departmentId?: string;
+        projectId?: string;
+        role: DashboardViewerRole;
+    };
+    kpis: {
+        averageCompletionHours: number | null;
+        handoffSuccessRate: number | null;
+        onTimeCompletionRate: number | null;
+    };
+    monthlyCompletion: Array<{
+        month: string;
+        completed: number;
+    }>;
+    overdueOutcome: Array<{
+        month: string;
+        total: number;
+        departments: Array<{
+            id: string;
+            name: string;
+            count: number;
+        }>;
+    }>;
+    workload: Array<{
+        userId: string;
+        name: string;
+        role: 'manager' | 'employee' | 'member';
+        active: number;
+        overdue: number;
+        estimatedHours: number;
+    }>;
+    blockedAgeing: {
+        averageDays: number | null;
+        maxDays: number | null;
+        items: Array<{
+            taskId: string;
+            title: string;
+            projectId: string;
+            projectName: string | null;
+            days: number;
+        }>;
+    };
+    priorityDistribution: Record<'critical' | 'high' | 'medium' | 'low', number>;
+    projectHealth: Array<{
+        projectId: string;
+        projectName: string;
+        score: number;
+        band: 'green' | 'amber' | 'red';
+        taskCount: number;
+        components: {
+            onTime: number;
+            overdueControl: number;
+            blockedAgeing: number;
+            workloadBalance: number;
+            handoffSuccess: number;
+        };
+    }>;
+}
 export interface DashboardWidget {
     id: string;
     type: 'task_count' | 'overdue' | 'workload' | 'project_progress' | 'custom';

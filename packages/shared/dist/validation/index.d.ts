@@ -974,6 +974,74 @@ export declare const dashboardTasksQuerySchema: z.ZodObject<{
     departmentId?: string | undefined;
     days?: number | undefined;
 }>;
+export declare const dashboardAnalyticsQuerySchema: z.ZodEffects<z.ZodObject<{
+    departmentId: z.ZodOptional<z.ZodString>;
+    projectId: z.ZodOptional<z.ZodString>;
+    dateFrom: z.ZodOptional<z.ZodEffects<z.ZodString, string, string>>;
+    dateTo: z.ZodOptional<z.ZodEffects<z.ZodString, string, string>>;
+    groupBy: z.ZodDefault<z.ZodLiteral<"month">>;
+}, "strip", z.ZodTypeAny, {
+    groupBy: "month";
+    departmentId?: string | undefined;
+    projectId?: string | undefined;
+    dateFrom?: string | undefined;
+    dateTo?: string | undefined;
+}, {
+    departmentId?: string | undefined;
+    projectId?: string | undefined;
+    dateFrom?: string | undefined;
+    dateTo?: string | undefined;
+    groupBy?: "month" | undefined;
+}>, {
+    groupBy: "month";
+    departmentId?: string | undefined;
+    projectId?: string | undefined;
+    dateFrom?: string | undefined;
+    dateTo?: string | undefined;
+}, {
+    departmentId?: string | undefined;
+    projectId?: string | undefined;
+    dateFrom?: string | undefined;
+    dateTo?: string | undefined;
+    groupBy?: "month" | undefined;
+}>;
+export declare const dashboardAnalyticsExportQuerySchema: z.ZodIntersection<z.ZodEffects<z.ZodObject<{
+    departmentId: z.ZodOptional<z.ZodString>;
+    projectId: z.ZodOptional<z.ZodString>;
+    dateFrom: z.ZodOptional<z.ZodEffects<z.ZodString, string, string>>;
+    dateTo: z.ZodOptional<z.ZodEffects<z.ZodString, string, string>>;
+    groupBy: z.ZodDefault<z.ZodLiteral<"month">>;
+}, "strip", z.ZodTypeAny, {
+    groupBy: "month";
+    departmentId?: string | undefined;
+    projectId?: string | undefined;
+    dateFrom?: string | undefined;
+    dateTo?: string | undefined;
+}, {
+    departmentId?: string | undefined;
+    projectId?: string | undefined;
+    dateFrom?: string | undefined;
+    dateTo?: string | undefined;
+    groupBy?: "month" | undefined;
+}>, {
+    groupBy: "month";
+    departmentId?: string | undefined;
+    projectId?: string | undefined;
+    dateFrom?: string | undefined;
+    dateTo?: string | undefined;
+}, {
+    departmentId?: string | undefined;
+    projectId?: string | undefined;
+    dateFrom?: string | undefined;
+    dateTo?: string | undefined;
+    groupBy?: "month" | undefined;
+}>, z.ZodObject<{
+    format: z.ZodEnum<["pdf", "xlsx"]>;
+}, "strip", z.ZodTypeAny, {
+    format: "pdf" | "xlsx";
+}, {
+    format: "pdf" | "xlsx";
+}>>;
 export declare const updateDependencySchema: z.ZodObject<{
     dependencyType: z.ZodOptional<z.ZodNativeEnum<typeof DependencyType>>;
     lagDays: z.ZodOptional<z.ZodNumber>;

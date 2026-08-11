@@ -7,9 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import apiClient from './client';
 import {
   buildDashboardParams,
+  buildDashboardAnalyticsParams,
   dashboardKeys,
   requestDashboardOverview,
   requestDashboardTasks,
+  requestDashboardAnalytics,
+  requestDashboardAnalyticsExport,
   useDashboardTasks,
   useDashboardOverview,
 } from './dashboard';
@@ -143,5 +146,36 @@ describe('dashboard API', () => {
     });
 
     expect(getMock).not.toHaveBeenCalled();
+  });
+
+  it('requests role-scoped analytics with canonical optional filters', async () => {
+    const response = { generatedAt: '2026-08-11T10:00:00.000Z' };
+    getMock.mockResolvedValueOnce({ data: response });
+    const filters = {
+      departmentId: ' department-1 ',
+      projectId: ' project-1 ',
+      dateFrom: '2025-09-01',
+      dateTo: '2026-08-31',
+      groupBy: 'month' as const,
+    };
+
+    expect(buildDashboardAnalyticsParams(filters).toString()).toBe(
+      'departmentId=department-1&projectId=project-1&dateFrom=2025-09-01&dateTo=2026-08-31&groupBy=month',
+    );
+    await expect(requestDashboardAnalytics(filters)).resolves.toBe(response);
+    expect(getMock).toHaveBeenCalledWith('/dashboard/analytics', expect.any(Object));
+  });
+
+  it('downloads the board summary as a blob without trusting client-side totals', async () => {
+    const blob = new Blob(['report'], { type: 'application/pdf' });
+    getMock.mockResolvedValueOnce({ data: blob });
+
+    await expect(
+      requestDashboardAnalyticsExport({ groupBy: 'month' }, 'pdf'),
+    ).resolves.toBe(blob);
+    const [, config] = getMock.mock.calls[0] ?? [];
+    expect(getMock).toHaveBeenCalledWith('/dashboard/analytics/export', expect.any(Object));
+    expect(config?.params?.toString()).toBe('groupBy=month&format=pdf');
+    expect(config?.responseType).toBe('blob');
   });
 });

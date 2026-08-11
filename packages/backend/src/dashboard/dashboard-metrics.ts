@@ -15,8 +15,13 @@ export interface DashboardTaskRow {
   updatedAt: Date;
   projectId: string;
   projectName: string | null;
+  estimatedHours?: number;
   handoffOwner: { id: string; displayName: string; email: string } | null;
-  assignees: Array<{ userId: string; name: string }>;
+  assignees: Array<{
+    userId: string;
+    name: string;
+    role?: 'manager' | 'employee' | 'member';
+  }>;
 }
 
 type DashboardMetrics = Omit<
@@ -99,7 +104,7 @@ function countBySortedKey(
 function uniqueSortedAssignees(
   assignees: DashboardTaskRow['assignees'],
 ): DashboardTaskRow['assignees'] {
-  const byUserId = new Map<string, { userId: string; name: string }>();
+  const byUserId = new Map<string, DashboardTaskRow['assignees'][number]>();
 
   for (const assignee of assignees) {
     const current = byUserId.get(assignee.userId);

@@ -126,6 +126,12 @@ vi.mock('../components/Dashboard/DashboardBoard', () => ({
   },
 }));
 
+vi.mock('../components/Dashboard/DashboardAnalytics', () => ({
+  DashboardAnalytics: ({ departmentId }: { departmentId?: string }) => (
+    <section aria-label="Dashboard analytics">Analytics for {departmentId ?? 'all departments'}</section>
+  ),
+}));
+
 vi.mock('../api/dashboard', () => ({
   useDashboardOverview: () => ({
     data: overview,
@@ -489,7 +495,12 @@ describe('DashboardPage board', () => {
     const buttons = Array.from(
       container.querySelectorAll<HTMLButtonElement>('[aria-label="Dashboard view"] button'),
     );
-    expect(buttons.map((button) => button.textContent)).toEqual(['Overview', 'Board', 'Timeline']);
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      'Overview',
+      'Board',
+      'Timeline',
+      'Analytics',
+    ]);
     await act(async () => {
       buttons[1]?.click();
       await Promise.resolve();
@@ -500,6 +511,25 @@ describe('DashboardPage board', () => {
     );
     expect(container.querySelector('[data-testid="location"]')?.textContent).toContain(
       'view=board',
+    );
+  });
+
+  it('opens role-scoped Analytics inside the dashboard', async () => {
+    await renderPage('/dashboard?department=department-1');
+    const analyticsButton = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[aria-label="Dashboard view"] button'),
+    ).find((button) => button.textContent === 'Analytics');
+
+    await act(async () => {
+      analyticsButton?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector('[aria-label="Dashboard analytics"]')?.textContent).toContain(
+      'department-1',
+    );
+    expect(container.querySelector('[data-testid="location"]')?.textContent).toContain(
+      'view=analytics',
     );
   });
 });

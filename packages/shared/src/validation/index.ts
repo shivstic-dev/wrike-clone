@@ -450,6 +450,56 @@ export const dashboardTasksQuerySchema = z.object({
   ]),
 });
 
+const dashboardAnalyticsDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a calendar date in YYYY-MM-DD format')
+  .refine((value) => {
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  }, 'Invalid calendar date');
+
+const dashboardAnalyticsBaseQuerySchema = z
+  .object({
+    departmentId: uuidField.optional(),
+    projectId: uuidField.optional(),
+    dateFrom: dashboardAnalyticsDate.optional(),
+    dateTo: dashboardAnalyticsDate.optional(),
+    groupBy: z.literal('month').default('month'),
+  })
+  .superRefine((value, context) => {
+    if (!!value.dateFrom !== !!value.dateTo) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [value.dateFrom ? 'dateTo' : 'dateFrom'],
+        message: 'dateFrom and dateTo must be supplied together',
+      });
+      return;
+    }
+    if (!value.dateFrom || !value.dateTo) return;
+
+    const from = Date.parse(`${value.dateFrom}T00:00:00.000Z`);
+    const to = Date.parse(`${value.dateTo}T23:59:59.999Z`);
+    if (from > to) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dateTo'],
+        message: 'dateFrom must be before or equal to dateTo',
+      });
+    } else if (to - from > 366 * 24 * 60 * 60 * 1_000) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['dateTo'],
+        message: 'Analytics range cannot exceed twelve months',
+      });
+    }
+  });
+
+export const dashboardAnalyticsQuerySchema = dashboardAnalyticsBaseQuerySchema;
+
+export const dashboardAnalyticsExportQuerySchema = dashboardAnalyticsBaseQuerySchema.and(
+  z.object({ format: z.enum(['pdf', 'xlsx']) }),
+);
+
 export const updateDependencySchema = z.object({
   dependencyType: z.nativeEnum(DependencyType).optional(),
   lagDays: z.number().int().min(0).max(3650).optional(),

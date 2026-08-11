@@ -1,5 +1,7 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import type {
+  DashboardAnalyticsQuery,
+  DashboardAnalyticsResponse,
   DashboardOverview,
   DashboardTaskBucket,
   DashboardTaskListResponse,
@@ -8,6 +10,7 @@ import type {
 } from '@wrike-clone/shared';
 import type { Knex } from 'knex';
 import { requireTenantContext } from '../common/tenant-context';
+import { MemoryCacheService } from '../common/cache/memory-cache.service';
 import { DATABASE_PROVIDER } from '../database/database.module';
 import { DepartmentAccessService } from '../rbac/department-access.service';
 import {
@@ -15,6 +18,13 @@ import {
   taskMatchesDashboardBucket,
   type DashboardTaskRow,
 } from './dashboard-metrics';
+import {
+  buildDashboardAnalytics,
+  normalizeDashboardActivity,
+  resolveAnalyticsPeriod,
+  type DashboardActivityRow,
+} from './dashboard-analytics-metrics';
+import { exportDashboardAnalytics } from './dashboard-analytics-export';
 
 export interface DashboardQueryScope {
   tenantId: string;
@@ -146,7 +156,24 @@ function assigneeProjection(db: Knex, scope: DashboardQueryScope): Knex.Raw {
           SELECT jsonb_agg(
             jsonb_build_object(
               'userId', "dashboard_assignees"."user_id",
-              'name', "dashboard_assignees"."display_name"
+              'name', "dashboard_assignees"."display_name",
+              'role', CASE
+                WHEN EXISTS (
+                  SELECT 1
+                  FROM "tenant_memberships" AS "dashboard_role_membership"
+                  LEFT JOIN "workspace_members" AS "dashboard_role_workspace"
+                    ON "dashboard_role_workspace"."tenant_id" = "dashboard_role_membership"."tenant_id"
+                   AND "dashboard_role_workspace"."user_id" = "dashboard_role_membership"."user_id"
+                   AND "dashboard_role_workspace"."workspace_id" = "tasks"."department_id"
+                  WHERE "dashboard_role_membership"."tenant_id" = "tasks"."tenant_id"
+                    AND "dashboard_role_membership"."user_id" = "dashboard_assignees"."user_id"
+                    AND (
+                      "dashboard_role_membership"."role" = 'manager'
+                      OR "dashboard_role_workspace"."role" = 'manager'
+                    )
+                ) THEN 'manager'
+                ELSE 'employee'
+              END
             )
             ORDER BY
               "dashboard_assignees"."display_name",
@@ -225,6 +252,7 @@ export function buildDashboardRowsQuery(
       'tasks.updated_at as updatedAt',
       'tasks.project_id as projectId',
       'dashboard_project.name as projectName',
+      'tasks.estimated_hours as estimatedHours',
       db.raw(
         `CASE WHEN dashboard_handoff_owner.id IS NULL THEN NULL ELSE jsonb_build_object('id', dashboard_handoff_owner.id, 'displayName', dashboard_handoff_owner.display_name, 'email', dashboard_handoff_owner.email) END AS "handoffOwner"`,
       ),
@@ -348,6 +376,7 @@ export class DashboardService {
   constructor(
     @Inject(DATABASE_PROVIDER) private readonly db: Knex,
     private readonly departmentAccess: DepartmentAccessService,
+    private readonly cache?: MemoryCacheService,
   ) {}
 
   private async resolveScope(departmentIdInput?: string): Promise<{
@@ -424,5 +453,78 @@ export class DashboardService {
         .sort(compareDashboardTaskRows)
         .map(toDashboardTaskSummary),
     };
+  }
+
+  async analytics(input: DashboardAnalyticsQuery): Promise<DashboardAnalyticsResponse> {
+    const ctx = requireTenantContext();
+    const { role, scope } = await this.resolveScope(input.departmentId);
+    const now = new Date();
+    const period = resolveAnalyticsPeriod(input, now);
+    const cacheKey = [
+      'dashboard-analytics',
+      ctx.tenantId,
+      ctx.userId,
+      ctx.membershipId,
+      role,
+      scope.departmentId ?? 'all-departments',
+      input.projectId ?? 'all-projects',
+      period.from.toISOString(),
+      period.to.toISOString(),
+    ].join(':');
+    const cached = this.cache?.get<DashboardAnalyticsResponse>(cacheKey);
+    if (cached) return cached;
+
+    const rowsQuery = buildDashboardRowsQuery(this.db, scope);
+    if (input.projectId) rowsQuery.andWhere('tasks.project_id', input.projectId);
+    const rows = (await rowsQuery) as DashboardTaskRow[];
+    const taskIds = rows.map((row) => row.id);
+    const rawActivities = taskIds.length
+      ? ((await this.db('activity_logs')
+          .where({ tenant_id: ctx.tenantId, entity_type: 'task' })
+          .whereIn('entity_id', taskIds)
+          .whereIn('action', [
+            'task:status:changed',
+            'task:handoff:ready',
+            'task:handoff:confirmed',
+          ])
+          .select(
+            'entity_id as taskId',
+            'action',
+            'created_at as createdAt',
+            'changes',
+          )
+          .orderBy('created_at', 'asc')) as Array<{
+          taskId: string;
+          action: string;
+          createdAt: Date;
+          changes: Record<string, unknown> | string | null;
+        }>)
+      : [];
+    const activities: DashboardActivityRow[] = rawActivities.map(normalizeDashboardActivity);
+    const metrics = buildDashboardAnalytics(rows, activities, period, now);
+    const result: DashboardAnalyticsResponse = {
+      generatedAt: now.toISOString(),
+      period: {
+        from: period.from.toISOString(),
+        to: period.to.toISOString(),
+        months: period.months,
+      },
+      scope: {
+        departmentId: scope.departmentId,
+        projectId: input.projectId,
+        role,
+      },
+      ...metrics,
+    };
+    this.cache?.set(cacheKey, result, 30);
+    return result;
+  }
+
+  async analyticsExport(
+    input: DashboardAnalyticsQuery & { format: 'pdf' | 'xlsx' },
+  ) {
+    const { format, ...query } = input;
+    const data = await this.analytics(query);
+    return exportDashboardAnalytics(data, format);
   }
 }

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, HttpStatus } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import type {
+  DashboardAnalyticsResponse,
   DashboardOverview,
   DashboardTaskBucket,
   DashboardTaskSummary,
@@ -146,6 +147,17 @@ describe('buildDashboardRowsQuery', () => {
       '"dashboard_handoff_owner"."id" = "dashboard_handoff_owner_membership"."user_id"',
     );
   });
+
+  it('projects estimated hours and an employee-or-manager role for analytics workload', () => {
+    const { sql } = normalizedSql(
+      buildDashboardRowsQuery(db, { ...baseScope, role: 'department_head' }),
+    );
+
+    expect(sql).toContain('"tasks"."estimated_hours" as "estimatedhours"');
+    expect(sql).toContain("'role'");
+    expect(sql).toContain("'manager'");
+    expect(sql).toContain("'employee'");
+  });
 });
 
 describe('DashboardService', () => {
@@ -158,6 +170,7 @@ describe('DashboardService', () => {
   };
 
   const dbRows = jest.fn<Promise<DashboardTaskRow[]>, []>();
+  const activityRows = jest.fn<Promise<unknown[]>, []>();
   const workspaceExists = jest.fn<Promise<{ id: string } | undefined>, []>();
   const departmentAccess = {
     getReportScope: jest.fn(),
@@ -173,6 +186,8 @@ describe('DashboardService', () => {
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(new Date('2026-07-28T12:00:00.000Z'));
     dbRows.mockReset();
+    activityRows.mockReset();
+    activityRows.mockResolvedValue([]);
     workspaceExists.mockReset();
     departmentAccess.getReportScope.mockReset();
 
@@ -189,14 +204,26 @@ describe('DashboardService', () => {
         onRejected?: (reason: unknown) => unknown,
       ) => dbRows().then(onFulfilled, onRejected),
     };
+    const activityQuery = {
+      where: jest.fn().mockReturnThis(),
+      whereIn: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      then: (
+        onFulfilled?: (rows: unknown[]) => unknown,
+        onRejected?: (reason: unknown) => unknown,
+      ) => activityRows().then(onFulfilled, onRejected),
+    };
     workspaceQuery = {
       where: jest.fn().mockReturnThis(),
       whereNull: jest.fn().mockReturnThis(),
       first: jest.fn(() => workspaceExists()),
     };
-    const database = jest.fn((table: string) =>
-      table === 'workspaces' ? workspaceQuery : taskRowsQuery,
-    ) as unknown as jest.MockedFunction<Knex>;
+    const database = jest.fn((table: string) => {
+      if (table === 'workspaces') return workspaceQuery;
+      if (table === 'activity_logs') return activityQuery;
+      return taskRowsQuery;
+    }) as unknown as jest.MockedFunction<Knex>;
     database.raw = jest.fn((sql: string) => sql) as unknown as typeof database.raw;
     db = database;
     service = new DashboardService(db, departmentAccess as never);
@@ -510,6 +537,40 @@ describe('DashboardService', () => {
       expect.objectContaining({ id: 'later-ready' }),
     ]);
   });
+
+  it('builds analytics only from the access-service scope and authorized task IDs', async () => {
+    departmentAccess.getReportScope.mockResolvedValue({
+      role: 'manager',
+      departmentId: 'department-1',
+      ownTasksOnly: false,
+    });
+    dbRows.mockResolvedValue([
+      row({
+        id: 'visible-task',
+        status: 'completed',
+        completedAt: new Date('2026-07-10T00:00:00.000Z'),
+        assignees: [{ userId: 'employee-1', name: 'Aparna', role: 'employee' }],
+      }),
+    ]);
+
+    const result = await tenantContext.run(context, () =>
+      service.analytics({
+        departmentId: 'department-1',
+        dateFrom: '2026-07-01',
+        dateTo: '2026-07-31',
+        groupBy: 'month',
+      }),
+    );
+
+    expect(departmentAccess.getReportScope).toHaveBeenCalledWith('department-1');
+    expect(result.scope).toEqual({
+      role: 'manager',
+      departmentId: 'department-1',
+      projectId: undefined,
+    });
+    expect(result.monthlyCompletion).toEqual([{ month: '2026-07', completed: 1 }]);
+    expect(db).toHaveBeenCalledWith('activity_logs');
+  });
 });
 
 describe('DashboardController', () => {
@@ -567,5 +628,47 @@ describe('DashboardController', () => {
     });
     expect(thrown).not.toBeInstanceOf(ZodError);
     expect(overview).not.toHaveBeenCalled();
+  });
+
+  it('validates analytics input before calling the dedicated service method', async () => {
+    const analytics = jest.fn<Promise<DashboardAnalyticsResponse>, [unknown]>();
+    const controller = new DashboardController({ analytics } as never);
+    analytics.mockResolvedValue({} as DashboardAnalyticsResponse);
+
+    await controller.analytics({ dateFrom: '2025-09-01', dateTo: '2026-08-31' });
+
+    expect(analytics).toHaveBeenCalledWith({
+      dateFrom: '2025-09-01',
+      dateTo: '2026-08-31',
+      groupBy: 'month',
+    });
+    await expect(
+      controller.analytics({ dateFrom: '2026-08-31', dateTo: '2026-01-01' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(analytics).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends analytics exports as private attachments after validating the format', async () => {
+    const analyticsExport = jest.fn().mockResolvedValue({
+      buffer: Buffer.from('%PDF'),
+      contentType: 'application/pdf',
+      filename: 'cepaa-board-summary-2026-08-11.pdf',
+    });
+    const response = {
+      setHeader: jest.fn(),
+      send: jest.fn(),
+    };
+    const controller = new DashboardController({ analyticsExport } as never);
+
+    await controller.exportAnalytics({ format: 'pdf' }, response as never);
+
+    expect(analyticsExport).toHaveBeenCalledWith({ format: 'pdf', groupBy: 'month' });
+    expect(response.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
+    expect(response.setHeader).toHaveBeenCalledWith(
+      'Content-Disposition',
+      'attachment; filename="cepaa-board-summary-2026-08-11.pdf"',
+    );
+    expect(response.setHeader).toHaveBeenCalledWith('Cache-Control', 'private, no-store');
+    expect(response.send).toHaveBeenCalledWith(Buffer.from('%PDF'));
   });
 });
