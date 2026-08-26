@@ -49,12 +49,12 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       const finalSlug = resolveLoginTenantSlug(slug, tenantSlug);
-      if (finalSlug) setTenantSlug(finalSlug);
       await login({
         ...(finalSlug ? { tenantSlug: finalSlug } : {}),
         email: email.trim(),
         password,
       });
+      if (finalSlug) setTenantSlug(finalSlug);
     } catch (caughtError: unknown) {
       const message = resolveAuthError(
         caughtError,

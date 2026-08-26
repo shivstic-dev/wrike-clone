@@ -156,6 +156,25 @@ describe('LoginPage', () => {
     expect(mocks.setTenantSlug).toHaveBeenCalledWith('cankids-india');
   });
 
+  it('does not remember an organization workspace when sign-in fails', async () => {
+    mocks.tenantSlug = '';
+    mocks.login.mockRejectedValue(new Error('Invalid tenant or credentials'));
+    renderLogin();
+
+    const slugInput = container.querySelector<HTMLInputElement>('#slug');
+    if (!slugInput) throw new Error('Organization workspace field did not render');
+
+    act(() => updateInput(slugInput, 'obsolete-workspace'));
+    await submitLogin('user@example.org', 'private-password');
+
+    expect(mocks.login).toHaveBeenCalledWith({
+      email: 'user@example.org',
+      password: 'private-password',
+      tenantSlug: 'obsolete-workspace',
+    });
+    expect(mocks.setTenantSlug).not.toHaveBeenCalled();
+  });
+
   it('stops the submit spinner when reduced motion is requested', async () => {
     mocks.login.mockImplementation(
       () =>
