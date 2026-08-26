@@ -23,7 +23,12 @@ export default function CalendarPage() {
     });
   }, []);
 
-  const { data: tasksData, isLoading, error, refetch } = useTasks({
+  const {
+    data: tasksData,
+    isLoading,
+    error,
+    refetch,
+  } = useTasks({
     perPage: 100,
     dueDateAfter: dateRange.start,
     dueDateBefore: dateRange.end,

@@ -22,7 +22,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ workspaceId: mocks.workspaceId }),
   useNavigate: () => mocks.navigate,
-  Link: ({ children, to, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { to: string }) => (
+  Link: ({
+    children,
+    to,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { to: string }) => (
     <a href={to} {...props}>
       {children}
     </a>
@@ -185,10 +189,7 @@ describe('WorkspacePage folder browsing', () => {
       root.render(<WorkspacePage />);
     });
 
-    expect(mocks.useTasks).toHaveBeenLastCalledWith(
-      { folderId: '', perPage: 100 },
-      false,
-    );
+    expect(mocks.useTasks).toHaveBeenLastCalledWith({ folderId: '', perPage: 100 }, false);
     expect(container.textContent).not.toContain('General Tasks');
     expect(container.textContent).toContain('Autumn appeal');
 
@@ -240,10 +241,7 @@ describe('WorkspacePage folder browsing', () => {
     mocks.workspaceId = 'department-2';
     act(() => root?.render(<WorkspacePage />));
 
-    expect(mocks.useTasks).toHaveBeenLastCalledWith(
-      { folderId: '', perPage: 100 },
-      false,
-    );
+    expect(mocks.useTasks).toHaveBeenLastCalledWith({ folderId: '', perPage: 100 }, false);
     expect(container.textContent).toContain('Health fair');
     expect(container.textContent).not.toContain('Tasks in');
   });

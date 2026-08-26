@@ -71,7 +71,6 @@ export class TaskController {
     return this.taskCompletionService.complete(taskId, input);
   }
 
-
   @Post(':id/assignees')
   @Permissions('task:read')
   async addAssignee(@Param('id') id: string, @Body() body: unknown) {

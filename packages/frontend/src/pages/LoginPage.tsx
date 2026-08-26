@@ -13,9 +13,8 @@ export function resolveLoginTenantSlug(
 
 function resolveAuthError(error: unknown, fallback: string): string {
   if (error instanceof Object && 'response' in error) {
-    const responseMessage = (
-      error as { response?: { data?: { error?: { message?: unknown } } } }
-    ).response?.data?.error?.message;
+    const responseMessage = (error as { response?: { data?: { error?: { message?: unknown } } } })
+      .response?.data?.error?.message;
     if (typeof responseMessage === 'string' && responseMessage.trim()) {
       return responseMessage;
     }
@@ -144,10 +143,7 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="mb-1.5 block text-sm font-semibold text-atlas-ink"
-            >
+            <label htmlFor="password" className="mb-1.5 block text-sm font-semibold text-atlas-ink">
               Password
             </label>
             <input

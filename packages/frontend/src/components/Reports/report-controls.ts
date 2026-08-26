@@ -6,20 +6,12 @@ export interface DescribedReportFilters extends ReportFilters {
   targetUserName?: string;
 }
 
-export function defaultReportScope(
-  tenantRole?: string,
-  departmentRole?: string,
-): ReportScope {
+export function defaultReportScope(tenantRole?: string, departmentRole?: string): ReportScope {
   if (tenantRole === 'admin') return 'combined';
-  return departmentRole === 'manager' || departmentRole === 'department_head'
-    ? 'combined'
-    : 'self';
+  return departmentRole === 'manager' || departmentRole === 'department_head' ? 'combined' : 'self';
 }
 
-export function allowedReportScopes(
-  tenantRole?: string,
-  departmentRole?: string,
-): ReportScope[] {
+export function allowedReportScopes(tenantRole?: string, departmentRole?: string): ReportScope[] {
   return tenantRole === 'admin' ||
     departmentRole === 'admin' ||
     departmentRole === 'department_head' ||
@@ -44,11 +36,7 @@ export function permittedReportMembers<T extends { userId: string; role: string 
   return members;
 }
 
-export function canExportReport(
-  enabled: boolean,
-  taskCount: number,
-  exporting: boolean,
-): boolean {
+export function canExportReport(enabled: boolean, taskCount: number, exporting: boolean): boolean {
   return enabled && taskCount > 0 && !exporting;
 }
 

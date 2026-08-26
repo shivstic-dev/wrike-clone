@@ -9,7 +9,9 @@ let container: HTMLDivElement;
 let root: Root | undefined;
 
 beforeEach(() => {
-  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  (
+    globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+  ).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div');
   document.body.append(container);
 });
@@ -31,7 +33,13 @@ describe('TimelineToolbar', () => {
           onPrevious={vi.fn()}
           onNext={vi.fn()}
           onToday={vi.fn()}
-          filters={{ projectId: '', departmentId: '', assigneeId: '', status: '', criticalOnly: false }}
+          filters={{
+            projectId: '',
+            departmentId: '',
+            assigneeId: '',
+            status: '',
+            criticalOnly: false,
+          }}
           onFiltersChange={vi.fn()}
           projects={[{ id: 'project-1', label: 'Community campaign' }]}
           departments={[{ id: 'department-1', label: 'Outreach' }]}
@@ -64,20 +72,32 @@ describe('TimelineToolbar', () => {
           onPrevious={onPrevious}
           onNext={vi.fn()}
           onToday={vi.fn()}
-          filters={{ projectId: '', departmentId: '', assigneeId: '', status: '', criticalOnly: false }}
+          filters={{
+            projectId: '',
+            departmentId: '',
+            assigneeId: '',
+            status: '',
+            criticalOnly: false,
+          }}
           onFiltersChange={onFiltersChange}
         />,
       );
     });
 
-    act(() => container.querySelector<HTMLButtonElement>('button[aria-label="Previous date range"]')?.click());
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label="Previous date range"]')
+        ?.click(),
+    );
     const zoom = container.querySelector<HTMLSelectElement>('select[aria-label="Timeline zoom"]');
     act(() => {
       if (!zoom) return;
       zoom.value = 'month';
       zoom.dispatchEvent(new Event('change', { bubbles: true }));
     });
-    const critical = container.querySelector<HTMLInputElement>('input[aria-label="Show critical path only"]');
+    const critical = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Show critical path only"]',
+    );
     act(() => critical?.click());
 
     expect(onPrevious).toHaveBeenCalledOnce();

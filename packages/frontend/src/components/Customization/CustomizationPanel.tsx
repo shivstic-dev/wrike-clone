@@ -501,9 +501,7 @@ export function RequestFormsManager() {
                 <span
                   className={clsx(
                     'rounded-full px-2 py-1 text-xs font-medium',
-                    f.is_public
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-slate-100 text-slate-600',
+                    f.is_public ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600',
                   )}
                 >
                   {f.is_public ? 'Published' : 'Unpublished'}

@@ -1,11 +1,4 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  HttpStatus,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { BadRequestException, Controller, Get, HttpStatus, Query, UseGuards } from '@nestjs/common';
 import {
   dashboardAnalyticsQuerySchema,
   dashboardAnalyticsExportQuerySchema,

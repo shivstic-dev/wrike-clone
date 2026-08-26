@@ -40,11 +40,7 @@ function managerVisibleMemberIds(db: Knex, scope: DashboardQueryScope): Knex.Que
         'dashboard_member_tenant.tenant_id',
         '=',
         'dashboard_member_workspace.tenant_id',
-      ).andOn(
-        'dashboard_member_tenant.user_id',
-        '=',
-        'dashboard_member_workspace.user_id',
-      );
+      ).andOn('dashboard_member_tenant.user_id', '=', 'dashboard_member_workspace.user_id');
     })
     .where('dashboard_member_workspace.tenant_id', scope.tenantId)
     .where('dashboard_member_workspace.workspace_id', scope.departmentId!)
@@ -53,9 +49,7 @@ function managerVisibleMemberIds(db: Knex, scope: DashboardQueryScope): Knex.Que
     .whereNotExists(function () {
       this.select(1)
         .from('department_heads as dashboard_member_head')
-        .whereRaw(
-          'dashboard_member_head.department_id = dashboard_member_workspace.workspace_id',
-        )
+        .whereRaw('dashboard_member_head.department_id = dashboard_member_workspace.workspace_id')
         .whereRaw('dashboard_member_head.user_id = dashboard_member_workspace.user_id')
         .andWhere('dashboard_member_head.tenant_id', scope.tenantId);
     })
@@ -74,11 +68,7 @@ function applyEmployeeScope(query: Knex.QueryBuilder, scope: DashboardQueryScope
   });
 }
 
-function applyManagerScope(
-  db: Knex,
-  query: Knex.QueryBuilder,
-  scope: DashboardQueryScope,
-): void {
+function applyManagerScope(db: Knex, query: Knex.QueryBuilder, scope: DashboardQueryScope): void {
   query.andWhere((visible) => {
     visible
       .where('tasks.assignee_id', scope.userId)
@@ -140,13 +130,7 @@ function assigneeProjection(db: Knex, scope: DashboardQueryScope): Knex.Raw {
             )
         )
     `;
-    bindings.push(
-      scope.userId,
-      scope.tenantId,
-      true,
-      'admin',
-      scope.tenantId,
-    );
+    bindings.push(scope.userId, scope.tenantId, true, 'admin', scope.tenantId);
   }
 
   return db.raw(
@@ -204,10 +188,7 @@ function assigneeProjection(db: Knex, scope: DashboardQueryScope): Knex.Raw {
   );
 }
 
-export function buildDashboardRowsQuery(
-  db: Knex,
-  scope: DashboardQueryScope,
-): Knex.QueryBuilder {
+export function buildDashboardRowsQuery(db: Knex, scope: DashboardQueryScope): Knex.QueryBuilder {
   const query = db('tasks')
     .join('workspaces', function () {
       this.on('workspaces.id', '=', 'tasks.department_id').andOn(
@@ -274,10 +255,7 @@ export function buildDashboardRowsQuery(
 
 function isDashboardRole(role: string): role is DashboardViewerRole {
   return (
-    role === 'employee' ||
-    role === 'manager' ||
-    role === 'department_head' ||
-    role === 'admin'
+    role === 'employee' || role === 'manager' || role === 'department_head' || role === 'admin'
   );
 }
 
@@ -365,10 +343,7 @@ function buildDepartmentComparison(
       ...department,
       completionRate: total === 0 ? 0 : Math.round((completed / total) * 100),
     }))
-    .sort(
-      (left, right) =>
-        compareText(left.name, right.name) || compareText(left.id, right.id),
-    );
+    .sort((left, right) => compareText(left.name, right.name) || compareText(left.id, right.id));
 }
 
 @Injectable()
@@ -391,8 +366,7 @@ export class DashboardService {
     if (resolved.role !== 'admin' && !resolved.departmentId) {
       throw new ForbiddenException('A department is required for dashboard access');
     }
-    const departmentId =
-      resolved.role === 'admin' ? departmentIdInput : resolved.departmentId;
+    const departmentId = resolved.role === 'admin' ? departmentIdInput : resolved.departmentId;
     if (resolved.role === 'admin' && departmentId) {
       const department = await this.db('workspaces')
         .where({ id: departmentId, tenant_id: ctx.tenantId })
@@ -414,10 +388,7 @@ export class DashboardService {
     };
   }
 
-  async overview(input: {
-    departmentId?: string;
-    days: 30;
-  }): Promise<DashboardOverview> {
+  async overview(input: { departmentId?: string; days: 30 }): Promise<DashboardOverview> {
     const { role, scope } = await this.resolveScope(input.departmentId);
     const now = new Date();
     const rows = (await buildDashboardRowsQuery(this.db, scope)) as DashboardTaskRow[];
@@ -431,8 +402,7 @@ export class DashboardService {
         role,
       },
       ...metrics,
-      departments:
-        role === 'admin' ? buildDepartmentComparison(rows, now) : [],
+      departments: role === 'admin' ? buildDepartmentComparison(rows, now) : [],
     };
   }
 
@@ -487,12 +457,7 @@ export class DashboardService {
             'task:handoff:ready',
             'task:handoff:confirmed',
           ])
-          .select(
-            'entity_id as taskId',
-            'action',
-            'created_at as createdAt',
-            'changes',
-          )
+          .select('entity_id as taskId', 'action', 'created_at as createdAt', 'changes')
           .orderBy('created_at', 'asc')) as Array<{
           taskId: string;
           action: string;
@@ -520,9 +485,7 @@ export class DashboardService {
     return result;
   }
 
-  async analyticsExport(
-    input: DashboardAnalyticsQuery & { format: 'pdf' | 'xlsx' },
-  ) {
+  async analyticsExport(input: DashboardAnalyticsQuery & { format: 'pdf' | 'xlsx' }) {
     const { format, ...query } = input;
     const data = await this.analytics(query);
     return exportDashboardAnalytics(data, format);

@@ -54,7 +54,9 @@ function FilterSelect({
       >
         <option value="">All</option>
         {options.map((option) => (
-          <option key={option.id} value={option.id}>{option.label}</option>
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
         ))}
       </select>
     </label>
@@ -84,7 +86,9 @@ export function TimelineToolbar({
         <button type="button" aria-label="Previous date range" onClick={onPrevious}>
           <span aria-hidden="true">←</span> Previous
         </button>
-        <button type="button" aria-label="Show today" onClick={onToday}>Today</button>
+        <button type="button" aria-label="Show today" onClick={onToday}>
+          Today
+        </button>
         <button type="button" aria-label="Next date range" onClick={onNext}>
           Next <span aria-hidden="true">→</span>
         </button>

@@ -22,9 +22,15 @@ function UnscheduledTask({
 
   return (
     <li className="unscheduled-task" data-unscheduled-task={task.id}>
-      <button type="button" className="unscheduled-task__identity" onClick={() => onOpenTask(task.id)}>
+      <button
+        type="button"
+        className="unscheduled-task__identity"
+        onClick={() => onOpenTask(task.id)}
+      >
         <strong>{task.title}</strong>
-        <span>{task.projectName || 'No project'} · {task.departmentName || 'Department work'}</span>
+        <span>
+          {task.projectName || 'No project'} · {task.departmentName || 'Department work'}
+        </span>
       </button>
       {task.capabilities.canEditSchedule ? (
         <div className="unscheduled-task__schedule" aria-label={`Schedule ${task.title}`}>

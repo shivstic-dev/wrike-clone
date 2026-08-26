@@ -9,11 +9,46 @@ const analytics: DashboardAnalyticsResponse = {
   scope: { role: 'manager', departmentId: 'department-1' },
   kpis: { averageCompletionHours: 28.5, handoffSuccessRate: 80, onTimeCompletionRate: 75 },
   monthlyCompletion: [{ month: '2026-08', completed: 12 }],
-  overdueOutcome: [{ month: '2026-08', total: 2, departments: [{ id: 'department-1', name: 'Operations', count: 2 }] }],
-  workload: [{ userId: 'user-1', name: 'Atul', role: 'manager', active: 4, overdue: 1, estimatedHours: 18 }],
-  blockedAgeing: { averageDays: 3, maxDays: 3, items: [{ taskId: 'task-1', title: 'Permit review', projectId: 'project-1', projectName: 'Annual plan', days: 3 }] },
+  overdueOutcome: [
+    {
+      month: '2026-08',
+      total: 2,
+      departments: [{ id: 'department-1', name: 'Operations', count: 2 }],
+    },
+  ],
+  workload: [
+    { userId: 'user-1', name: 'Atul', role: 'manager', active: 4, overdue: 1, estimatedHours: 18 },
+  ],
+  blockedAgeing: {
+    averageDays: 3,
+    maxDays: 3,
+    items: [
+      {
+        taskId: 'task-1',
+        title: 'Permit review',
+        projectId: 'project-1',
+        projectName: 'Annual plan',
+        days: 3,
+      },
+    ],
+  },
   priorityDistribution: { critical: 1, high: 2, medium: 3, low: 4 },
-  projectHealth: [{ projectId: 'project-1', projectName: 'Annual plan', score: 82, band: 'green', taskCount: 10, components: { onTime: 75, overdueControl: 90, blockedAgeing: 90, workloadBalance: 80, handoffSuccess: 80 } }],
+  projectHealth: [
+    {
+      projectId: 'project-1',
+      projectName: 'Annual plan',
+      score: 82,
+      band: 'green',
+      taskCount: 10,
+      components: {
+        onTime: 75,
+        overdueControl: 90,
+        blockedAgeing: 90,
+        workloadBalance: 80,
+        handoffSuccess: 80,
+      },
+    },
+  ],
 };
 
 describe('DashboardAnalyticsPanel', () => {

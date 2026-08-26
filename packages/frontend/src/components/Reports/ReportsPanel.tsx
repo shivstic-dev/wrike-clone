@@ -112,9 +112,7 @@ export function ReportsPanel() {
     [departmentId, dateFrom, dateTo, status, priority, assigneeId, scope, targetUserId],
   );
   const enabled =
-    roleReady &&
-    (isAdmin || !!departmentId) &&
-    (scope !== 'individual' || !!targetUserId);
+    roleReady && (isAdmin || !!departmentId) && (scope !== 'individual' || !!targetUserId);
   const report = useDepartmentReport(filters, enabled);
 
   async function exportReport(format: 'pdf' | 'xlsx') {
@@ -401,9 +399,7 @@ export function ReportsPanel() {
                       <td className="px-4 py-2 capitalize">{task.status.replace('_', ' ')}</td>
                       <td className="px-4 py-2 capitalize">{task.priority}</td>
                       <td className="px-4 py-2">
-                        {task.dueDate
-                          ? new Date(task.dueDate).toLocaleDateString()
-                          : 'No due date'}
+                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}
                       </td>
                     </tr>
                   ))}

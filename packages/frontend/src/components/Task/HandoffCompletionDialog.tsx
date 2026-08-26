@@ -105,7 +105,10 @@ export function HandoffCompletionDialog({
           </div>
 
           <div className="flex flex-1 flex-col px-5 py-5 sm:px-6">
-            <h3 id="handoff-completion-question" className="text-base font-medium leading-6 text-slate-700">
+            <h3
+              id="handoff-completion-question"
+              className="text-base font-medium leading-6 text-slate-700"
+            >
               Has the finished work been shared with the intended recipient?
             </h3>
 
@@ -115,7 +118,13 @@ export function HandoffCompletionDialog({
                   aria-hidden="true"
                   className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white text-atlas-current shadow-[0_1px_2px_rgba(13,59,42,0.08)]"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    className="h-4 w-4"
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" d="m5 12 4 4L19 6" />
                   </svg>
                 </span>
@@ -124,9 +133,7 @@ export function HandoffCompletionDialog({
                     Intended recipient
                   </p>
                   <h3 className="mt-1 text-sm font-semibold text-atlas-ink">{ownerName}</h3>
-                  <p className="mt-1 text-xs leading-5 text-slate-600">
-                    Task owner
-                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">Task owner</p>
                 </div>
               </div>
             </div>

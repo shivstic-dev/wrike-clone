@@ -20,9 +20,7 @@ import {
 } from './dashboard.service';
 import type { DashboardTaskRow } from './dashboard-metrics';
 
-function row(
-  overrides: Partial<DashboardTaskRow> & { id: string },
-): DashboardTaskRow {
+function row(overrides: Partial<DashboardTaskRow> & { id: string }): DashboardTaskRow {
   return {
     title: overrides.id,
     status: 'todo',
@@ -137,9 +135,7 @@ describe('buildDashboardRowsQuery', () => {
     const { sql } = normalizedSql(buildDashboardRowsQuery(db, baseScope));
 
     expect(sql).toContain('left join "tenant_memberships" as "dashboard_handoff_owner_membership"');
-    expect(sql).toContain(
-      '"dashboard_handoff_owner_membership"."tenant_id" = "tasks"."tenant_id"',
-    );
+    expect(sql).toContain('"dashboard_handoff_owner_membership"."tenant_id" = "tasks"."tenant_id"');
     expect(sql).toContain(
       '"dashboard_handoff_owner_membership"."user_id" = "tasks"."handoff_owner_id"',
     );
@@ -347,9 +343,7 @@ describe('DashboardService', () => {
       }),
     ]);
 
-    const result = await tenantContext.run(context, () =>
-      service.overview({ days: 30 }),
-    );
+    const result = await tenantContext.run(context, () => service.overview({ days: 30 }));
 
     expect(result.generatedAt).toBe('2026-07-28T12:00:00.000Z');
     expect(result.scope).toEqual({ role: 'admin', departmentId: undefined });
@@ -459,7 +453,11 @@ describe('DashboardService', () => {
       ownTasksOnly: role === 'employee',
     });
     dbRows.mockResolvedValue([
-      row({ id: 'ready', handoffStatus: 'ready', handoffReadyAt: new Date('2026-07-27T12:00:00Z') }),
+      row({
+        id: 'ready',
+        handoffStatus: 'ready',
+        handoffReadyAt: new Date('2026-07-27T12:00:00Z'),
+      }),
       row({ id: 'pending' }),
     ]);
 
@@ -579,9 +577,9 @@ describe('DashboardController', () => {
       AuthGuard,
       RolesGuard,
     ]);
-    expect(
-      Reflect.getMetadata(PERMISSIONS_KEY, DashboardController.prototype.overview),
-    ).toEqual(['task:read']);
+    expect(Reflect.getMetadata(PERMISSIONS_KEY, DashboardController.prototype.overview)).toEqual([
+      'task:read',
+    ]);
   });
 
   it('validates and defaults overview query input before calling the service', async () => {
@@ -601,7 +599,11 @@ describe('DashboardController', () => {
       [{ departmentId?: string; days: 30; bucket: DashboardTaskBucket }]
     >();
     const controller = new DashboardController({ tasks } as never);
-    tasks.mockResolvedValue({ generatedAt: '2026-07-28T12:00:00.000Z', bucket: 'ready_for_handoff', data: [] });
+    tasks.mockResolvedValue({
+      generatedAt: '2026-07-28T12:00:00.000Z',
+      bucket: 'ready_for_handoff',
+      data: [],
+    });
 
     await controller.tasks({ bucket: 'ready_for_handoff' });
 

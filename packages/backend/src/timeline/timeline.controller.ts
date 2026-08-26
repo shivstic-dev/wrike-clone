@@ -1,5 +1,23 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { createDependencySchema, timelineQuerySchema, updateDependencySchema, updateTaskScheduleSchema } from '@wrike-clone/shared';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  createDependencySchema,
+  timelineQuerySchema,
+  updateDependencySchema,
+  updateTaskScheduleSchema,
+} from '@wrike-clone/shared';
 import { Permissions } from '../common/decorators/permissions.decorator';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';

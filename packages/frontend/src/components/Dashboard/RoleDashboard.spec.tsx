@@ -123,7 +123,9 @@ describe('RoleDashboard', () => {
     const onSelectBucket = vi.fn();
     await act(async () => {
       root = createRoot(container);
-      root.render(<RoleDashboard overview={overview({ role: 'manager' })} onSelectBucket={onSelectBucket} />);
+      root.render(
+        <RoleDashboard overview={overview({ role: 'manager' })} onSelectBucket={onSelectBucket} />,
+      );
       await Promise.resolve();
     });
 

@@ -52,6 +52,8 @@ export function dependencyPath(
   return {
     anchors,
     points,
-    path: points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' '),
+    path: points
+      .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+      .join(' '),
   };
 }

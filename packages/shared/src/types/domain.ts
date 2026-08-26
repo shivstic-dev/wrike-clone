@@ -6,7 +6,14 @@
  * so API contracts are a single source of truth.
  */
 
-import type { TaskPriority, TaskStatus, HandoffStatus, TenantRole, PlanTier, FileCategory } from '../enums';
+import type {
+  TaskPriority,
+  TaskStatus,
+  HandoffStatus,
+  TenantRole,
+  PlanTier,
+  FileCategory,
+} from '../enums';
 
 // ── Timestamp helpers ──────────────────────────────────────────
 export type Timestamp = string; // ISO-8601
@@ -160,7 +167,6 @@ export interface Task extends BaseEntity {
   handoffConfirmedBy?: string | null;
   handoffConfirmedAt?: Timestamp | null;
 }
-
 
 export interface TaskDependency {
   id: string;

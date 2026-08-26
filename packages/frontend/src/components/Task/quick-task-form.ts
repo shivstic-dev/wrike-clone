@@ -91,7 +91,6 @@ export function normalizeQuickTaskInput(state: QuickTaskFormState): CreateTaskRe
   };
 }
 
-
 export function canCreateQuickTask<T extends { departmentRole?: string }>(
   departments: T[],
   tenantRole?: string,

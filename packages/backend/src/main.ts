@@ -36,7 +36,10 @@ async function bootstrap(): Promise<void> {
   const isWildcard = origins.includes('*');
 
   app.enableCors({
-    origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    origin: (
+      requestOrigin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
       // Allow non-browser requests (e.g. curl, server-to-server, health checks)
       if (!requestOrigin) {
         return callback(null, true);

@@ -82,7 +82,11 @@ describe('dashboard API', () => {
   });
 
   it('serializes the ready-for-handoff bucket and current department exactly', async () => {
-    const response = { generatedAt: '2026-07-30T12:00:00.000Z', bucket: 'ready_for_handoff', data: [] };
+    const response = {
+      generatedAt: '2026-07-30T12:00:00.000Z',
+      bucket: 'ready_for_handoff',
+      data: [],
+    };
     getMock.mockResolvedValueOnce({ data: response });
 
     await expect(
@@ -170,9 +174,7 @@ describe('dashboard API', () => {
     const blob = new Blob(['report'], { type: 'application/pdf' });
     getMock.mockResolvedValueOnce({ data: blob });
 
-    await expect(
-      requestDashboardAnalyticsExport({ groupBy: 'month' }, 'pdf'),
-    ).resolves.toBe(blob);
+    await expect(requestDashboardAnalyticsExport({ groupBy: 'month' }, 'pdf')).resolves.toBe(blob);
     const [, config] = getMock.mock.calls[0] ?? [];
     expect(getMock).toHaveBeenCalledWith('/dashboard/analytics/export', expect.any(Object));
     expect(config?.params?.toString()).toBe('groupBy=month&format=pdf');

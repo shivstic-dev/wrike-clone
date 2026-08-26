@@ -81,8 +81,12 @@ export function useTimeline(
   });
 }
 
-function replaceTask(response: TimelineResponse, taskId: string, patch: Pick<TimelineTask, 'startDate' | 'dueDate'>): TimelineResponse {
-  const replace = (task: TimelineTask) => task.id === taskId ? { ...task, ...patch } : task;
+function replaceTask(
+  response: TimelineResponse,
+  taskId: string,
+  patch: Pick<TimelineTask, 'startDate' | 'dueDate'>,
+): TimelineResponse {
+  const replace = (task: TimelineTask) => (task.id === taskId ? { ...task, ...patch } : task);
   return {
     ...response,
     tasks: response.tasks.map(replace),
@@ -131,7 +135,11 @@ export function useUpdateTaskSchedule(): UseMutationResult<
   });
 }
 
-export function useCreateDependency(): UseMutationResult<TaskDependency, Error, CreateDependencyRequest> {
+export function useCreateDependency(): UseMutationResult<
+  TaskDependency,
+  Error,
+  CreateDependencyRequest
+> {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input) => {

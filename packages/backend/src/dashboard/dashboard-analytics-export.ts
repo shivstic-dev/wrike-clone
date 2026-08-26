@@ -67,7 +67,17 @@ function xlsx(data: DashboardAnalyticsResponse): Buffer {
     ]),
   ];
   const health: Array<Array<string | number>> = [
-    ['Project', 'Score', 'Band', 'Tasks', 'On-time', 'Overdue control', 'Blocked ageing', 'Workload balance', 'Handoff success'],
+    [
+      'Project',
+      'Score',
+      'Band',
+      'Tasks',
+      'On-time',
+      'Overdue control',
+      'Blocked ageing',
+      'Workload balance',
+      'Handoff success',
+    ],
     ...data.projectHealth.map((project) => [
       project.projectName,
       project.score,
@@ -113,7 +123,9 @@ function pdf(data: DashboardAnalyticsResponse): Promise<Buffer> {
     document.fillColor('#0d3b2a').fontSize(22).text('CEPAA Board Summary');
     document.fillColor('#64748b').fontSize(9).text(`Generated ${data.generatedAt}`);
     document.moveDown().fillColor('#0f172a').fontSize(11);
-    document.text(`Scope: ${data.scope.role} · ${data.scope.departmentId ?? 'all authorized departments'}`);
+    document.text(
+      `Scope: ${data.scope.role} · ${data.scope.departmentId ?? 'all authorized departments'}`,
+    );
     document.text(`Period: ${data.period.from.slice(0, 10)} to ${data.period.to.slice(0, 10)}`);
     document.moveDown().fontSize(15).text('Key performance indicators');
     document.fontSize(10);
@@ -132,9 +144,11 @@ function pdf(data: DashboardAnalyticsResponse): Promise<Buffer> {
     for (const project of data.projectHealth) {
       if (document.y > 750) document.addPage();
       document.text(`${project.projectName}: ${project.score}/100 (${project.band})`);
-      document.fillColor('#64748b').text(
-        `On-time ${project.components.onTime} · overdue control ${project.components.overdueControl} · blocked ageing ${project.components.blockedAgeing} · workload ${project.components.workloadBalance} · handoff ${project.components.handoffSuccess}`,
-      );
+      document
+        .fillColor('#64748b')
+        .text(
+          `On-time ${project.components.onTime} · overdue control ${project.components.overdueControl} · blocked ageing ${project.components.blockedAgeing} · workload ${project.components.workloadBalance} · handoff ${project.components.handoffSuccess}`,
+        );
       document.fillColor('#0f172a');
     }
     document.end();

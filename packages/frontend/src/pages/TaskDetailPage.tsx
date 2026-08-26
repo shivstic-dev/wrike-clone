@@ -32,9 +32,7 @@ function TaskLocationEditor({ task }: { task: Task }) {
   const [selectedProjectId, setSelectedProjectId] = useState(
     task.isSystemProject ? '' : task.projectId,
   );
-  const selectedLocation = locations.find(
-    (location) => location.folderId === selectedFolderId,
-  );
+  const selectedLocation = locations.find((location) => location.folderId === selectedFolderId);
 
   async function handleFolderChange(folderId: string) {
     if (!folderId || folderId === selectedFolderId) return;
@@ -64,14 +62,9 @@ function TaskLocationEditor({ task }: { task: Task }) {
   }
 
   return (
-    <section
-      className="card mb-6 overflow-hidden"
-      aria-labelledby="task-location-heading"
-    >
+    <section className="card mb-6 overflow-hidden" aria-labelledby="task-location-heading">
       <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">
-          Task home
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-primary-600">Task home</p>
         <h2 id="task-location-heading" className="mt-0.5 text-sm font-semibold text-slate-800">
           Location
         </h2>
@@ -131,7 +124,10 @@ function TaskLocationEditor({ task }: { task: Task }) {
         </div>
       </div>
       {isError && (
-        <p className="border-t border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700" role="alert">
+        <p
+          className="border-t border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700"
+          role="alert"
+        >
           Available folders could not be loaded. Try refreshing the page.
         </p>
       )}
@@ -161,9 +157,7 @@ export default function TaskDetailPage() {
       toast.success('Saved in Ready for handoff');
     } else {
       toast.success(
-        taskToComplete.handoffRequired
-          ? 'Handoff confirmed and task completed'
-          : 'Task completed',
+        taskToComplete.handoffRequired ? 'Handoff confirmed and task completed' : 'Task completed',
       );
     }
     return true;
@@ -303,7 +297,9 @@ export default function TaskDetailPage() {
           {/* Status and Priority */}
           <div className="mb-6 grid grid-cols-3 gap-4">
             <div>
-              <label className="label" htmlFor="task-status">Status</label>
+              <label className="label" htmlFor="task-status">
+                Status
+              </label>
               <select
                 id="task-status"
                 value={task.status}
@@ -345,7 +341,10 @@ export default function TaskDetailPage() {
             </div>
           </div>
 
-          <section className="card mb-6 border-atlas-mist p-4" aria-labelledby="handoff-status-heading">
+          <section
+            className="card mb-6 border-atlas-mist p-4"
+            aria-labelledby="handoff-status-heading"
+          >
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-atlas-current">
               Final handoff
             </p>

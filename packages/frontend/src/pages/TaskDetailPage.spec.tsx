@@ -13,7 +13,12 @@ const mocks = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   departmentRole: 'manager',
-  members: [] as Array<{ userId: string; displayName: string; email: string; role: 'employee' | 'manager' | 'department_head' | 'admin' }>,
+  members: [] as Array<{
+    userId: string;
+    displayName: string;
+    email: string;
+    role: 'employee' | 'manager' | 'department_head' | 'admin';
+  }>,
 }));
 
 const task = {
@@ -155,9 +160,7 @@ function changeSelect(select: HTMLSelectElement, value: string) {
 
 function getByRole<T extends HTMLElement>(role: 'combobox', name: string): T {
   const control = [...container.querySelectorAll<HTMLElement>('select')].find((candidate) => {
-    const label = candidate.id
-      ? container.querySelector(`label[for="${candidate.id}"]`)
-      : null;
+    const label = candidate.id ? container.querySelector(`label[for="${candidate.id}"]`) : null;
     return label?.textContent?.trim() === name;
   });
   if (!(control instanceof HTMLElement)) throw new Error(`${role} named ${name} was not rendered`);
@@ -181,7 +184,11 @@ beforeEach(() => {
   mocks.updateTask.mockReset();
   mocks.updateTask.mockResolvedValue(task);
   mocks.requestCompletion.mockReset();
-  mocks.requestCompletion.mockResolvedValue({ ...task, status: 'completed', handoffStatus: 'confirmed' });
+  mocks.requestCompletion.mockResolvedValue({
+    ...task,
+    status: 'completed',
+    handoffStatus: 'confirmed',
+  });
   mocks.toastSuccess.mockReset();
   mocks.toastError.mockReset();
   container = document.createElement('div');
@@ -304,7 +311,11 @@ describe('TaskDetailPage handoff completion', () => {
   });
 
   it('keeps a Not yet task outside Completed and shows the Ready for handoff toast', async () => {
-    mocks.requestCompletion.mockResolvedValue({ ...task, status: 'in_progress', handoffStatus: 'ready' });
+    mocks.requestCompletion.mockResolvedValue({
+      ...task,
+      status: 'in_progress',
+      handoffStatus: 'ready',
+    });
     act(() => {
       root = createRoot(container);
       root.render(<TaskDetailPage />);
@@ -346,7 +357,9 @@ describe('TaskDetailPage handoff completion', () => {
       await Promise.resolve();
     });
 
-    expect(mocks.requestCompletion).toHaveBeenCalledWith(expect.objectContaining({ handoffRequired: false }));
+    expect(mocks.requestCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({ handoffRequired: false }),
+    );
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 

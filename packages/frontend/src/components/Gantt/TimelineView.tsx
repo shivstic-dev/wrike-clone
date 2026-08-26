@@ -107,7 +107,8 @@ function mergeTimeline(previous: TimelineResponse, next: TimelineResponse): Time
 }
 
 function errorDetails(error: unknown): ErrorDetails {
-  const response = (error as { response?: { status?: number; data?: { code?: string } } })?.response;
+  const response = (error as { response?: { status?: number; data?: { code?: string } } })
+    ?.response;
   return { status: response?.status, code: response?.data?.code };
 }
 
@@ -229,8 +230,7 @@ export function TimelineView({ scope }: TimelineViewProps) {
     );
   }, [range.from, range.to, setSearchParams, zoom]);
 
-  const data =
-    accumulated?.identity === identity ? accumulated.response : timeline.data;
+  const data = accumulated?.identity === identity ? accumulated.response : timeline.data;
   const visibleData = useMemo(() => {
     if (!data || !filters.criticalOnly) return data;
     const tasks = data.tasks.filter((task) => task.isCritical);
@@ -240,8 +240,7 @@ export function TimelineView({ scope }: TimelineViewProps) {
       tasks,
       unscheduled: [],
       dependencies: data.dependencies.filter(
-        (dependency) =>
-          taskIds.has(dependency.taskId) && taskIds.has(dependency.dependsOnTaskId),
+        (dependency) => taskIds.has(dependency.taskId) && taskIds.has(dependency.dependsOnTaskId),
       ),
     };
   }, [data, filters.criticalOnly]);

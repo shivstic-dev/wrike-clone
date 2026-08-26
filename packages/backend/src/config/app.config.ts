@@ -105,8 +105,12 @@ export function validateProductionConfig(): void {
 
   const problems: string[] = [];
   const jwtSecret = process.env['JWT_SECRET'] || '';
-  const rawCorsOrigins = parseCorsOrigins(process.env['CORS_ORIGIN'] || process.env['CORS_ORIGINS'] || '');
-  const corsOrigins = loadCorsOrigins(process.env['CORS_ORIGIN'] || process.env['CORS_ORIGINS'] || '');
+  const rawCorsOrigins = parseCorsOrigins(
+    process.env['CORS_ORIGIN'] || process.env['CORS_ORIGINS'] || '',
+  );
+  const corsOrigins = loadCorsOrigins(
+    process.env['CORS_ORIGIN'] || process.env['CORS_ORIGINS'] || '',
+  );
 
   if (!process.env['DATABASE_URL']) problems.push('DATABASE_URL is required');
   if (!process.env['APP_PUBLIC_URL']) problems.push('APP_PUBLIC_URL is required');
@@ -143,7 +147,9 @@ export function loadDatabaseConfig(): DatabaseConfig {
     10,
   );
   const maxConnections = parseInt(
-    process.env['DATABASE_POOL_MAX'] || process.env['DB_MAX_CONNECTIONS'] || (databaseUrl ? '8' : '10'),
+    process.env['DATABASE_POOL_MAX'] ||
+      process.env['DB_MAX_CONNECTIONS'] ||
+      (databaseUrl ? '8' : '10'),
     10,
   );
   const idleTimeoutMs = parseInt(process.env['DB_IDLE_TIMEOUT_MS'] || '10000', 10);

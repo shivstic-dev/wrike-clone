@@ -23,16 +23,18 @@ function timelineTask(overrides: Partial<TimelineTask> = {}): TimelineTask {
     departmentId: 'department-1',
     parentTaskId: null,
     assigneeId: 'person-1',
-    assignees: [{
-      id: 'assignment-1',
-      taskId: 'task-1',
-      userId: 'person-1',
-      assignedById: 'manager-1',
-      isPrimary: true,
-      assignedAt: '2026-07-01T00:00:00.000Z',
-      displayName: 'Mira Sen',
-      email: 'mira@example.org',
-    }],
+    assignees: [
+      {
+        id: 'assignment-1',
+        taskId: 'task-1',
+        userId: 'person-1',
+        assignedById: 'manager-1',
+        isPrimary: true,
+        assignedAt: '2026-07-01T00:00:00.000Z',
+        displayName: 'Mira Sen',
+        email: 'mira@example.org',
+      },
+    ],
     createdById: 'manager-1',
     title: 'Prepare health-camp banner',
     description: null,
@@ -81,7 +83,10 @@ function response(
 let container: HTMLDivElement;
 let root: Root | undefined;
 
-function renderChart(data: TimelineResponse, props: Partial<ComponentProps<typeof GanttChart>> = {}) {
+function renderChart(
+  data: TimelineResponse,
+  props: Partial<ComponentProps<typeof GanttChart>> = {},
+) {
   const onScheduleChange = vi.fn();
   const onOpenTask = vi.fn();
   act(() => {
@@ -99,14 +104,24 @@ function renderChart(data: TimelineResponse, props: Partial<ComponentProps<typeo
   return { onScheduleChange, onOpenTask };
 }
 
-function pointer(target: Element, type: string, init: { pointerId: number; clientX: number; pointerType?: string }) {
+function pointer(
+  target: Element,
+  type: string,
+  init: { pointerId: number; clientX: number; pointerType?: string },
+) {
   const event = new Event(type, { bubbles: true, cancelable: true });
-  Object.assign(event, { pointerId: init.pointerId, clientX: init.clientX, pointerType: init.pointerType ?? 'mouse' });
+  Object.assign(event, {
+    pointerId: init.pointerId,
+    clientX: init.clientX,
+    pointerType: init.pointerType ?? 'mouse',
+  });
   target.dispatchEvent(event);
 }
 
 beforeEach(() => {
-  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  (
+    globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+  ).IS_REACT_ACT_ENVIRONMENT = true;
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-07-05T10:00:00.000Z'));
   container = document.createElement('div');
@@ -122,10 +137,17 @@ afterEach(() => {
 
 describe('GanttChart renderer', () => {
   it('renders one identity row and one timeline bar per scheduled task', () => {
-    renderChart(response([
-      timelineTask(),
-      timelineTask({ id: 'task-2', title: 'Confirm volunteer roster', startDate: '2026-07-05', dueDate: '2026-07-08' }),
-    ]));
+    renderChart(
+      response([
+        timelineTask(),
+        timelineTask({
+          id: 'task-2',
+          title: 'Confirm volunteer roster',
+          startDate: '2026-07-05',
+          dueDate: '2026-07-08',
+        }),
+      ]),
+    );
 
     expect(container.querySelectorAll('[data-gantt-row]')).toHaveLength(2);
     expect(container.querySelectorAll('[data-gantt-bar]')).toHaveLength(2);
@@ -140,7 +162,12 @@ describe('GanttChart renderer', () => {
   });
 
   it('keeps unscheduled work in its panel instead of placing it at the timeline origin', () => {
-    const unscheduled = timelineTask({ id: 'task-unscheduled', title: 'Call district coordinator', startDate: null, dueDate: null });
+    const unscheduled = timelineTask({
+      id: 'task-unscheduled',
+      title: 'Call district coordinator',
+      startDate: null,
+      dueDate: null,
+    });
     renderChart(response([], [unscheduled]));
 
     expect(container.querySelector('[data-unscheduled-task="task-unscheduled"]')).not.toBeNull();
@@ -171,14 +198,27 @@ describe('GanttChart renderer', () => {
     [DependencyType.START_TO_FINISH, '40', '360'],
   ])('uses the correct anchors for %s dependencies', (dependencyType, fromX, toX) => {
     const first = timelineTask();
-    const second = timelineTask({ id: 'task-2', title: 'Deliver final artwork', startDate: '2026-07-07', dueDate: '2026-07-09' });
-    renderChart(response([first, second], [], [{
-      id: `dependency-${dependencyType}`,
-      taskId: second.id,
-      dependsOnTaskId: first.id,
-      dependencyType,
-      lagDays: 2,
-    }]));
+    const second = timelineTask({
+      id: 'task-2',
+      title: 'Deliver final artwork',
+      startDate: '2026-07-07',
+      dueDate: '2026-07-09',
+    });
+    renderChart(
+      response(
+        [first, second],
+        [],
+        [
+          {
+            id: `dependency-${dependencyType}`,
+            taskId: second.id,
+            dependsOnTaskId: first.id,
+            dependencyType,
+            lagDays: 2,
+          },
+        ],
+      ),
+    );
 
     const path = container.querySelector(`[data-dependency-type="${dependencyType}"]`);
     expect(path?.getAttribute('data-from-x')).toBe(fromX);
@@ -187,11 +227,15 @@ describe('GanttChart renderer', () => {
   });
 
   it('announces critical, overdue, and handoff-ready work', () => {
-    renderChart(response([timelineTask({
-      dueDate: '2026-07-03',
-      isCritical: true,
-      handoffStatus: HandoffStatus.READY,
-    })]));
+    renderChart(
+      response([
+        timelineTask({
+          dueDate: '2026-07-03',
+          isCritical: true,
+          handoffStatus: HandoffStatus.READY,
+        }),
+      ]),
+    );
 
     expect(container.querySelector('[aria-label*="Critical path"]')).not.toBeNull();
     expect(container.textContent).toContain('Overdue');
@@ -199,9 +243,13 @@ describe('GanttChart renderer', () => {
   });
 
   it('removes schedule affordances when the task cannot be edited', () => {
-    renderChart(response([timelineTask({
-      capabilities: { canEditSchedule: false, canManageDependencies: false },
-    })]));
+    renderChart(
+      response([
+        timelineTask({
+          capabilities: { canEditSchedule: false, canManageDependencies: false },
+        }),
+      ]),
+    );
 
     expect(container.querySelector('[data-drag-handle]')).toBeNull();
     expect(container.querySelector('[data-resize-handle]')).toBeNull();
@@ -220,20 +268,28 @@ describe('GanttChart renderer', () => {
   it('uses unique dependency marker IDs for multiple charts', () => {
     const first = timelineTask();
     const second = timelineTask({ id: 'task-2', startDate: '2026-07-07', dueDate: '2026-07-09' });
-    const data = response([first, second], [], [{
-      id: 'dependency-1',
-      taskId: second.id,
-      dependsOnTaskId: first.id,
-      dependencyType: DependencyType.FINISH_TO_START,
-      lagDays: 0,
-    }]);
+    const data = response(
+      [first, second],
+      [],
+      [
+        {
+          id: 'dependency-1',
+          taskId: second.id,
+          dependsOnTaskId: first.id,
+          dependencyType: DependencyType.FINISH_TO_START,
+          lagDays: 0,
+        },
+      ],
+    );
 
     act(() => {
       root = createRoot(container);
-      root.render(<>
-        <GanttChart data={data} zoom="day" onScheduleChange={vi.fn()} onOpenTask={vi.fn()} />
-        <GanttChart data={data} zoom="day" onScheduleChange={vi.fn()} onOpenTask={vi.fn()} />
-      </>);
+      root.render(
+        <>
+          <GanttChart data={data} zoom="day" onScheduleChange={vi.fn()} onOpenTask={vi.fn()} />
+          <GanttChart data={data} zoom="day" onScheduleChange={vi.fn()} onOpenTask={vi.fn()} />
+        </>,
+      );
     });
 
     const markerIds = [...container.querySelectorAll('marker')].map((marker) => marker.id);
@@ -242,12 +298,16 @@ describe('GanttChart renderer', () => {
 
   it('provides a table fallback with complete task context and permitted date editing', () => {
     const { onScheduleChange } = renderChart(response([timelineTask()]));
-    const toggle = [...container.querySelectorAll('button')].find((button) => button.textContent === 'View as table');
+    const toggle = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'View as table',
+    );
     act(() => toggle?.click());
 
     expect(container.querySelector('table')?.textContent).toContain('Community campaign');
     expect(container.querySelector('table')?.textContent).toContain('Mira Sen');
-    const startInput = container.querySelector<HTMLInputElement>('table input[aria-label="Start date for Prepare health-camp banner"]');
+    const startInput = container.querySelector<HTMLInputElement>(
+      'table input[aria-label="Start date for Prepare health-camp banner"]',
+    );
     act(() => {
       if (!startInput) return;
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
@@ -256,10 +316,10 @@ describe('GanttChart renderer', () => {
       );
       startInput.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    expect(onScheduleChange).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'task-1' }),
-      { startDate: '2026-07-03', dueDate: '2026-07-04' },
-    );
+    expect(onScheduleChange).toHaveBeenCalledWith(expect.objectContaining({ id: 'task-1' }), {
+      startDate: '2026-07-03',
+      dueDate: '2026-07-04',
+    });
   });
 
   it('moves a bar by snapped day increments and commits once on pointer release', () => {
@@ -296,10 +356,12 @@ describe('GanttChart renderer', () => {
     });
 
     expect(onScheduleChange).toHaveBeenNthCalledWith(1, task, {
-      startDate: '2026-07-03', dueDate: '2026-07-04',
+      startDate: '2026-07-03',
+      dueDate: '2026-07-04',
     });
     expect(onScheduleChange).toHaveBeenNthCalledWith(2, task, {
-      startDate: '2026-07-02', dueDate: '2026-07-03',
+      startDate: '2026-07-02',
+      dueDate: '2026-07-03',
     });
   });
 
@@ -318,9 +380,12 @@ describe('GanttChart renderer', () => {
       pointer(bar, 'pointerup', { pointerId: 4, clientX: 100 + movement, pointerType: 'touch' });
     });
 
-    expect(onScheduleChange).toHaveBeenCalledWith(task, expect.objectContaining({
-      startDate: '2026-07-03',
-    }));
+    expect(onScheduleChange).toHaveBeenCalledWith(
+      task,
+      expect.objectContaining({
+        startDate: '2026-07-03',
+      }),
+    );
   });
 
   it('continues a captured drag outside the chart and Escape cancels without a request', () => {
@@ -335,7 +400,10 @@ describe('GanttChart renderer', () => {
       pointer(chart, 'pointermove', { pointerId: 5, clientX: 140 });
       pointer(chart, 'pointerup', { pointerId: 5, clientX: 140 });
     });
-    expect(onScheduleChange).toHaveBeenLastCalledWith(task, { startDate: '2026-07-03', dueDate: '2026-07-05' });
+    expect(onScheduleChange).toHaveBeenLastCalledWith(task, {
+      startDate: '2026-07-03',
+      dueDate: '2026-07-05',
+    });
 
     act(() => {
       if (!bar || !chart) return;
@@ -348,28 +416,53 @@ describe('GanttChart renderer', () => {
   });
 
   it('hides every scheduling and dependency write control from forbidden rows', () => {
-    renderChart(response([timelineTask({ capabilities: { canEditSchedule: false, canManageDependencies: false } })]), {
-      onCreateDependency: vi.fn(), onDeleteDependency: vi.fn(),
-    });
+    renderChart(
+      response([
+        timelineTask({ capabilities: { canEditSchedule: false, canManageDependencies: false } }),
+      ]),
+      {
+        onCreateDependency: vi.fn(),
+        onDeleteDependency: vi.fn(),
+      },
+    );
 
-    expect(container.querySelector('[data-gantt-bar]')?.getAttribute('data-can-schedule')).toBe('false');
+    expect(container.querySelector('[data-gantt-bar]')?.getAttribute('data-can-schedule')).toBe(
+      'false',
+    );
     expect(container.querySelector('[data-resize-start-handle]')).toBeNull();
     expect(container.querySelector('[data-resize-end-handle]')).toBeNull();
-    expect([...container.querySelectorAll('button')].some((button) => button.textContent === 'Add dependency')).toBe(false);
+    expect(
+      [...container.querySelectorAll('button')].some(
+        (button) => button.textContent === 'Add dependency',
+      ),
+    ).toBe(false);
   });
 
   it('creates an accessible dependency and removes it from the adjacent dependency list', () => {
     const predecessor = timelineTask();
-    const dependent = timelineTask({ id: 'task-2', title: 'Deliver final artwork', startDate: '2026-07-07', dueDate: '2026-07-09' });
+    const dependent = timelineTask({
+      id: 'task-2',
+      title: 'Deliver final artwork',
+      startDate: '2026-07-07',
+      dueDate: '2026-07-09',
+    });
     const dependency = {
-      id: 'dependency-1', taskId: dependent.id, dependsOnTaskId: predecessor.id,
-      dependencyType: DependencyType.FINISH_TO_START, lagDays: 0,
+      id: 'dependency-1',
+      taskId: dependent.id,
+      dependsOnTaskId: predecessor.id,
+      dependencyType: DependencyType.FINISH_TO_START,
+      lagDays: 0,
     };
     const onCreateDependency = vi.fn();
     const onDeleteDependency = vi.fn();
-    renderChart(response([predecessor, dependent], [], [dependency]), { onCreateDependency, onDeleteDependency });
+    renderChart(response([predecessor, dependent], [], [dependency]), {
+      onCreateDependency,
+      onDeleteDependency,
+    });
 
-    const add = container.querySelector<HTMLButtonElement>('[aria-label="Add a dependency to Deliver final artwork"]');
+    const add = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Add a dependency to Deliver final artwork"]',
+    );
     act(() => add?.click());
     const select = container.querySelector<HTMLSelectElement>('select[aria-label="Predecessor"]');
     const form = container.querySelector<HTMLFormElement>('form[aria-label="Add dependency"]');
@@ -378,11 +471,15 @@ describe('GanttChart renderer', () => {
       form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
     expect(onCreateDependency).toHaveBeenCalledWith({
-      dependsOnTaskId: predecessor.id, taskId: dependent.id,
-      dependencyType: DependencyType.FINISH_TO_START, lagDays: 0,
+      dependsOnTaskId: predecessor.id,
+      taskId: dependent.id,
+      dependencyType: DependencyType.FINISH_TO_START,
+      lagDays: 0,
     });
 
-    const remove = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Remove dependency');
+    const remove = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Remove dependency',
+    );
     act(() => remove?.click());
     expect(onDeleteDependency).toHaveBeenCalledWith('dependency-1');
   });

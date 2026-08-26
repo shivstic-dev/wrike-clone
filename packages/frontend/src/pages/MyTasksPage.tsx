@@ -8,9 +8,13 @@ import { EmptyState } from '../components/common/EmptyState';
 function formatWaitingTime(readyAt: string | null): string {
   if (!readyAt) return 'Waiting time unavailable';
 
-  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(readyAt).getTime()) / 60_000));
+  const elapsedMinutes = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(readyAt).getTime()) / 60_000),
+  );
   if (elapsedMinutes < 1) return 'Waiting less than a minute';
-  if (elapsedMinutes < 60) return `Waiting ${elapsedMinutes} minute${elapsedMinutes === 1 ? '' : 's'}`;
+  if (elapsedMinutes < 60)
+    return `Waiting ${elapsedMinutes} minute${elapsedMinutes === 1 ? '' : 's'}`;
 
   const elapsedHours = Math.floor(elapsedMinutes / 60);
   if (elapsedHours < 24) return `Waiting ${elapsedHours} hour${elapsedHours === 1 ? '' : 's'}`;
@@ -61,7 +65,10 @@ export default function MyTasksPage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-atlas-current">
                   Final handoff
                 </p>
-                <h2 id="ready-for-handoff-heading" className="mt-1 text-lg font-semibold text-atlas-ink">
+                <h2
+                  id="ready-for-handoff-heading"
+                  className="mt-1 text-lg font-semibold text-atlas-ink"
+                >
                   Ready for handoff
                 </h2>
               </div>
@@ -82,7 +89,10 @@ export default function MyTasksPage() {
                           {task.title}
                         </Link>
                         <p className="mt-1 text-sm text-slate-600">
-                          Owner: {task.handoffOwner?.displayName || task.handoffOwner?.email || 'Not assigned'}
+                          Owner:{' '}
+                          {task.handoffOwner?.displayName ||
+                            task.handoffOwner?.email ||
+                            'Not assigned'}
                         </p>
                       </div>
                       <p className="shrink-0 text-sm font-medium text-atlas-current">

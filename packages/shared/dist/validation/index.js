@@ -353,19 +353,18 @@ exports.departmentReportFilterSchema = zod_1.z
 // ── Type exports (infer from schemas) ──────────────────────────
 exports.dashboardOverviewQuerySchema = zod_1.z.object({
     departmentId: exports.uuidField.optional(),
-    days: zod_1.z.coerce.number().default(30).refine((days) => days === 30),
+    days: zod_1.z.coerce
+        .number()
+        .default(30)
+        .refine((days) => days === 30),
 });
 exports.dashboardTasksQuerySchema = zod_1.z.object({
     departmentId: exports.uuidField.optional(),
-    days: zod_1.z.coerce.number().default(30).refine((days) => days === 30),
-    bucket: zod_1.z.enum([
-        'active',
-        'completed',
-        'overdue',
-        'blocked',
-        'unassigned',
-        'ready_for_handoff',
-    ]),
+    days: zod_1.z.coerce
+        .number()
+        .default(30)
+        .refine((days) => days === 30),
+    bucket: zod_1.z.enum(['active', 'completed', 'overdue', 'blocked', 'unassigned', 'ready_for_handoff']),
 });
 const dashboardAnalyticsDate = zod_1.z
     .string()

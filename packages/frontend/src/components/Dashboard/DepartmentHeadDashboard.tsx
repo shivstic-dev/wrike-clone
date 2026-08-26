@@ -9,7 +9,11 @@ import {
   type RoleCompositionProps,
 } from './EmployeeDashboard';
 
-export function DepartmentHeadDashboard({ grouped, overview, onSelectBucket }: RoleCompositionProps) {
+export function DepartmentHeadDashboard({
+  grouped,
+  overview,
+  onSelectBucket,
+}: RoleCompositionProps) {
   return (
     <div className="space-y-5" data-dashboard-role="department_head">
       <OverviewCore overview={overview} onSelectBucket={onSelectBucket} />

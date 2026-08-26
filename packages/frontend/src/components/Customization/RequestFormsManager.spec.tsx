@@ -18,7 +18,9 @@ vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() 
 let container: HTMLDivElement;
 let root: Root | undefined;
 
-async function renderManager(queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+async function renderManager(
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   await act(async () => {
     root = createRoot(container);
     root.render(
@@ -39,8 +41,9 @@ async function renderManager(queryClient = new QueryClient({ defaultOptions: { q
 }
 
 beforeEach(() => {
-  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
-    true;
+  (
+    globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+  ).IS_REACT_ACT_ENVIRONMENT = true;
   apiMocks.get.mockReset();
   apiMocks.get.mockImplementation((path: string) => {
     if (path === '/customization/request-forms') {

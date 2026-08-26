@@ -97,9 +97,7 @@ export function useTaskCompletionFlow(): {
         if (currentPendingCompletion.task.id === task.id) {
           return currentPendingCompletion.promise;
         }
-        return Promise.reject(
-          new Error('Another task is already awaiting handoff confirmation'),
-        );
+        return Promise.reject(new Error('Another task is already awaiting handoff confirmation'));
       }
 
       let resolvePromise: (task: Task | null) => void = () => undefined;

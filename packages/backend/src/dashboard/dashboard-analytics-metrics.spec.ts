@@ -5,9 +5,7 @@ import {
 } from './dashboard-analytics-metrics';
 import type { DashboardTaskRow } from './dashboard-metrics';
 
-function task(
-  overrides: Partial<DashboardTaskRow> & { id: string },
-): DashboardTaskRow {
+function task(overrides: Partial<DashboardTaskRow> & { id: string }): DashboardTaskRow {
   return {
     id: overrides.id,
     title: overrides.title ?? overrides.id,
@@ -158,17 +156,60 @@ describe('buildDashboardAnalytics', () => {
   it('uses the latest blocked transition and pairs handoffs within 48 hours', () => {
     const rows = [
       task({ id: 'blocked', status: 'blocked', updatedAt: new Date('2026-03-29T00:00:00.000Z') }),
-      task({ id: 'fast-handoff', status: 'completed', completedAt: new Date('2026-03-12T00:00:00.000Z') }),
-      task({ id: 'slow-handoff', status: 'completed', completedAt: new Date('2026-03-20T00:00:00.000Z') }),
+      task({
+        id: 'fast-handoff',
+        status: 'completed',
+        completedAt: new Date('2026-03-12T00:00:00.000Z'),
+      }),
+      task({
+        id: 'slow-handoff',
+        status: 'completed',
+        completedAt: new Date('2026-03-20T00:00:00.000Z'),
+      }),
     ];
     const activities = [
-      { taskId: 'blocked', action: 'task:status:changed', createdAt: new Date('2026-03-10T00:00:00.000Z'), changes: { status: { old: 'todo', new: 'blocked' } } },
-      { taskId: 'blocked', action: 'task:status:changed', createdAt: new Date('2026-03-15T00:00:00.000Z'), changes: { status: { old: 'blocked', new: 'todo' } } },
-      { taskId: 'blocked', action: 'task:status:changed', createdAt: new Date('2026-03-22T00:00:00.000Z'), changes: { status: { old: 'todo', new: 'blocked' } } },
-      { taskId: 'fast-handoff', action: 'task:handoff:ready', createdAt: new Date('2026-03-10T00:00:00.000Z'), changes: {} },
-      { taskId: 'fast-handoff', action: 'task:handoff:confirmed', createdAt: new Date('2026-03-11T23:00:00.000Z'), changes: {} },
-      { taskId: 'slow-handoff', action: 'task:handoff:ready', createdAt: new Date('2026-03-15T00:00:00.000Z'), changes: {} },
-      { taskId: 'slow-handoff', action: 'task:handoff:confirmed', createdAt: new Date('2026-03-17T00:00:00.001Z'), changes: {} },
+      {
+        taskId: 'blocked',
+        action: 'task:status:changed',
+        createdAt: new Date('2026-03-10T00:00:00.000Z'),
+        changes: { status: { old: 'todo', new: 'blocked' } },
+      },
+      {
+        taskId: 'blocked',
+        action: 'task:status:changed',
+        createdAt: new Date('2026-03-15T00:00:00.000Z'),
+        changes: { status: { old: 'blocked', new: 'todo' } },
+      },
+      {
+        taskId: 'blocked',
+        action: 'task:status:changed',
+        createdAt: new Date('2026-03-22T00:00:00.000Z'),
+        changes: { status: { old: 'todo', new: 'blocked' } },
+      },
+      {
+        taskId: 'fast-handoff',
+        action: 'task:handoff:ready',
+        createdAt: new Date('2026-03-10T00:00:00.000Z'),
+        changes: {},
+      },
+      {
+        taskId: 'fast-handoff',
+        action: 'task:handoff:confirmed',
+        createdAt: new Date('2026-03-11T23:00:00.000Z'),
+        changes: {},
+      },
+      {
+        taskId: 'slow-handoff',
+        action: 'task:handoff:ready',
+        createdAt: new Date('2026-03-15T00:00:00.000Z'),
+        changes: {},
+      },
+      {
+        taskId: 'slow-handoff',
+        action: 'task:handoff:confirmed',
+        createdAt: new Date('2026-03-17T00:00:00.001Z'),
+        changes: {},
+      },
     ];
 
     const result = buildDashboardAnalytics(rows, activities, period, now);
@@ -176,14 +217,27 @@ describe('buildDashboardAnalytics', () => {
     expect(result.blockedAgeing).toEqual({
       averageDays: 10,
       maxDays: 10,
-      items: [{ taskId: 'blocked', title: 'blocked', projectId: 'project-1', projectName: 'Annual plan', days: 10 }],
+      items: [
+        {
+          taskId: 'blocked',
+          title: 'blocked',
+          projectId: 'project-1',
+          projectName: 'Annual plan',
+          days: 10,
+        },
+      ],
     });
     expect(result.kpis.handoffSuccessRate).toBe(50);
   });
 
   it('uses neutral health components when a project has no applicable denominator', () => {
     const result = buildDashboardAnalytics(
-      [task({ id: 'plain', assignees: [{ userId: 'employee-1', name: 'Aparna', role: 'employee' }] })],
+      [
+        task({
+          id: 'plain',
+          assignees: [{ userId: 'employee-1', name: 'Aparna', role: 'employee' }],
+        }),
+      ],
       [],
       period,
       now,

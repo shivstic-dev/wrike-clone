@@ -8,9 +8,8 @@ import { AuthStage } from '../layouts/AuthLayout';
 
 function resolvePasswordChangeError(error: unknown): string {
   if (error instanceof Object && 'response' in error) {
-    const responseMessage = (
-      error as { response?: { data?: { error?: { message?: unknown } } } }
-    ).response?.data?.error?.message;
+    const responseMessage = (error as { response?: { data?: { error?: { message?: unknown } } } })
+      .response?.data?.error?.message;
     if (typeof responseMessage === 'string' && responseMessage.trim()) {
       return responseMessage;
     }
@@ -91,8 +90,8 @@ export default function ChangePasswordPage() {
               Create your private password
             </h1>
             <p className="mt-3 text-sm leading-6 text-atlas-current">
-              Your organization issued a temporary password. Replace it now with a password only
-              you know before you enter the workspace.
+              Your organization issued a temporary password. Replace it now with a password only you
+              know before you enter the workspace.
             </p>
           </div>
 

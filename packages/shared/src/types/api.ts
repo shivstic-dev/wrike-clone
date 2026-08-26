@@ -245,7 +245,6 @@ export interface TaskFilterParams extends PaginationParams {
   folderId?: string;
 }
 
-
 export interface DepartmentReportFilter {
   departmentId?: string;
   dateFrom?: string;
@@ -288,8 +287,7 @@ export interface TimelineResponse {
 }
 
 export type TimelineScope =
-  | { kind: 'dashboard'; departmentId?: string }
-  | { kind: 'project'; projectId: string };
+  { kind: 'dashboard'; departmentId?: string } | { kind: 'project'; projectId: string };
 
 export interface UpdateTaskScheduleRequest {
   startDate: string | null;
@@ -336,12 +334,7 @@ export interface DashboardTaskSummary {
 }
 
 export type DashboardTaskBucket =
-  | 'active'
-  | 'completed'
-  | 'overdue'
-  | 'blocked'
-  | 'unassigned'
-  | 'ready_for_handoff';
+  'active' | 'completed' | 'overdue' | 'blocked' | 'unassigned' | 'ready_for_handoff';
 
 export interface DashboardTaskListResponse {
   generatedAt: string;
@@ -436,7 +429,13 @@ export interface DashboardOverview {
     dueDate: string | null;
     assigneeName: string | null;
   }>;
-  departments: Array<{ id: string; name: string; active: number; overdue: number; completionRate: number }>;
+  departments: Array<{
+    id: string;
+    name: string;
+    active: number;
+    overdue: number;
+    completionRate: number;
+  }>;
 }
 
 export interface DashboardAnalyticsQuery {

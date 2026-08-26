@@ -139,10 +139,7 @@ export class CustomizationController {
 
   @Post('request-forms/:formId/submit')
   @Permissions('task:create')
-  async submitRequestForm(
-    @Param('formId') formId: string,
-    @Body() body: SubmitRequestFormDto,
-  ) {
+  async submitRequestForm(@Param('formId') formId: string, @Body() body: SubmitRequestFormDto) {
     return this.customizationService.submitRequestForm(formId, body.values);
   }
 }

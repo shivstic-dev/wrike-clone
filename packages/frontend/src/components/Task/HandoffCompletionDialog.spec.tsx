@@ -127,7 +127,7 @@ describe('HandoffCompletionDialog', () => {
     expect(
       getByRole<HTMLHeadingElement>(
         'heading',
-      'Has the finished work been shared with the intended recipient?',
+        'Has the finished work been shared with the intended recipient?',
       ),
     ).toBeInstanceOf(HTMLHeadingElement);
     expect(getByRole<HTMLHeadingElement>('heading', 'Asha Mehta')).toBeInstanceOf(
@@ -167,9 +167,7 @@ describe('HandoffCompletionDialog', () => {
     expect(document.activeElement).toBe(notYet);
 
     notYet.focus();
-    act(() =>
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true })),
-    );
+    act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true })));
     expect(document.activeElement).toBe(confirmed);
   });
 
@@ -179,9 +177,7 @@ describe('HandoffCompletionDialog', () => {
     const confirmed = getButton('Yes, handoff completed');
 
     expect(document.activeElement).toBe(heading);
-    act(() =>
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true })),
-    );
+    act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true })));
     expect(document.activeElement).toBe(confirmed);
   });
 });
@@ -235,7 +231,8 @@ describe('useTaskCompletionFlow', () => {
       first = requestCompletion?.({ ...task, handoffRequired: false });
       second = requestCompletion?.({ ...task, handoffRequired: false });
     });
-    if (!first || !second || !resolveMutation) throw new Error('Completion requests were not created');
+    if (!first || !second || !resolveMutation)
+      throw new Error('Completion requests were not created');
 
     expect(second).toBe(first);
     expect(completionMutation.mutateAsync).toHaveBeenCalledTimes(1);

@@ -32,4 +32,3 @@ export async function down(knex: Knex): Promise<void> {
     DROP INDEX IF EXISTS idx_comments_task_created;
   `);
 }
-

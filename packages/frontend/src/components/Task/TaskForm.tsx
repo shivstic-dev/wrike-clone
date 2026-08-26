@@ -82,7 +82,6 @@ export function TaskForm({
     } as Partial<Task>);
   };
 
-
   const inputClasses =
     'block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm placeholder-slate-400 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-slate-50 disabled:text-slate-500';
 
@@ -266,7 +265,6 @@ export function TaskForm({
       </div>
 
       <div className="flex justify-end gap-3 pt-2">
-
         {onCancel && (
           <button
             type="button"

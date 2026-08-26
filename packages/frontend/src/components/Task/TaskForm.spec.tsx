@@ -27,7 +27,9 @@ function setInputValue(input: HTMLInputElement, value: string) {
 }
 
 beforeEach(() => {
-  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  (
+    globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+  ).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div');
   document.body.append(container);
 });
@@ -43,7 +45,9 @@ describe('TaskForm', () => {
     const markup = renderToStaticMarkup(<TaskForm onSubmit={async () => undefined} />);
 
     expect(markup).toContain('Final handoff required');
-    expect(markup).toContain('OpenWork only asks for confirmation; it does not store or send the work.');
+    expect(markup).toContain(
+      'OpenWork only asks for confirmation; it does not store or send the work.',
+    );
     expect(markup).toContain('checked=""');
   });
 
@@ -59,14 +63,18 @@ describe('TaskForm', () => {
     await act(async () => {
       setInputValue(getByRole<HTMLInputElement>('textbox', 'Title *'), 'Prepare update');
       handoffRequired.click();
-      container.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      container
+        .querySelector('form')
+        ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
       await Promise.resolve();
     });
 
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
-      title: 'Prepare update',
-      handoffRequired: false,
-    }));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Prepare update',
+        handoffRequired: false,
+      }),
+    );
   });
 
   it('does not offer tenant admins as task assignees', () => {

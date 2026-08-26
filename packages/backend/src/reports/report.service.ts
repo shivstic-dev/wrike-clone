@@ -189,15 +189,13 @@ export class ReportService {
     if (!audience.userIds) return;
     const ctx = requireTenantContext();
     query.andWhere((visible) => {
-      visible
-        .whereIn('tasks.assignee_id', audience.userIds!)
-        .orWhereExists(function () {
-          this.select(1)
-            .from('task_assignees as report_scope_ta')
-            .whereRaw('report_scope_ta.task_id = tasks.id')
-            .andWhere('report_scope_ta.tenant_id', ctx.tenantId)
-            .whereIn('report_scope_ta.user_id', audience.userIds!);
-        });
+      visible.whereIn('tasks.assignee_id', audience.userIds!).orWhereExists(function () {
+        this.select(1)
+          .from('task_assignees as report_scope_ta')
+          .whereRaw('report_scope_ta.task_id = tasks.id')
+          .andWhere('report_scope_ta.tenant_id', ctx.tenantId)
+          .whereIn('report_scope_ta.user_id', audience.userIds!);
+      });
       if (audience.includeUnassigned) {
         visible.orWhere((unassigned) =>
           unassigned.whereNull('tasks.assignee_id').whereNotExists(function () {

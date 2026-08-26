@@ -252,9 +252,9 @@ describe('ReportsPanel', () => {
     expect(container.textContent).toContain('Scope: Combined team');
     expect(inputByLabel('Created from')).toBeInstanceOf(HTMLInputElement);
     expect(inputByLabel('Created to')).toBeInstanceOf(HTMLInputElement);
-    const exportButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).filter(
-      (button) => button.textContent?.startsWith('Export'),
-    );
+    const exportButtons = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('button'),
+    ).filter((button) => button.textContent?.startsWith('Export'));
     expect(exportButtons).toHaveLength(2);
     expect(exportButtons.every((button) => button.disabled)).toBe(true);
   });
@@ -279,9 +279,9 @@ describe('ReportsPanel', () => {
     expect(container.textContent).toContain('Unassigned');
     expect(container.textContent).toContain('in progress');
     expect(container.textContent).toContain('No due date');
-    const exportButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).filter(
-      (button) => button.textContent?.startsWith('Export'),
-    );
+    const exportButtons = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('button'),
+    ).filter((button) => button.textContent?.startsWith('Export'));
     expect(exportButtons.every((button) => !button.disabled)).toBe(true);
   });
 });

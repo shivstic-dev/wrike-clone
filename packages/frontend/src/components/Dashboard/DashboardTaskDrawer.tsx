@@ -25,9 +25,11 @@ function personName(person: { displayName: string | null; email: string } | null
 
 function formatDueDate(value: string | null): string {
   if (!value) return 'No due date';
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(
-    new Date(value),
-  );
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(value));
 }
 
 export function DashboardTaskDrawer({
@@ -44,7 +46,8 @@ export function DashboardTaskDrawer({
   const label = bucketLabels[bucket];
 
   useEffect(() => {
-    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    returnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     headingRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -67,12 +70,24 @@ export function DashboardTaskDrawer({
       >
         <header className="flex items-start justify-between gap-4 border-b border-atlas-mist px-5 py-5">
           <div>
-            <p className="font-atlasMono text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-atlas-current">Task list</p>
-            <h2 className="mt-1 font-atlasDisplay text-2xl font-semibold text-atlas-ink" id="dashboard-task-drawer-heading" ref={headingRef} tabIndex={-1}>
+            <p className="font-atlasMono text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-atlas-current">
+              Task list
+            </p>
+            <h2
+              className="mt-1 font-atlasDisplay text-2xl font-semibold text-atlas-ink"
+              id="dashboard-task-drawer-heading"
+              ref={headingRef}
+              tabIndex={-1}
+            >
               {label}
             </h2>
           </div>
-          <button aria-label="Close task list" className="rounded-lg px-3 py-2 text-sm font-semibold text-atlas-canopy hover:bg-atlas-paper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current" onClick={onClose} type="button">
+          <button
+            aria-label="Close task list"
+            className="rounded-lg px-3 py-2 text-sm font-semibold text-atlas-canopy hover:bg-atlas-paper focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-atlas-current"
+            onClick={onClose}
+            type="button"
+          >
             Close
           </button>
         </header>
@@ -94,13 +109,32 @@ export function DashboardTaskDrawer({
             <ul className="divide-y divide-atlas-mist">
               {query.data!.data.map((task) => (
                 <li className="py-4" key={task.id}>
-                  <a className="block rounded-lg outline-none hover:bg-atlas-paper focus-visible:ring-2 focus-visible:ring-atlas-current" href={`/tasks/${task.id}`}>
+                  <a
+                    className="block rounded-lg outline-none hover:bg-atlas-paper focus-visible:ring-2 focus-visible:ring-atlas-current"
+                    href={`/tasks/${task.id}`}
+                  >
                     <p className="font-semibold text-atlas-ink">{task.title}</p>
                     <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                      <div><dt className="text-xs text-slate-500">Project</dt><dd>{task.projectName || 'No project'}</dd></div>
-                      <div><dt className="text-xs text-slate-500">Assignee</dt><dd>{task.assignees.length ? task.assignees.map((assignee) => assignee.name).join(', ') : 'Unassigned'}</dd></div>
-                      <div><dt className="text-xs text-slate-500">Task owner</dt><dd>{personName(task.handoffOwner)}</dd></div>
-                      <div><dt className="text-xs text-slate-500">Due</dt><dd>{formatDueDate(task.dueDate)}</dd></div>
+                      <div>
+                        <dt className="text-xs text-slate-500">Project</dt>
+                        <dd>{task.projectName || 'No project'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-slate-500">Assignee</dt>
+                        <dd>
+                          {task.assignees.length
+                            ? task.assignees.map((assignee) => assignee.name).join(', ')
+                            : 'Unassigned'}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-slate-500">Task owner</dt>
+                        <dd>{personName(task.handoffOwner)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-slate-500">Due</dt>
+                        <dd>{formatDueDate(task.dueDate)}</dd>
+                      </div>
                     </dl>
                   </a>
                 </li>

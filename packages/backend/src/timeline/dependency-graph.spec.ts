@@ -1,10 +1,6 @@
 import { DependencyType } from '@wrike-clone/shared';
 
-import {
-  criticalPathTaskIds,
-  type DependencyEdge,
-  wouldCreateCycle,
-} from './dependency-graph';
+import { criticalPathTaskIds, type DependencyEdge, wouldCreateCycle } from './dependency-graph';
 
 const fs = DependencyType.FINISH_TO_START;
 
@@ -19,9 +15,7 @@ function edge(
 
 describe('wouldCreateCycle', () => {
   it('detects a candidate that closes a predecessor-to-dependent path', () => {
-    expect(
-      wouldCreateCycle([edge('b', 'a')], edge('a', 'b')),
-    ).toBe(true);
+    expect(wouldCreateCycle([edge('b', 'a')], edge('a', 'b'))).toBe(true);
   });
 
   it('rejects a self dependency before traversing the graph', () => {
@@ -36,9 +30,7 @@ describe('wouldCreateCycle', () => {
   });
 
   it('treats malformed input containing an existing cycle as cyclic', () => {
-    expect(
-      wouldCreateCycle([edge('b', 'a'), edge('a', 'b')], edge('d', 'c')),
-    ).toBe(true);
+    expect(wouldCreateCycle([edge('b', 'a'), edge('a', 'b')], edge('d', 'c'))).toBe(true);
   });
 });
 
@@ -53,11 +45,7 @@ describe('criticalPathTaskIds', () => {
     ];
 
     expect(
-      criticalPathTaskIds(tasks, [
-        edge('b', 'a'),
-        edge('d', 'b', fs, 1),
-        edge('d', 'unscheduled'),
-      ]),
+      criticalPathTaskIds(tasks, [edge('b', 'a'), edge('d', 'b', fs, 1), edge('d', 'unscheduled')]),
     ).toEqual(new Set(['a', 'b', 'd']));
   });
 
@@ -87,9 +75,9 @@ describe('criticalPathTaskIds', () => {
       { id: 'd', startDate: '2026-08-02', dueDate: '2026-08-02' },
     ];
 
-    expect(
-      criticalPathTaskIds(tasks, [edge('d', 'b'), edge('d', 'a')]),
-    ).toEqual(new Set(['a', 'd']));
+    expect(criticalPathTaskIds(tasks, [edge('d', 'b'), edge('d', 'a')])).toEqual(
+      new Set(['a', 'd']),
+    );
   });
 
   it('rejects a scheduled dependency cycle instead of returning a partial path', () => {

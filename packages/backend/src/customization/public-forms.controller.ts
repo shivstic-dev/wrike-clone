@@ -26,10 +26,7 @@ export class PublicFormsController {
    * tenant context or authentication.
    */
   @Post(':formId/submit')
-  async submitForm(
-    @Param('formId') formId: string,
-    @Body() body: SubmitRequestFormDto,
-  ) {
+  async submitForm(@Param('formId') formId: string, @Body() body: SubmitRequestFormDto) {
     return this.customizationService.submitPublicRequestForm(formId, body.values);
   }
 }

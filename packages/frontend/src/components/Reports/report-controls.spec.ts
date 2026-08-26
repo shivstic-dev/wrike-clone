@@ -23,11 +23,7 @@ describe('report controls', () => {
   });
 
   it('offers management all permission-checked scopes', () => {
-    expect(allowedReportScopes('member', 'manager')).toEqual([
-      'self',
-      'individual',
-      'combined',
-    ]);
+    expect(allowedReportScopes('member', 'manager')).toEqual(['self', 'individual', 'combined']);
   });
 
   it('limits a manager person picker to self and employees', () => {

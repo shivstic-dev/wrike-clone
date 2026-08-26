@@ -70,10 +70,7 @@ function renderAuthLayout(): void {
 }
 
 function updateInput(input: HTMLInputElement, value: string): void {
-  const valueSetter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    'value',
-  )?.set;
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   valueSetter?.call(input, value);
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }

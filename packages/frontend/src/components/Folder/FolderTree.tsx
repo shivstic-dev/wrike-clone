@@ -35,21 +35,14 @@ function FolderTreeNode({
             className="flex h-8 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           >
             <svg
-              className={clsx(
-                'h-3 w-3 transition-transform',
-                isExpanded && 'rotate-90',
-              )}
+              className={clsx('h-3 w-3 transition-transform', isExpanded && 'rotate-90')}
               fill="none"
               viewBox="0 0 24 24"
               strokeWidth={2}
               stroke="currentColor"
               aria-hidden="true"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M8.25 4.5l7.5 7.5-7.5 7.5"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
             </svg>
           </button>
         ) : (
@@ -67,10 +60,7 @@ function FolderTreeNode({
           )}
         >
           <svg
-            className={clsx(
-              'h-4 w-4 shrink-0',
-              isSelected ? 'text-primary-500' : 'text-amber-500',
-            )}
+            className={clsx('h-4 w-4 shrink-0', isSelected ? 'text-primary-500' : 'text-amber-500')}
             fill="currentColor"
             viewBox="0 0 24 24"
             aria-hidden="true"

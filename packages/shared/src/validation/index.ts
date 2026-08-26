@@ -7,13 +7,19 @@
  */
 
 import { z } from 'zod';
-import { TaskStatus, TaskPriority, HandoffStatus, DependencyType, TriggerEvent, TenantRole } from '../enums';
+import {
+  TaskStatus,
+  TaskPriority,
+  HandoffStatus,
+  DependencyType,
+  TriggerEvent,
+  TenantRole,
+} from '../enums';
 
 // ── Helpers ────────────────────────────────────────────────────
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const slugRegex = /^[a-z0-9-]+$/;
-
 
 export const uuidField = z.string().regex(uuidRegex, 'Invalid UUID format');
 export const slugField = z
@@ -166,21 +172,24 @@ export const taskLocationInputSchema = z
     folderId: uuidField.optional(),
     projectId: uuidField.optional(),
   })
-  .refine((value) => {
-    const hasDepartment = !!value.departmentId;
-    const hasFolder = !!value.folderId;
-    const hasProject = !!value.projectId;
+  .refine(
+    (value) => {
+      const hasDepartment = !!value.departmentId;
+      const hasFolder = !!value.folderId;
+      const hasProject = !!value.projectId;
 
-    return (
-      (hasDepartment && !hasFolder && !hasProject) ||
-      (hasDepartment && hasFolder && !hasProject) ||
-      (!hasDepartment && !hasFolder && hasProject) ||
-      (hasDepartment && hasFolder && hasProject)
-    );
-  }, {
-    message: 'invalid task location combination',
-    path: ['departmentId'],
-  });
+      return (
+        (hasDepartment && !hasFolder && !hasProject) ||
+        (hasDepartment && hasFolder && !hasProject) ||
+        (!hasDepartment && !hasFolder && hasProject) ||
+        (hasDepartment && hasFolder && hasProject)
+      );
+    },
+    {
+      message: 'invalid task location combination',
+      path: ['departmentId'],
+    },
+  );
 
 export const moveTaskLocationSchema = z
   .object({
@@ -283,7 +292,6 @@ export const bulkTaskUpdateSchema = z.object({
   taskIds: z.array(uuidField).min(1).max(100),
   updates: updateTaskSchema,
 });
-
 
 // ── Dependencies ───────────────────────────────────────────────
 
@@ -434,20 +442,19 @@ export const dashboardOverviewQuerySchema: z.ZodType<
   { departmentId?: string; days?: number }
 > = z.object({
   departmentId: uuidField.optional(),
-  days: z.coerce.number().default(30).refine((days): days is 30 => days === 30),
+  days: z.coerce
+    .number()
+    .default(30)
+    .refine((days): days is 30 => days === 30),
 });
 
 export const dashboardTasksQuerySchema = z.object({
   departmentId: uuidField.optional(),
-  days: z.coerce.number().default(30).refine((days): days is 30 => days === 30),
-  bucket: z.enum([
-    'active',
-    'completed',
-    'overdue',
-    'blocked',
-    'unassigned',
-    'ready_for_handoff',
-  ]),
+  days: z.coerce
+    .number()
+    .default(30)
+    .refine((days): days is 30 => days === 30),
+  bucket: z.enum(['active', 'completed', 'overdue', 'blocked', 'unassigned', 'ready_for_handoff']),
 });
 
 const dashboardAnalyticsDate = z
@@ -544,7 +551,8 @@ export const timelineQuerySchema = z
     perPage: z.coerce.number().int().min(1).max(500).optional().default(100),
   })
   .refine(
-    (value) => !value.from || !value.to || new Date(value.from).getTime() <= new Date(value.to).getTime(),
+    (value) =>
+      !value.from || !value.to || new Date(value.from).getTime() <= new Date(value.to).getTime(),
     { message: 'from must be before or equal to to', path: ['to'] },
   )
   .refine(

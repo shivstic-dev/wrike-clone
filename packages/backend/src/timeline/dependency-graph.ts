@@ -34,10 +34,7 @@ const dependencyTypes = new Set<DependencyType>(Object.values(DependencyType));
  * graph cyclic. Existing malformed cycles are also reported as cyclic so a
  * caller never accepts an edge against an already unsafe graph.
  */
-export function wouldCreateCycle(
-  edges: DependencyEdge[],
-  candidate: DependencyEdge,
-): boolean {
+export function wouldCreateCycle(edges: DependencyEdge[], candidate: DependencyEdge): boolean {
   if (candidate.taskId === candidate.dependsOnTaskId) {
     return true;
   }
@@ -205,9 +202,7 @@ function topologicalOrder(
   }
 
   const ready = sorted(
-    [...indegree.entries()]
-      .filter(([, count]) => count === 0)
-      .map(([taskId]) => taskId),
+    [...indegree.entries()].filter(([, count]) => count === 0).map(([taskId]) => taskId),
   );
   const order: string[] = [];
 

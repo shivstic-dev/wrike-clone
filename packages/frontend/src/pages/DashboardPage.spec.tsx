@@ -128,7 +128,9 @@ vi.mock('../components/Dashboard/DashboardBoard', () => ({
 
 vi.mock('../components/Dashboard/DashboardAnalytics', () => ({
   DashboardAnalytics: ({ departmentId }: { departmentId?: string }) => (
-    <section aria-label="Dashboard analytics">Analytics for {departmentId ?? 'all departments'}</section>
+    <section aria-label="Dashboard analytics">
+      Analytics for {departmentId ?? 'all departments'}
+    </section>
   ),
 }));
 

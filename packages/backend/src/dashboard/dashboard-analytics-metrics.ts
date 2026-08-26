@@ -40,17 +40,16 @@ export interface AnalyticsPeriod {
   months: number;
 }
 
-interface AnalyticsMetricResult
-  extends Pick<
-    DashboardAnalyticsResponse,
-    | 'kpis'
-    | 'monthlyCompletion'
-    | 'overdueOutcome'
-    | 'workload'
-    | 'blockedAgeing'
-    | 'priorityDistribution'
-    | 'projectHealth'
-  > {}
+interface AnalyticsMetricResult extends Pick<
+  DashboardAnalyticsResponse,
+  | 'kpis'
+  | 'monthlyCompletion'
+  | 'overdueOutcome'
+  | 'workload'
+  | 'blockedAgeing'
+  | 'priorityDistribution'
+  | 'projectHealth'
+> {}
 
 function monthKey(value: Date): string {
   return value.toISOString().slice(0, 7);
@@ -68,7 +67,11 @@ function monthKeys(from: Date, to: Date): string[] {
 }
 
 function within(value: Date | null, period: AnalyticsPeriod): value is Date {
-  return value !== null && value.getTime() >= period.from.getTime() && value.getTime() <= period.to.getTime();
+  return (
+    value !== null &&
+    value.getTime() >= period.from.getTime() &&
+    value.getTime() <= period.to.getTime()
+  );
 }
 
 function rounded(value: number): number {
@@ -90,10 +93,7 @@ function statusChangedToBlocked(activity: DashboardActivityRow): boolean {
   );
 }
 
-function blockedSince(
-  row: DashboardTaskRow,
-  activities: DashboardActivityRow[],
-): Date {
+function blockedSince(row: DashboardTaskRow, activities: DashboardActivityRow[]): Date {
   return (
     activities
       .filter((activity) => activity.taskId === row.id && statusChangedToBlocked(activity))
@@ -128,7 +128,10 @@ function handoffCounts(
         (candidate, candidateIndex) =>
           candidateIndex > index && candidate.action === 'task:handoff:ready',
       );
-      const candidates = taskActivities.slice(index + 1, nextReadyIndex === -1 ? undefined : nextReadyIndex);
+      const candidates = taskActivities.slice(
+        index + 1,
+        nextReadyIndex === -1 ? undefined : nextReadyIndex,
+      );
       const confirmed = candidates.find(
         (candidate) => candidate.action === 'task:handoff:confirmed',
       );
@@ -161,21 +164,32 @@ function buildHealth(
   const firstRow = rows[0];
   if (!firstRow) throw new RangeError('Project health requires at least one task');
   const completedWithDue = rows.filter((row) => within(row.completedAt, period) && row.dueDate);
-  const onTime = rate(
-    completedWithDue.filter((row) => row.completedAt!.getTime() <= row.dueDate!.getTime()).length,
-    completedWithDue.length,
-  ) ?? 100;
+  const onTime =
+    rate(
+      completedWithDue.filter((row) => row.completedAt!.getTime() <= row.dueDate!.getTime()).length,
+      completedWithDue.length,
+    ) ?? 100;
   const active = rows.filter((row) => row.status !== 'completed');
-  const overdueControl = active.length === 0
-    ? 100
-    : Math.round((1 - active.filter((row) => taskIsCurrentlyOverdue(row, now)).length / active.length) * 100);
+  const overdueControl =
+    active.length === 0
+      ? 100
+      : Math.round(
+          (1 - active.filter((row) => taskIsCurrentlyOverdue(row, now)).length / active.length) *
+            100,
+        );
   const blocked = active.filter((row) => row.status === 'blocked');
-  const averageBlockedDays = blocked.length === 0
-    ? 0
-    : blocked.reduce(
-        (sum, row) => sum + Math.max(0, Math.floor((now.getTime() - blockedSince(row, activities).getTime()) / DAY_MS)),
-        0,
-      ) / blocked.length;
+  const averageBlockedDays =
+    blocked.length === 0
+      ? 0
+      : blocked.reduce(
+          (sum, row) =>
+            sum +
+            Math.max(
+              0,
+              Math.floor((now.getTime() - blockedSince(row, activities).getTime()) / DAY_MS),
+            ),
+          0,
+        ) / blocked.length;
   const blockedAgeing = Math.round(Math.max(0, 100 - (averageBlockedDays / 30) * 100));
 
   const workByAssignee = new Map<string, number>();
@@ -185,9 +199,10 @@ function buildHealth(
     }
   }
   const workloads = [...workByAssignee.values()];
-  const workloadBalance = workloads.length < 2
-    ? 100
-    : Math.round((Math.min(...workloads) / Math.max(...workloads)) * 100);
+  const workloadBalance =
+    workloads.length < 2
+      ? 100
+      : Math.round((Math.min(...workloads) / Math.max(...workloads)) * 100);
   const handoffs = handoffCounts(new Set(rows.map((row) => row.id)), activities, period);
   const handoffSuccess = rate(handoffs.successful, handoffs.ready) ?? 100;
   const score = Math.round(
@@ -230,10 +245,9 @@ export function buildDashboardAnalytics(
 ): AnalyticsMetricResult {
   const months = monthKeys(period.from, period.to);
   const completionCounts = new Map(months.map((month) => [month, 0]));
-  const overdueByMonth = new Map<
-    string,
-    Map<string, { id: string; name: string; count: number }>
-  >(months.map((month) => [month, new Map()]));
+  const overdueByMonth = new Map<string, Map<string, { id: string; name: string; count: number }>>(
+    months.map((month) => [month, new Map()]),
+  );
   const completionDurations: number[] = [];
 
   for (const row of rows) {
@@ -283,7 +297,10 @@ export function buildDashboardAnalytics(
       title: row.title,
       projectId: row.projectId,
       projectName: row.projectName,
-      days: Math.max(0, Math.floor((now.getTime() - blockedSince(row, activities).getTime()) / DAY_MS)),
+      days: Math.max(
+        0,
+        Math.floor((now.getTime() - blockedSince(row, activities).getTime()) / DAY_MS),
+      ),
     }))
     .sort((left, right) => right.days - left.days || left.title.localeCompare(right.title));
   const handoffs = handoffCounts(new Set(rows.map((row) => row.id)), activities, period);
@@ -301,14 +318,21 @@ export function buildDashboardAnalytics(
       averageCompletionHours:
         completionDurations.length === 0
           ? null
-          : rounded(completionDurations.reduce((sum, value) => sum + value, 0) / completionDurations.length),
+          : rounded(
+              completionDurations.reduce((sum, value) => sum + value, 0) /
+                completionDurations.length,
+            ),
       handoffSuccessRate: rate(handoffs.successful, handoffs.ready),
       onTimeCompletionRate: rate(
-        completedWithDue.filter((row) => row.completedAt!.getTime() <= row.dueDate!.getTime()).length,
+        completedWithDue.filter((row) => row.completedAt!.getTime() <= row.dueDate!.getTime())
+          .length,
         completedWithDue.length,
       ),
     },
-    monthlyCompletion: months.map((month) => ({ month, completed: completionCounts.get(month) ?? 0 })),
+    monthlyCompletion: months.map((month) => ({
+      month,
+      completed: completionCounts.get(month) ?? 0,
+    })),
     overdueOutcome: months.map((month) => {
       const departments = [...(overdueByMonth.get(month)?.values() ?? [])].sort(
         (left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id),
@@ -338,6 +362,9 @@ export function buildDashboardAnalytics(
     projectHealth: [...projects.values()]
       .filter((projectRows) => !!projectRows[0]?.projectId)
       .map((projectRows) => buildHealth(projectRows, activities, period, now))
-      .sort((left, right) => left.score - right.score || left.projectName.localeCompare(right.projectName)),
+      .sort(
+        (left, right) =>
+          left.score - right.score || left.projectName.localeCompare(right.projectName),
+      ),
   };
 }

@@ -42,15 +42,13 @@ const dependencyTypes = [
   'start_to_finish' as DependencyType,
 ] as const;
 
-type Interaction =
-  | {
-    kind: 'move' | 'resize-start' | 'resize-end';
-    taskId: string;
-    pointerId: number;
-    originX: number;
-    original: { startDate: string; dueDate: string };
-  }
-  | null;
+type Interaction = {
+  kind: 'move' | 'resize-start' | 'resize-end';
+  taskId: string;
+  pointerId: number;
+  originX: number;
+  original: { startDate: string; dueDate: string };
+} | null;
 
 interface DependencyDraft {
   taskId: string;
@@ -140,9 +138,15 @@ function Header({ scale }: { scale: ReturnType<typeof createTimelineScale> }) {
 function TaskSignals({ task, today }: { task: TimelineTask; today: string }) {
   return (
     <span className="gantt-signals">
-      {task.isCritical && <span className="gantt-signal gantt-signal--critical">Critical path</span>}
-      {isOverdue(task, today) && <span className="gantt-signal gantt-signal--overdue">Overdue</span>}
-      {task.handoffStatus === 'ready' && <span className="gantt-signal gantt-signal--handoff">Ready for handoff</span>}
+      {task.isCritical && (
+        <span className="gantt-signal gantt-signal--critical">Critical path</span>
+      )}
+      {isOverdue(task, today) && (
+        <span className="gantt-signal gantt-signal--overdue">Overdue</span>
+      )}
+      {task.handoffStatus === 'ready' && (
+        <span className="gantt-signal gantt-signal--handoff">Ready for handoff</span>
+      )}
     </span>
   );
 }
@@ -184,7 +188,9 @@ function AccessibleTable({
           {tasks.map((task) => (
             <tr key={task.id}>
               <th scope="row">
-                <button type="button" onClick={() => onOpenTask(task.id)}>{task.title}</button>
+                <button type="button" onClick={() => onOpenTask(task.id)}>
+                  {task.title}
+                </button>
                 <TaskSignals task={task} today={today} />
               </th>
               <td>{task.projectName || 'No project'}</td>
@@ -197,7 +203,9 @@ function AccessibleTable({
                     max={dateOnly(task.dueDate) || undefined}
                     onChange={(event) => updateDate(task, 'startDate', event.target.value)}
                   />
-                ) : dateOnly(task.startDate) || 'Not scheduled'}
+                ) : (
+                  dateOnly(task.startDate) || 'Not scheduled'
+                )}
               </td>
               <td>
                 {task.capabilities.canEditSchedule ? (
@@ -208,7 +216,9 @@ function AccessibleTable({
                     min={dateOnly(task.startDate) || undefined}
                     onChange={(event) => updateDate(task, 'dueDate', event.target.value)}
                   />
-                ) : dateOnly(task.dueDate) || 'Not scheduled'}
+                ) : (
+                  dateOnly(task.dueDate) || 'Not scheduled'
+                )}
               </td>
               <td>{readableStatus(task.status)}</td>
               <td>
@@ -239,7 +249,9 @@ export function GanttChart({
   const markerId = `gantt-arrow-${useId().replaceAll(':', '')}`;
   const [view, setView] = useState<'chart' | 'table'>('chart');
   const [interaction, setInteraction] = useState<Interaction>(null);
-  const [schedulePreview, setSchedulePreview] = useState<Record<string, { startDate: string; dueDate: string }>>({});
+  const [schedulePreview, setSchedulePreview] = useState<
+    Record<string, { startDate: string; dueDate: string }>
+  >({});
   const [dependencyDraft, setDependencyDraft] = useState<DependencyDraft | null>(null);
   const scale = useMemo(
     () => createTimelineScale({ from: data.meta.from, to: data.meta.to, zoom }),
@@ -268,17 +280,22 @@ export function GanttChart({
     overscan: 8,
   });
   const measuredItems = rowVirtualizer.getVirtualItems();
-  const virtualItems = measuredItems.length ? measuredItems : fallbackVirtualItems(scheduled.length);
+  const virtualItems = measuredItems.length
+    ? measuredItems
+    : fallbackVirtualItems(scheduled.length);
   const totalHeight = Math.max(rowVirtualizer.getTotalSize(), bodyHeight);
 
-  const interactionSchedule = useCallback((active: Exclude<Interaction, null>, clientX: number) => {
-    const snappedPixels = scale.snapDelta(clientX - active.originX);
-    return scheduleAfterDelta(
-      active.original,
-      active.kind,
-      Math.round(snappedPixels / scale.columnWidth),
-    );
-  }, [scale]);
+  const interactionSchedule = useCallback(
+    (active: Exclude<Interaction, null>, clientX: number) => {
+      const snappedPixels = scale.snapDelta(clientX - active.originX);
+      return scheduleAfterDelta(
+        active.original,
+        active.kind,
+        Math.round(snappedPixels / scale.columnWidth),
+      );
+    },
+    [scale],
+  );
 
   const clearInteraction = useCallback(() => {
     const active = interactionRef.current;
@@ -291,45 +308,55 @@ export function GanttChart({
     setSchedulePreview({});
   }, []);
 
-  const beginInteraction = useCallback((
-    event: ReactPointerEvent<HTMLButtonElement>,
-    task: TimelineTask,
-    kind: Exclude<Interaction, null>['kind'],
-  ) => {
-    if (!task.capabilities.canEditSchedule || !task.startDate || !task.dueDate) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    const active: Exclude<Interaction, null> = {
-      kind,
-      taskId: task.id,
-      pointerId: event.pointerId,
-      originX: event.clientX,
-      original: { startDate: dateOnly(task.startDate), dueDate: dateOnly(task.dueDate) },
-    };
-    captureTargetRef.current = event.currentTarget;
-    interactionRef.current = active;
-    setInteraction(active);
-  }, []);
+  const beginInteraction = useCallback(
+    (
+      event: ReactPointerEvent<HTMLButtonElement>,
+      task: TimelineTask,
+      kind: Exclude<Interaction, null>['kind'],
+    ) => {
+      if (!task.capabilities.canEditSchedule || !task.startDate || !task.dueDate) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      const active: Exclude<Interaction, null> = {
+        kind,
+        taskId: task.id,
+        pointerId: event.pointerId,
+        originX: event.clientX,
+        original: { startDate: dateOnly(task.startDate), dueDate: dateOnly(task.dueDate) },
+      };
+      captureTargetRef.current = event.currentTarget;
+      interactionRef.current = active;
+      setInteraction(active);
+    },
+    [],
+  );
 
-  const updateInteraction = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    const active = interactionRef.current;
-    if (!active || active.pointerId !== event.pointerId) return;
-    setSchedulePreview({ [active.taskId]: interactionSchedule(active, event.clientX) });
-  }, [interactionSchedule]);
+  const updateInteraction = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const active = interactionRef.current;
+      if (!active || active.pointerId !== event.pointerId) return;
+      setSchedulePreview({ [active.taskId]: interactionSchedule(active, event.clientX) });
+    },
+    [interactionSchedule],
+  );
 
-  const finishInteraction = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    const active = interactionRef.current;
-    if (!active || active.pointerId !== event.pointerId) return;
-    const task = scheduled.find((candidate) => candidate.id === active.taskId);
-    const next = interactionSchedule(active, event.clientX);
-    const changed = next.startDate !== active.original.startDate || next.dueDate !== active.original.dueDate;
-    suppressOpenRef.current = changed;
-    clearInteraction();
-    if (task && changed) {
-      onScheduleChange(task, next);
-    }
-  }, [clearInteraction, interactionSchedule, onScheduleChange, scheduled]);
+  const finishInteraction = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const active = interactionRef.current;
+      if (!active || active.pointerId !== event.pointerId) return;
+      const task = scheduled.find((candidate) => candidate.id === active.taskId);
+      const next = interactionSchedule(active, event.clientX);
+      const changed =
+        next.startDate !== active.original.startDate || next.dueDate !== active.original.dueDate;
+      suppressOpenRef.current = changed;
+      clearInteraction();
+      if (task && changed) {
+        onScheduleChange(task, next);
+      }
+    },
+    [clearInteraction, interactionSchedule, onScheduleChange, scheduled],
+  );
 
   useEffect(() => () => clearInteraction(), [clearInteraction]);
 
@@ -340,23 +367,33 @@ export function GanttChart({
     }
   };
 
-  const boundsByTask = useMemo(() => new Map(scheduled.map((task, index) => {
-    const displaySchedule = schedulePreview[task.id];
-    const startDate = displaySchedule?.startDate ?? dateOnly(task.startDate);
-    const dueDate = displaySchedule?.dueDate ?? dateOnly(task.dueDate);
-    const left = scale.dateToX(startDate);
-    const width = Math.max(
-      scale.columnWidth,
-      scale.dateToX(dueDate) - left + scale.columnWidth,
-    );
-    return [task.id, { left, right: left + width, y: index * ROW_HEIGHT + ROW_HEIGHT / 2 }];
-  })), [scale, schedulePreview, scheduled]);
+  const boundsByTask = useMemo(
+    () =>
+      new Map(
+        scheduled.map((task, index) => {
+          const displaySchedule = schedulePreview[task.id];
+          const startDate = displaySchedule?.startDate ?? dateOnly(task.startDate);
+          const dueDate = displaySchedule?.dueDate ?? dateOnly(task.dueDate);
+          const left = scale.dateToX(startDate);
+          const width = Math.max(
+            scale.columnWidth,
+            scale.dateToX(dueDate) - left + scale.columnWidth,
+          );
+          return [task.id, { left, right: left + width, y: index * ROW_HEIGHT + ROW_HEIGHT / 2 }];
+        }),
+      ),
+    [scale, schedulePreview, scheduled],
+  );
 
   const renderDependency = (dependency: TaskDependency) => {
     const predecessor = boundsByTask.get(dependency.dependsOnTaskId);
     const dependent = boundsByTask.get(dependency.taskId);
     if (!predecessor || !dependent) return null;
-    const geometry = dependencyPath(dependency.dependencyType as DependencyType, predecessor, dependent);
+    const geometry = dependencyPath(
+      dependency.dependencyType as DependencyType,
+      predecessor,
+      dependent,
+    );
     const label = `${readableStatus(dependency.dependencyType)} dependency${dependency.lagDays ? `, ${dependency.lagDays} day lag` : ''}`;
     const middle = geometry.points[Math.floor(geometry.points.length / 2)] ?? {
       x: geometry.anchors.toX,
@@ -378,7 +415,8 @@ export function GanttChart({
         </path>
         {dependency.lagDays !== 0 && (
           <text x={middle.x + 5} y={middle.y - 7} className="gantt-dependency__lag">
-            {dependency.lagDays > 0 ? '+' : ''}{dependency.lagDays}d
+            {dependency.lagDays > 0 ? '+' : ''}
+            {dependency.lagDays}d
           </text>
         )}
       </g>
@@ -388,11 +426,13 @@ export function GanttChart({
   return (
     <section className="gantt-shell" aria-label="Operations timeline">
       <div className="gantt-view-switch" role="group" aria-label="Timeline view">
-        <span>{scheduled.length} scheduled · {unscheduled.length} unscheduled</span>
+        <span>
+          {scheduled.length} scheduled · {unscheduled.length} unscheduled
+        </span>
         <button
           type="button"
           aria-pressed={view === 'table'}
-          onClick={() => setView((current) => current === 'chart' ? 'table' : 'chart')}
+          onClick={() => setView((current) => (current === 'chart' ? 'table' : 'chart'))}
         >
           {view === 'chart' ? 'View as table' : 'View as chart'}
         </button>
@@ -484,7 +524,10 @@ export function GanttChart({
                     key={task.id}
                     className="gantt-row"
                     data-gantt-row={task.id}
-                    style={{ height: virtualRow.size, transform: `translateY(${virtualRow.start}px)` }}
+                    style={{
+                      height: virtualRow.size,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
                     tabIndex={0}
                     aria-label={`Open ${task.title}`}
                     onKeyDown={(event) => openWithKeyboard(event, task.id)}
@@ -495,11 +538,15 @@ export function GanttChart({
                     >
                       <button type="button" onClick={() => onOpenTask(task.id)}>
                         <strong>{task.title}</strong>
-                        <span>{readableStatus(task.status)} · {dateOnly(task.startDate)}–{dateOnly(task.dueDate)}</span>
+                        <span>
+                          {readableStatus(task.status)} · {dateOnly(task.startDate)}–
+                          {dateOnly(task.dueDate)}
+                        </span>
                       </button>
                       <TaskSignals task={task} today={today} />
-                      {onCreateDependency && task.capabilities.canManageDependencies && (
-                        dependencyDraft?.taskId === task.id ? (
+                      {onCreateDependency &&
+                        task.capabilities.canManageDependencies &&
+                        (dependencyDraft?.taskId === task.id ? (
                           <form
                             aria-label="Add dependency"
                             className="gantt-row__dependency-form"
@@ -515,13 +562,23 @@ export function GanttChart({
                               <select
                                 aria-label="Predecessor"
                                 value={dependencyDraft.dependsOnTaskId}
-                                onChange={(event) => setDependencyDraft((draft) => draft && {
-                                  ...draft, dependsOnTaskId: event.target.value,
-                                })}
+                                onChange={(event) =>
+                                  setDependencyDraft(
+                                    (draft) =>
+                                      draft && {
+                                        ...draft,
+                                        dependsOnTaskId: event.target.value,
+                                      },
+                                  )
+                                }
                               >
-                                {scheduled.filter((candidate) => candidate.id !== task.id).map((candidate) => (
-                                  <option key={candidate.id} value={candidate.id}>{candidate.title}</option>
-                                ))}
+                                {scheduled
+                                  .filter((candidate) => candidate.id !== task.id)
+                                  .map((candidate) => (
+                                    <option key={candidate.id} value={candidate.id}>
+                                      {candidate.title}
+                                    </option>
+                                  ))}
                               </select>
                             </label>
                             <label>
@@ -529,12 +586,20 @@ export function GanttChart({
                               <select
                                 aria-label="Dependency type"
                                 value={dependencyDraft.dependencyType}
-                                onChange={(event) => setDependencyDraft((draft) => draft && {
-                                  ...draft, dependencyType: event.target.value as DependencyType,
-                                })}
+                                onChange={(event) =>
+                                  setDependencyDraft(
+                                    (draft) =>
+                                      draft && {
+                                        ...draft,
+                                        dependencyType: event.target.value as DependencyType,
+                                      },
+                                  )
+                                }
                               >
                                 {dependencyTypes.map((type) => (
-                                  <option key={type} value={type}>{readableStatus(type)}</option>
+                                  <option key={type} value={type}>
+                                    {readableStatus(type)}
+                                  </option>
                                 ))}
                               </select>
                             </label>
@@ -544,13 +609,21 @@ export function GanttChart({
                                 aria-label="Lag in days"
                                 type="number"
                                 value={dependencyDraft.lagDays}
-                                onChange={(event) => setDependencyDraft((draft) => draft && {
-                                  ...draft, lagDays: Number(event.target.value) || 0,
-                                })}
+                                onChange={(event) =>
+                                  setDependencyDraft(
+                                    (draft) =>
+                                      draft && {
+                                        ...draft,
+                                        lagDays: Number(event.target.value) || 0,
+                                      },
+                                  )
+                                }
                               />
                             </label>
                             <button type="submit">Create dependency</button>
-                            <button type="button" onClick={() => setDependencyDraft(null)}>Cancel</button>
+                            <button type="button" onClick={() => setDependencyDraft(null)}>
+                              Cancel
+                            </button>
                           </form>
                         ) : (
                           <button
@@ -558,7 +631,9 @@ export function GanttChart({
                             className="gantt-row__link-action"
                             aria-label={`Add a dependency to ${task.title}`}
                             onClick={() => {
-                              const firstPredecessor = scheduled.find((candidate) => candidate.id !== task.id);
+                              const firstPredecessor = scheduled.find(
+                                (candidate) => candidate.id !== task.id,
+                              );
                               if (firstPredecessor) {
                                 setDependencyDraft({
                                   taskId: task.id,
@@ -571,8 +646,7 @@ export function GanttChart({
                           >
                             Add dependency
                           </button>
-                        )
-                      )}
+                        ))}
                     </div>
 
                     <button
@@ -585,7 +659,9 @@ export function GanttChart({
                         task.isCritical ? 'gantt-bar--critical' : '',
                         isOverdue(task, today) ? 'gantt-bar--overdue' : '',
                         selected ? 'gantt-bar--selected' : '',
-                      ].filter(Boolean).join(' ')}
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
                       style={{
                         left: LABEL_WIDTH + bounds.left,
                         top: (ROW_HEIGHT - BAR_HEIGHT) / 2,
@@ -595,11 +671,15 @@ export function GanttChart({
                       }}
                       aria-label={[
                         task.title,
-                        milestone ? `milestone on ${displaySchedule?.startDate ?? dateOnly(task.startDate)}` : `${displaySchedule?.startDate ?? dateOnly(task.startDate)} to ${displaySchedule?.dueDate ?? dateOnly(task.dueDate)}`,
+                        milestone
+                          ? `milestone on ${displaySchedule?.startDate ?? dateOnly(task.startDate)}`
+                          : `${displaySchedule?.startDate ?? dateOnly(task.startDate)} to ${displaySchedule?.dueDate ?? dateOnly(task.dueDate)}`,
                         task.isCritical ? 'Critical path' : '',
                         isOverdue(task, today) ? 'Overdue' : '',
                         task.handoffStatus === 'ready' ? 'Ready for handoff' : '',
-                      ].filter(Boolean).join(', ')}
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}
                       onPointerDown={(event) => beginInteraction(event, task, 'move')}
                       onClick={() => {
                         if (suppressOpenRef.current) {
@@ -622,7 +702,11 @@ export function GanttChart({
                           data-resize-start-handle
                           className="gantt-bar__resize gantt-bar__resize--start"
                           aria-label={`Change start date for ${task.title}`}
-                          style={{ left: LABEL_WIDTH + bounds.left - 1, top: 20, touchAction: 'none' }}
+                          style={{
+                            left: LABEL_WIDTH + bounds.left - 1,
+                            top: 20,
+                            touchAction: 'none',
+                          }}
                           onPointerDown={(event) => beginInteraction(event, task, 'resize-start')}
                         />
                         <button
@@ -630,7 +714,11 @@ export function GanttChart({
                           data-resize-end-handle
                           className="gantt-bar__resize"
                           aria-label={`Change due date for ${task.title}`}
-                          style={{ left: LABEL_WIDTH + bounds.right - 9, top: 20, touchAction: 'none' }}
+                          style={{
+                            left: LABEL_WIDTH + bounds.right - 9,
+                            top: 20,
+                            touchAction: 'none',
+                          }}
                           onPointerDown={(event) => beginInteraction(event, task, 'resize-end')}
                         />
                       </>
@@ -657,11 +745,21 @@ export function GanttChart({
             {data.dependencies.map((dependency) => {
               const dependentTask = scheduled.find((task) => task.id === dependency.taskId);
               const predecessor = scheduled.find((task) => task.id === dependency.dependsOnTaskId);
-              const canDelete = Boolean(onDeleteDependency && dependentTask?.capabilities.canManageDependencies);
+              const canDelete = Boolean(
+                onDeleteDependency && dependentTask?.capabilities.canManageDependencies,
+              );
               return (
                 <li key={dependency.id}>
-                  <span>{predecessor?.title || 'Outside timeline'} → {dependentTask?.title || 'Outside timeline'} ({readableStatus(dependency.dependencyType)})</span>
-                  {canDelete && <button type="button" onClick={() => onDeleteDependency?.(dependency.id)}>Remove dependency</button>}
+                  <span>
+                    {predecessor?.title || 'Outside timeline'} →{' '}
+                    {dependentTask?.title || 'Outside timeline'} (
+                    {readableStatus(dependency.dependencyType)})
+                  </span>
+                  {canDelete && (
+                    <button type="button" onClick={() => onDeleteDependency?.(dependency.id)}>
+                      Remove dependency
+                    </button>
+                  )}
                 </li>
               );
             })}

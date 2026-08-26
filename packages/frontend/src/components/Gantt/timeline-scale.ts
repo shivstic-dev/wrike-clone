@@ -41,11 +41,17 @@ function dateString(day: number): string {
 }
 
 function monthLabel(day: number): string {
-  return new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric', timeZone: 'UTC' })
-    .format(new Date(day));
+  return new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(
+    new Date(day),
+  );
 }
 
-function headerCells(fromDay: number, toDay: number, zoom: TimelineZoom, width: number): TimelineHeaderCell[] {
+function headerCells(
+  fromDay: number,
+  toDay: number,
+  zoom: TimelineZoom,
+  width: number,
+): TimelineHeaderCell[] {
   const cells: TimelineHeaderCell[] = [];
   if (zoom === 'day') {
     for (let day = fromDay; day <= toDay; day += DAY_MS) {
@@ -57,10 +63,11 @@ function headerCells(fromDay: number, toDay: number, zoom: TimelineZoom, width: 
   let start = fromDay;
   while (start <= toDay) {
     const current = new Date(start);
-    const end = zoom === 'week'
-      ? Math.min(toDay, start + (6 * DAY_MS))
-      : Math.min(toDay, Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + 1, 0));
-    const days = ((end - start) / DAY_MS) + 1;
+    const end =
+      zoom === 'week'
+        ? Math.min(toDay, start + 6 * DAY_MS)
+        : Math.min(toDay, Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + 1, 0));
+    const days = (end - start) / DAY_MS + 1;
     cells.push({
       label: zoom === 'week' ? `Week of ${dateString(start)}` : monthLabel(start),
       width: zoom === 'month' ? Math.max(28, days * width) : days * width,
@@ -78,13 +85,13 @@ export function createTimelineScale({ from, to, zoom }: TimelineScaleInput): Tim
   const toDay = utcDay(to);
   if (toDay < fromDay) throw new RangeError('Timeline end must be on or after its start');
   const columnWidth = WIDTHS[zoom];
-  const dayCount = ((toDay - fromDay) / DAY_MS) + 1;
+  const dayCount = (toDay - fromDay) / DAY_MS + 1;
   return {
     columnWidth,
     totalWidth: dayCount * columnWidth,
     headerCells: headerCells(fromDay, toDay, zoom, columnWidth),
     dateToX: (date) => ((utcDay(date) - fromDay) / DAY_MS) * columnWidth,
-    xToDate: (x) => dateString(fromDay + (Math.round(x / columnWidth) * DAY_MS)),
+    xToDate: (x) => dateString(fromDay + Math.round(x / columnWidth) * DAY_MS),
     snapDelta: (px) => Math.round(px / columnWidth) * columnWidth,
   };
 }

@@ -4,12 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  TaskPriority,
-  TaskStatus,
-  type PaginatedResponse,
-  type Task,
-} from '@wrike-clone/shared';
+import { TaskPriority, TaskStatus, type PaginatedResponse, type Task } from '@wrike-clone/shared';
 import { TaskTable } from '../components/Table/TaskTable';
 import MyTasksPage from './MyTasksPage';
 
@@ -86,7 +81,9 @@ async function renderPage(): Promise<void> {
 }
 
 beforeEach(() => {
-  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  (
+    globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+  ).IS_REACT_ACT_ENVIRONMENT = true;
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-07-30T12:00:00.000Z'));
   mocks.data = undefined;
@@ -116,9 +113,9 @@ describe('MyTasksPage handoff queue', () => {
 
     await renderPage();
 
-    expect(container.querySelector('[aria-labelledby="ready-for-handoff-heading"]')?.textContent).toContain(
-      '0 tasks',
-    );
+    expect(
+      container.querySelector('[aria-labelledby="ready-for-handoff-heading"]')?.textContent,
+    ).toContain('0 tasks');
     expect(container.textContent).toContain('No tasks assigned to you');
   });
 
@@ -157,7 +154,9 @@ describe('MyTasksPage handoff queue', () => {
 
     await renderPage();
 
-    const readySection = container.querySelector<HTMLElement>('[aria-labelledby="ready-for-handoff-heading"]');
+    const readySection = container.querySelector<HTMLElement>(
+      '[aria-labelledby="ready-for-handoff-heading"]',
+    );
     expect(readySection).not.toBeNull();
     expect(readySection?.textContent).toContain('Ready for handoff');
     expect(readySection?.textContent).toContain('1 task');

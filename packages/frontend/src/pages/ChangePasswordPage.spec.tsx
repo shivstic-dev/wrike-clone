@@ -42,10 +42,7 @@ function renderChangePassword(): void {
 }
 
 function updateInput(input: HTMLInputElement, value: string): void {
-  const valueSetter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    'value',
-  )?.set;
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   valueSetter?.call(input, value);
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
@@ -55,11 +52,9 @@ async function submitPasswordChange(
   newPassword: string,
   confirmPassword: string,
 ): Promise<void> {
-  const currentPasswordInput =
-    container.querySelector<HTMLInputElement>('#currentPassword');
+  const currentPasswordInput = container.querySelector<HTMLInputElement>('#currentPassword');
   const newPasswordInput = container.querySelector<HTMLInputElement>('#newPassword');
-  const confirmPasswordInput =
-    container.querySelector<HTMLInputElement>('#confirmPassword');
+  const confirmPasswordInput = container.querySelector<HTMLInputElement>('#confirmPassword');
   const form = container.querySelector<HTMLFormElement>('form');
   if (!currentPasswordInput || !newPasswordInput || !confirmPasswordInput || !form) {
     throw new Error('Password form did not render');

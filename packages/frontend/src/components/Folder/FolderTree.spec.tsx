@@ -63,11 +63,7 @@ describe('FolderTree', () => {
     act(() => {
       root = createRoot(container);
       root.render(
-        <FolderTree
-          folders={folders}
-          selectedFolderId="folder-parent"
-          onSelect={onSelect}
-        />,
+        <FolderTree folders={folders} selectedFolderId="folder-parent" onSelect={onSelect} />,
       );
     });
 

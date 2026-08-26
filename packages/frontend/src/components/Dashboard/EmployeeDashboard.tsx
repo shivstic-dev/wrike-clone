@@ -45,7 +45,10 @@ export function AtlasPanel({
   );
 }
 
-export function OverviewCore({ overview, onSelectBucket }: Pick<RoleCompositionProps, 'overview' | 'onSelectBucket'>) {
+export function OverviewCore({
+  overview,
+  onSelectBucket,
+}: Pick<RoleCompositionProps, 'overview' | 'onSelectBucket'>) {
   return <DepartmentPulse overview={overview} onSelectBucket={onSelectBucket} />;
 }
 

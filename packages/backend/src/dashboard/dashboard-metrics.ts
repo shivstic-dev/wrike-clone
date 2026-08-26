@@ -114,8 +114,7 @@ function uniqueSortedAssignees(
   }
 
   return [...byUserId.values()].sort(
-    (left, right) =>
-      compareText(left.name, right.name) || compareText(left.userId, right.userId),
+    (left, right) => compareText(left.name, right.name) || compareText(left.userId, right.userId),
   );
 }
 

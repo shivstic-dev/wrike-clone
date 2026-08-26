@@ -35,9 +35,7 @@ export function buildDashboardTaskParams(filters: DashboardTaskFilters): URLSear
   return params;
 }
 
-export function buildDashboardAnalyticsParams(
-  filters: DashboardAnalyticsFilters,
-): URLSearchParams {
+export function buildDashboardAnalyticsParams(filters: DashboardAnalyticsFilters): URLSearchParams {
   const params = new URLSearchParams();
   const departmentId = filters.departmentId?.trim();
   const projectId = filters.projectId?.trim();
@@ -79,10 +77,7 @@ export async function requestDashboardTasks(
   return data;
 }
 
-export function dashboardOverviewQueryOptions(
-  filters: DashboardOverviewFilters,
-  enabled = true,
-) {
+export function dashboardOverviewQueryOptions(filters: DashboardOverviewFilters, enabled = true) {
   return queryOptions({
     queryKey: dashboardKeys.overview(filters),
     queryFn: () => requestDashboardOverview(filters),

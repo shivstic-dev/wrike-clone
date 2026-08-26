@@ -6,9 +6,19 @@ export async function up(knex: Knex): Promise<void> {
     await knex.schema.alterTable('tasks', (table) => {
       table.boolean('handoff_required').notNullable().defaultTo(true);
       table.string('handoff_status').notNullable().defaultTo('pending');
-      table.uuid('handoff_owner_id').nullable().references('id').inTable('users').onDelete('SET NULL');
+      table
+        .uuid('handoff_owner_id')
+        .nullable()
+        .references('id')
+        .inTable('users')
+        .onDelete('SET NULL');
       table.timestamp('handoff_ready_at', { useTz: true }).nullable();
-      table.uuid('handoff_confirmed_by').nullable().references('id').inTable('users').onDelete('SET NULL');
+      table
+        .uuid('handoff_confirmed_by')
+        .nullable()
+        .references('id')
+        .inTable('users')
+        .onDelete('SET NULL');
       table.timestamp('handoff_confirmed_at', { useTz: true }).nullable();
     });
 

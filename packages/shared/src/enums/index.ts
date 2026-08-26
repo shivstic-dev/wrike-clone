@@ -79,7 +79,6 @@ export enum HandoffStatus {
   NOT_REQUIRED = 'not_required',
 }
 
-
 /** Priority levels for tasks. */
 export enum TaskPriority {
   LOW = 'low',
