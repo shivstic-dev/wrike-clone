@@ -1,0 +1,445 @@
+"use strict";
+/**
+ * @wrike-clone/shared — Zod validation schemas
+ *
+ * Every API input is validated against these schemas before reaching
+ * business logic. Shared between backend (server-side validation) and
+ * frontend (form validation), so rules never diverge.
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.timelineQuerySchema = exports.updateTaskScheduleSchema = exports.updateDependencySchema = exports.dashboardAnalyticsExportQuerySchema = exports.dashboardAnalyticsQuerySchema = exports.dashboardTasksQuerySchema = exports.dashboardOverviewQuerySchema = exports.departmentReportFilterSchema = exports.paginationSchema = exports.addTaskAssigneeSchema = exports.changeDepartmentMemberRoleSchema = exports.updateWorkspaceMemberRoleSchema = exports.addWorkspaceMemberSchema = exports.createWebhookSchema = exports.submitApprovalVoteSchema = exports.createApprovalSchema = exports.createAutomationRuleSchema = exports.createTimeEntrySchema = exports.createCommentSchema = exports.createDependencySchema = exports.bulkTaskUpdateSchema = exports.bulkTaskCompletionSchema = exports.taskCompletionSchema = exports.taskFilterSchema = exports.updateTaskSchema = exports.createTaskSchema = exports.moveTaskLocationSchema = exports.taskLocationInputSchema = exports.updateProjectSchema = exports.createProjectSchema = exports.updateFolderSchema = exports.createFolderSchema = exports.updateWorkspaceSchema = exports.createWorkspaceSchema = exports.updateMembershipSchema = exports.inviteUserSchema = exports.updateTenantSchema = exports.bootstrapTenantSchema = exports.createTenantSchema = exports.changePasswordSchema = exports.adminResetPasswordSchema = exports.registerSchema = exports.refreshTokenSchema = exports.loginSchema = exports.isoDate = exports.slugField = exports.uuidField = void 0;
+const zod_1 = require("zod");
+const enums_1 = require("../enums");
+// ── Helpers ────────────────────────────────────────────────────
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const slugRegex = /^[a-z0-9-]+$/;
+exports.uuidField = zod_1.z.string().regex(uuidRegex, 'Invalid UUID format');
+exports.slugField = zod_1.z
+    .string()
+    .min(2)
+    .max(64)
+    .regex(slugRegex, 'Only lowercase letters, numbers, and hyphens');
+exports.isoDate = zod_1.z
+    .string()
+    .datetime({ offset: true })
+    .or(zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2})?(\.\d{3})?Z?$/));
+// ── Auth ───────────────────────────────────────────────────────
+exports.loginSchema = zod_1.z.object({
+    email: zod_1.z.string().email(),
+    password: zod_1.z.string().min(8).max(256),
+    tenantSlug: exports.slugField.optional(), // optional when DEFAULT_TENANT_SLUG is set
+});
+exports.refreshTokenSchema = zod_1.z.object({
+    refreshToken: zod_1.z.string().min(1),
+});
+exports.registerSchema = zod_1.z.object({
+    email: zod_1.z.string().email(),
+    password: zod_1.z.string().min(12).max(256),
+    displayName: zod_1.z.string().trim().min(1).max(128),
+    tenantSlug: exports.slugField,
+});
+exports.adminResetPasswordSchema = zod_1.z.object({
+    userId: exports.uuidField,
+    tempPassword: zod_1.z.string().min(12).max(256),
+});
+exports.changePasswordSchema = zod_1.z
+    .object({
+    currentPassword: zod_1.z.string().min(1),
+    newPassword: zod_1.z.string().min(8).max(256),
+})
+    .refine((d) => d.currentPassword !== d.newPassword, 'New password must be different from current password');
+// ── Tenant ─────────────────────────────────────────────────────
+exports.createTenantSchema = zod_1.z.object({
+    name: zod_1.z.string().min(1).max(128),
+    slug: exports.slugField,
+    domain: zod_1.z.string().max(256).optional(),
+});
+exports.bootstrapTenantSchema = zod_1.z.object({
+    tenant: exports.createTenantSchema,
+    admin: zod_1.z.object({
+        email: zod_1.z.string().email(),
+        password: zod_1.z.string().min(12).max(256),
+        displayName: zod_1.z.string().trim().min(1).max(128),
+    }),
+});
+exports.updateTenantSchema = zod_1.z
+    .object({
+    name: zod_1.z.string().min(1).max(128).optional(),
+    settings: zod_1.z.record(zod_1.z.unknown()).optional(),
+})
+    .refine((d) => Object.keys(d).length > 0, 'At least one field required');
+// ── User ───────────────────────────────────────────────────────
+exports.inviteUserSchema = zod_1.z.object({
+    email: zod_1.z.string().email(),
+    role: zod_1.z.nativeEnum(enums_1.TenantRole),
+    message: zod_1.z.string().max(500).optional(),
+});
+exports.updateMembershipSchema = zod_1.z.object({
+    role: zod_1.z.nativeEnum(enums_1.TenantRole),
+});
+// ── Workspace ──────────────────────────────────────────────────
+exports.createWorkspaceSchema = zod_1.z.object({
+    name: zod_1.z.string().min(1).max(128),
+    description: zod_1.z.string().max(2000).optional(),
+    icon: zod_1.z.string().max(64).optional(),
+});
+exports.updateWorkspaceSchema = zod_1.z
+    .object({
+    name: zod_1.z.string().min(1).max(128).optional(),
+    description: zod_1.z.string().max(2000).optional(),
+    icon: zod_1.z.string().max(64).optional(),
+})
+    .refine((d) => Object.keys(d).length > 0, 'At least one field required');
+// ── Folder ─────────────────────────────────────────────────────
+exports.createFolderSchema = zod_1.z.object({
+    workspaceId: exports.uuidField,
+    parentFolderId: exports.uuidField.optional(),
+    name: zod_1.z.string().min(1).max(128),
+    description: zod_1.z.string().max(2000).optional(),
+    icon: zod_1.z.string().max(64).optional(),
+});
+exports.updateFolderSchema = zod_1.z
+    .object({
+    name: zod_1.z.string().min(1).max(128).optional(),
+    description: zod_1.z.string().max(2000).optional(),
+    icon: zod_1.z.string().max(64).optional(),
+    isArchived: zod_1.z.boolean().optional(),
+})
+    .refine((d) => Object.keys(d).length > 0, 'At least one field required');
+// ── Project ────────────────────────────────────────────────────
+exports.createProjectSchema = zod_1.z.object({
+    folderId: exports.uuidField,
+    name: zod_1.z.string().min(1).max(128),
+    description: zod_1.z.string().max(5000).optional(),
+    startDate: exports.isoDate.optional(),
+    dueDate: exports.isoDate.optional(),
+    priority: zod_1.z.nativeEnum(enums_1.TaskPriority).optional(),
+    budget: zod_1.z.number().nonnegative().optional(),
+    visibility: zod_1.z.enum(['global', 'department']).optional().default('department'),
+});
+exports.updateProjectSchema = zod_1.z
+    .object({
+    name: zod_1.z.string().min(1).max(128).optional(),
+    description: zod_1.z.string().max(5000).optional(),
+    status: zod_1.z.enum(['active', 'on_hold', 'completed', 'cancelled']).optional(),
+    startDate: exports.isoDate.nullable().optional(),
+    dueDate: exports.isoDate.nullable().optional(),
+    priority: zod_1.z.nativeEnum(enums_1.TaskPriority).optional(),
+    budget: zod_1.z.number().nonnegative().optional(),
+    actualCost: zod_1.z.number().nonnegative().optional(),
+    visibility: zod_1.z.enum(['global', 'department']).optional(),
+})
+    .refine((d) => Object.keys(d).length > 0, 'At least one field required');
+// ── Task ───────────────────────────────────────────────────────
+exports.taskLocationInputSchema = zod_1.z
+    .object({
+    departmentId: exports.uuidField.optional(),
+    folderId: exports.uuidField.optional(),
+    projectId: exports.uuidField.optional(),
+})
+    .refine((value) => {
+    const hasDepartment = !!value.departmentId;
+    const hasFolder = !!value.folderId;
+    const hasProject = !!value.projectId;
+    return ((hasDepartment && !hasFolder && !hasProject) ||
+        (hasDepartment && hasFolder && !hasProject) ||
+        (!hasDepartment && !hasFolder && hasProject) ||
+        (hasDepartment && hasFolder && hasProject));
+}, {
+    message: 'invalid task location combination',
+    path: ['departmentId'],
+});
+exports.moveTaskLocationSchema = zod_1.z
+    .object({
+    folderId: exports.uuidField.optional(),
+    projectId: exports.uuidField.optional(),
+})
+    .refine((value) => !!value.folderId || !!value.projectId, {
+    message: 'folderId or projectId is required',
+    path: ['folderId'],
+});
+exports.createTaskSchema = exports.taskLocationInputSchema.and(zod_1.z.object({
+    parentTaskId: exports.uuidField.optional(),
+    assigneeId: exports.uuidField.optional(),
+    assigneeIds: zod_1.z.array(exports.uuidField).max(50).optional(),
+    title: zod_1.z.string().min(1).max(500),
+    description: zod_1.z.string().max(10000).optional(),
+    status: zod_1.z.nativeEnum(enums_1.TaskStatus).optional(),
+    priority: zod_1.z.nativeEnum(enums_1.TaskPriority).optional(),
+    estimatedHours: zod_1.z.number().nonnegative().optional(),
+    startDate: exports.isoDate.optional(),
+    dueDate: exports.isoDate.optional(),
+    visibility: zod_1.z.enum(['global', 'department']).optional().default('department'),
+    customFields: zod_1.z.record(zod_1.z.unknown()).optional(),
+    handoffRequired: zod_1.z.boolean().optional().default(true),
+}));
+exports.updateTaskSchema = zod_1.z
+    .object({
+    title: zod_1.z.string().min(1).max(500).optional(),
+    description: zod_1.z.string().max(10000).optional(),
+    status: zod_1.z.nativeEnum(enums_1.TaskStatus).optional(),
+    priority: zod_1.z.nativeEnum(enums_1.TaskPriority).optional(),
+    assigneeId: exports.uuidField.nullable().optional(),
+    assigneeIds: zod_1.z.array(exports.uuidField).max(50).optional(),
+    estimatedHours: zod_1.z.number().nonnegative().optional(),
+    actualHours: zod_1.z.number().nonnegative().optional(),
+    startDate: exports.isoDate.nullable().optional(),
+    dueDate: exports.isoDate.nullable().optional(),
+    visibility: zod_1.z.enum(['global', 'department']).optional(),
+    sortOrder: zod_1.z.number().int().optional(),
+    customFields: zod_1.z.record(zod_1.z.unknown()).optional(),
+    handoffRequired: zod_1.z.boolean().optional(),
+})
+    .refine((d) => Object.keys(d).length > 0, 'At least one field required');
+exports.taskFilterSchema = zod_1.z.object({
+    projectId: exports.uuidField.optional(),
+    assigneeId: exports.uuidField.optional(),
+    status: zod_1.z.preprocess((value) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value), zod_1.z.array(zod_1.z.nativeEnum(enums_1.TaskStatus)).optional()),
+    priority: zod_1.z.preprocess((value) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value), zod_1.z.array(zod_1.z.nativeEnum(enums_1.TaskPriority)).optional()),
+    search: zod_1.z.string().max(200).optional(),
+    dueDateBefore: exports.isoDate.optional(),
+    dueDateAfter: exports.isoDate.optional(),
+    folderId: exports.uuidField.optional(),
+    departmentId: exports.uuidField.optional(),
+    page: zod_1.z.coerce.number().int().positive().optional().default(1),
+    perPage: zod_1.z.coerce.number().int().min(1).max(1000).optional().default(25),
+    handoffStatus: zod_1.z.nativeEnum(enums_1.HandoffStatus).optional(),
+});
+exports.taskCompletionSchema = zod_1.z.object({
+    outcome: zod_1.z.enum(['confirmed', 'not_yet']),
+});
+exports.bulkTaskCompletionSchema = zod_1.z.object({
+    items: zod_1.z
+        .array(zod_1.z.object({
+        taskId: exports.uuidField,
+        outcome: zod_1.z.enum(['confirmed', 'not_yet']),
+    }))
+        .min(1)
+        .max(100)
+        .superRefine((items, ctx) => {
+        const seen = new Set();
+        items.forEach((item, index) => {
+            if (seen.has(item.taskId)) {
+                ctx.addIssue({
+                    code: zod_1.z.ZodIssueCode.custom,
+                    message: 'Each task can appear only once in a bulk completion request',
+                    path: [index, 'taskId'],
+                });
+            }
+            seen.add(item.taskId);
+        });
+    }),
+});
+exports.bulkTaskUpdateSchema = zod_1.z.object({
+    taskIds: zod_1.z.array(exports.uuidField).min(1).max(100),
+    updates: exports.updateTaskSchema,
+});
+// ── Dependencies ───────────────────────────────────────────────
+exports.createDependencySchema = zod_1.z.object({
+    taskId: exports.uuidField,
+    dependsOnTaskId: exports.uuidField,
+    dependencyType: zod_1.z.nativeEnum(enums_1.DependencyType),
+    lagDays: zod_1.z.number().int().min(0).max(3650).optional().default(0),
+});
+// ── Comments ───────────────────────────────────────────────────
+exports.createCommentSchema = zod_1.z.object({
+    taskId: exports.uuidField,
+    content: zod_1.z.string().min(1).max(10000),
+    parentCommentId: exports.uuidField.optional(),
+    attachments: zod_1.z.array(zod_1.z.string()).max(10).optional(),
+});
+// ── Time Entry ─────────────────────────────────────────────────
+exports.createTimeEntrySchema = zod_1.z.object({
+    taskId: exports.uuidField,
+    description: zod_1.z.string().max(500).optional(),
+    loggedDate: exports.isoDate,
+    durationMinutes: zod_1.z.number().int().positive().max(1440),
+    isBillable: zod_1.z.boolean().optional().default(true),
+});
+// ── Automation ─────────────────────────────────────────────────
+exports.createAutomationRuleSchema = zod_1.z.object({
+    name: zod_1.z.string().min(1).max(128),
+    triggerEvent: zod_1.z.nativeEnum(enums_1.TriggerEvent),
+    conditions: zod_1.z
+        .array(zod_1.z.object({
+        field: zod_1.z.string(),
+        operator: zod_1.z.enum([
+            'equals',
+            'not_equals',
+            'contains',
+            'greater_than',
+            'less_than',
+            'changed_to',
+            'is_set',
+            'is_not_set',
+        ]),
+        value: zod_1.z.unknown(),
+    }))
+        .max(20),
+    actions: zod_1.z
+        .array(zod_1.z.object({
+        type: zod_1.z.enum([
+            'update_field',
+            'assign_user',
+            'change_status',
+            'send_notification',
+            'create_task',
+            'webhook',
+            'llm_action',
+        ]),
+        config: zod_1.z.record(zod_1.z.unknown()),
+    }))
+        .min(1)
+        .max(10),
+});
+// ── Approvals ──────────────────────────────────────────────────
+exports.createApprovalSchema = zod_1.z.object({
+    taskId: exports.uuidField,
+    chainId: exports.uuidField,
+});
+exports.submitApprovalVoteSchema = zod_1.z.object({
+    status: zod_1.z.enum(['approved', 'rejected', 'changes_requested']),
+    comment: zod_1.z.string().max(2000).optional(),
+});
+// ── Webhook ────────────────────────────────────────────────────
+exports.createWebhookSchema = zod_1.z.object({
+    url: zod_1.z.string().url().max(500),
+    events: zod_1.z.array(zod_1.z.string()).min(1).max(50),
+    secret: zod_1.z.string().min(16).max(256).optional(),
+});
+// ── Workspace Members ────────────────────────────────────────────
+exports.addWorkspaceMemberSchema = zod_1.z.object({
+    email: zod_1.z.string().email(),
+    displayName: zod_1.z.string().min(1).max(128),
+    tempPassword: zod_1.z.string().min(8).max(256),
+    role: zod_1.z.enum(['employee', 'manager', 'department_head']),
+});
+exports.updateWorkspaceMemberRoleSchema = zod_1.z.object({
+    role: zod_1.z.enum(['employee', 'manager', 'department_head']),
+});
+exports.changeDepartmentMemberRoleSchema = zod_1.z.object({
+    role: zod_1.z.enum(['employee', 'manager']),
+});
+exports.addTaskAssigneeSchema = zod_1.z.object({
+    userId: exports.uuidField,
+});
+// ── Pagination ─────────────────────────────────────────────────
+exports.paginationSchema = zod_1.z.object({
+    page: zod_1.z.coerce.number().int().positive().optional().default(1),
+    perPage: zod_1.z.coerce.number().int().min(1).max(100).optional().default(25),
+    sortBy: zod_1.z.string().optional(),
+    sortDirection: zod_1.z.enum(['asc', 'desc']).optional().default('asc'),
+});
+exports.departmentReportFilterSchema = zod_1.z
+    .object({
+    departmentId: zod_1.z.string().uuid().optional(),
+    dateFrom: zod_1.z.coerce.date().optional(),
+    dateTo: zod_1.z.coerce.date().optional(),
+    status: zod_1.z.nativeEnum(enums_1.TaskStatus).optional(),
+    priority: zod_1.z.nativeEnum(enums_1.TaskPriority).optional(),
+    assigneeId: zod_1.z.string().uuid().optional(),
+    scope: zod_1.z.enum(['self', 'individual', 'combined']).optional(),
+    targetUserId: zod_1.z.string().uuid().optional(),
+    format: zod_1.z.enum(['pdf', 'xlsx']).optional(),
+})
+    .refine((value) => value.scope !== 'individual' || !!value.targetUserId, {
+    message: 'targetUserId is required for individual reports',
+    path: ['targetUserId'],
+})
+    .refine((value) => !value.dateFrom || !value.dateTo || value.dateFrom <= value.dateTo, {
+    message: 'dateFrom must be before or equal to dateTo',
+    path: ['dateTo'],
+});
+// ── Type exports (infer from schemas) ──────────────────────────
+exports.dashboardOverviewQuerySchema = zod_1.z.object({
+    departmentId: exports.uuidField.optional(),
+    days: zod_1.z.coerce
+        .number()
+        .default(30)
+        .refine((days) => days === 30),
+});
+exports.dashboardTasksQuerySchema = zod_1.z.object({
+    departmentId: exports.uuidField.optional(),
+    days: zod_1.z.coerce
+        .number()
+        .default(30)
+        .refine((days) => days === 30),
+    bucket: zod_1.z.enum(['active', 'completed', 'overdue', 'blocked', 'unassigned', 'ready_for_handoff']),
+});
+const dashboardAnalyticsDate = zod_1.z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a calendar date in YYYY-MM-DD format')
+    .refine((value) => {
+    const parsed = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}, 'Invalid calendar date');
+const dashboardAnalyticsBaseQuerySchema = zod_1.z
+    .object({
+    departmentId: exports.uuidField.optional(),
+    projectId: exports.uuidField.optional(),
+    dateFrom: dashboardAnalyticsDate.optional(),
+    dateTo: dashboardAnalyticsDate.optional(),
+    groupBy: zod_1.z.literal('month').default('month'),
+})
+    .superRefine((value, context) => {
+    if (!!value.dateFrom !== !!value.dateTo) {
+        context.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: [value.dateFrom ? 'dateTo' : 'dateFrom'],
+            message: 'dateFrom and dateTo must be supplied together',
+        });
+        return;
+    }
+    if (!value.dateFrom || !value.dateTo)
+        return;
+    const from = Date.parse(`${value.dateFrom}T00:00:00.000Z`);
+    const to = Date.parse(`${value.dateTo}T23:59:59.999Z`);
+    if (from > to) {
+        context.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: ['dateTo'],
+            message: 'dateFrom must be before or equal to dateTo',
+        });
+    }
+    else if (to - from > 366 * 24 * 60 * 60 * 1_000) {
+        context.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: ['dateTo'],
+            message: 'Analytics range cannot exceed twelve months',
+        });
+    }
+});
+exports.dashboardAnalyticsQuerySchema = dashboardAnalyticsBaseQuerySchema;
+exports.dashboardAnalyticsExportQuerySchema = dashboardAnalyticsBaseQuerySchema.and(zod_1.z.object({ format: zod_1.z.enum(['pdf', 'xlsx']) }));
+exports.updateDependencySchema = zod_1.z.object({
+    dependencyType: zod_1.z.nativeEnum(enums_1.DependencyType).optional(),
+    lagDays: zod_1.z.number().int().min(0).max(3650).optional(),
+});
+exports.updateTaskScheduleSchema = zod_1.z
+    .object({
+    startDate: exports.isoDate.nullable(),
+    dueDate: exports.isoDate.nullable(),
+    expectedUpdatedAt: exports.isoDate,
+})
+    .refine((value) => (value.startDate === null && value.dueDate === null) ||
+    (value.startDate !== null && value.dueDate !== null), { message: 'startDate and dueDate must be scheduled together' })
+    .refine((value) => value.startDate === null ||
+    new Date(value.startDate).getTime() <= new Date(value.dueDate).getTime(), { message: 'startDate must not be after dueDate' });
+const MAX_TIMELINE_RANGE_MS = 730 * 24 * 60 * 60 * 1000;
+exports.timelineQuerySchema = zod_1.z
+    .object({
+    projectId: exports.uuidField.optional(),
+    departmentId: exports.uuidField.optional(),
+    assigneeId: exports.uuidField.optional(),
+    status: zod_1.z.preprocess((value) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value), zod_1.z.array(zod_1.z.nativeEnum(enums_1.TaskStatus)).optional()),
+    priority: zod_1.z.preprocess((value) => (typeof value === 'string' ? value.split(',').filter(Boolean) : value), zod_1.z.array(zod_1.z.nativeEnum(enums_1.TaskPriority)).optional()),
+    from: exports.isoDate.optional(),
+    to: exports.isoDate.optional(),
+    cursor: zod_1.z.string().optional(),
+    perPage: zod_1.z.coerce.number().int().min(1).max(500).optional().default(100),
+})
+    .refine((value) => !value.from || !value.to || new Date(value.from).getTime() <= new Date(value.to).getTime(), { message: 'from must be before or equal to to', path: ['to'] })
+    .refine((value) => !value.from ||
+    !value.to ||
+    new Date(value.to).getTime() - new Date(value.from).getTime() <= MAX_TIMELINE_RANGE_MS, { message: 'timeline range must not exceed 730 days', path: ['to'] });
+//# sourceMappingURL=index.js.map

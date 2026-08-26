@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs - exclude shared/dist so Railway can use pre-built
+dist/
+!packages/shared/dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test
+coverage/
+junit.xml
+
+# Docker
+docker/data/
+docker/volumes/
+
+# Misc
+.cache/
+.worktrees/
+graphify-out/
+.superpowers/
+tmp/
+temp/
+
+.vercel
+.env*

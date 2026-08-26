@@ -1,0 +1,1 @@
+CREATE INDEX idx_department_heads_assigned_by ON department_heads(assigned_by_id);

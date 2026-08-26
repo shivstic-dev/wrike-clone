@@ -1,0 +1,30 @@
+name: Keep Backend Warm
+
+on:
+  schedule:
+    # Run every 14 minutes to prevent free-tier instances (Render/Railway) from sleeping
+    - cron: "*/14 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping-backend:
+    name: Ping Health Endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping Backend Health Endpoint
+        run: |
+          TARGET_URL="${{ secrets.BACKEND_URL || secrets.HEALTH_CHECK_URL }}"
+          if [ -z "$TARGET_URL" ]; then
+            TARGET_URL="https://wrike-clone-backend.onrender.com/api/v1/health"
+          fi
+          echo "Pinging backend health endpoint at $TARGET_URL..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$TARGET_URL")
+          echo "Response HTTP Status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "Backend is warm and healthy."
+          else
+            echo "Backend ping returned status $HTTP_STATUS"
+            exit 1
+          fi

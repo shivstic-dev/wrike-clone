@@ -1,0 +1,58 @@
+# ──────────────────────────────────────────────
+# Wrike Clone — Docker ignore
+# ──────────────────────────────────────────────
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test / coverage
+coverage/
+junit.xml
+
+# Docker volumes / data
+docker/data/
+docker/volumes/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Temp
+.cache/
+tmp/
+temp/
+
+# Docs
+docs/
+README.md
+
+# CI
+.github/
