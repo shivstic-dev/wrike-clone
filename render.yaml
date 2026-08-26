@@ -18,12 +18,18 @@ services:
         value: api/v1
       - key: DATABASE_URL
         sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: APP_PUBLIC_URL
+        sync: false
+      - key: ALLOW_PUBLIC_REGISTRATION
+        value: "false"
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
-      # Set to your Vercel frontend origin(s) before going live.
-      # "*" is fine for testing only.
+      # Your Vercel frontend origin(s), comma-separated. Wildcards are
+      # rejected in production by validateProductionConfig.
       - key: CORS_ORIGINS
         sync: false
       # ── Supabase storage + realtime broadcast ──
