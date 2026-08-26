@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import apiClient from './client';
+import { taskKeys, type GroupedDepartmentTasks } from './taskQueryKeys';
 import type {
   Task,
   TaskFilterParams,
@@ -9,20 +10,14 @@ import type {
   BulkTaskCompletionResult,
   TaskCompletionOutcome,
 } from '@wrike-clone/shared';
+import { applyTaskToCache, removeTaskFromCache } from '../lib/taskCache';
+import { adaptivePollingRefetchInterval } from '../hooks/useAdaptivePolling';
+import { useRealtimeActive } from '../hooks/useTaskRealtime';
+
+export { taskKeys };
+export type { GroupedDepartmentTasks, DepartmentTaskGroup } from './taskQueryKeys';
 
 // ---- Query key factory ----
-export const taskKeys = {
-  all: ['tasks'] as const,
-  lists: () => [...taskKeys.all, 'list'] as const,
-  list: (filters: TaskFilterParams) => [...taskKeys.lists(), filters] as const,
-  details: () => [...taskKeys.all, 'detail'] as const,
-  detail: (id: string) => [...taskKeys.details(), id] as const,
-  mine: (filters: TaskFilterParams) => [...taskKeys.all, 'mine', filters] as const,
-  grouped: (departmentId: string) => [...taskKeys.all, 'grouped', departmentId] as const,
-  allList: (filters: TaskFilterParams, principalKey = 'anonymous') =>
-    [...taskKeys.all, 'all-list', principalKey, filters] as const,
-};
-
 export const taskDependentQueryKeys = [
   ['tasks'],
   ['reports'],
@@ -47,25 +42,6 @@ export function invalidateTaskDependentQueries(queryClient: QueryClient): void {
   }
 }
 
-export interface DepartmentTaskGroup {
-  user: {
-    userId: string;
-    displayName: string;
-    email: string;
-    role: 'employee' | 'manager' | 'department_head';
-  };
-  tasks: Task[];
-}
-
-export interface GroupedDepartmentTasks {
-  viewerRole: 'admin' | 'department_head' | 'manager';
-  myTasks: Task[];
-  managerGroups: DepartmentTaskGroup[];
-  employeeGroups: DepartmentTaskGroup[];
-  unassigned: Task[];
-  members: DepartmentTaskGroup['user'][];
-}
-
 export function buildTaskSearchParams(filters: TaskFilterParams): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.page) params.set('page', String(filters.page));
@@ -87,7 +63,14 @@ export function buildTaskSearchParams(filters: TaskFilterParams): URLSearchParam
 
 // ---- Hooks ----
 
+/** Shared refetchInterval: realtime-first, adaptive polling as fallback. */
+function useTaskRefetchInterval() {
+  const realtimeActive = useRealtimeActive();
+  return () => adaptivePollingRefetchInterval(realtimeActive);
+}
+
 export function useTasks(filters: TaskFilterParams = {}, enabled = true) {
+  const refetchInterval = useTaskRefetchInterval();
   return useQuery({
     queryKey: taskKeys.list(filters),
     queryFn: async () => {
@@ -96,6 +79,7 @@ export function useTasks(filters: TaskFilterParams = {}, enabled = true) {
       return data;
     },
     enabled,
+    refetchInterval,
   });
 }
 
@@ -120,14 +104,17 @@ export function useAllTasks(
   enabled = true,
   principalKey = 'anonymous',
 ) {
+  const refetchInterval = useTaskRefetchInterval();
   return useQuery({
     queryKey: taskKeys.allList(filters, principalKey),
     queryFn: () => fetchAllTasks(filters),
     enabled,
+    refetchInterval,
   });
 }
 
 export function useMyTasks(filters: TaskFilterParams = {}, enabled = true) {
+  const refetchInterval = useTaskRefetchInterval();
   return useQuery({
     queryKey: taskKeys.mine(filters),
     queryFn: async () => {
@@ -138,10 +125,12 @@ export function useMyTasks(filters: TaskFilterParams = {}, enabled = true) {
       return data;
     },
     enabled,
+    refetchInterval,
   });
 }
 
 export function useGroupedDepartmentTasks(departmentId: string, enabled = true) {
+  const refetchInterval = useTaskRefetchInterval();
   return useQuery({
     queryKey: taskKeys.grouped(departmentId),
     queryFn: async () => {
@@ -151,6 +140,7 @@ export function useGroupedDepartmentTasks(departmentId: string, enabled = true) 
       return data;
     },
     enabled: enabled && !!departmentId,
+    refetchInterval,
   });
 }
 
@@ -162,8 +152,7 @@ export function useAddTaskAssignee() {
       return data;
     },
     onSuccess: (task) => {
-      invalidateTaskDependentQueries(queryClient);
-      queryClient.setQueryData(taskKeys.detail(task.id), task);
+      applyTaskToCache(queryClient, task);
     },
   });
 }
@@ -176,8 +165,7 @@ export function useRemoveTaskAssignee() {
       return data;
     },
     onSuccess: (task) => {
-      invalidateTaskDependentQueries(queryClient);
-      queryClient.setQueryData(taskKeys.detail(task.id), task);
+      applyTaskToCache(queryClient, task);
     },
   });
 }
@@ -203,8 +191,11 @@ export function useCreateTask() {
       const { data } = await apiClient.post<Task>('/tasks', input);
       return data;
     },
-    onSuccess: () => {
-      invalidateTaskDependentQueries(queryClient);
+    // New tasks may not match every active list filter, so refetch only the
+    // ['tasks'] family once — realtime broadcasts keep other clients fresh.
+    onSuccess: (task) => {
+      applyTaskToCache(queryClient, task);
+      void queryClient.invalidateQueries({ queryKey: taskKeys.all });
     },
   });
 }
@@ -226,10 +217,7 @@ export function useCompleteTask() {
       return data;
     },
     onSuccess: (task) => {
-      queryClient.setQueryData(taskKeys.detail(task.id), task);
-    },
-    onSettled: () => {
-      invalidateTaskDependentQueries(queryClient);
+      applyTaskToCache(queryClient, task);
     },
   });
 }
@@ -250,9 +238,8 @@ export function useBulkCompleteTasks() {
     },
     onSuccess: (result) => {
       for (const task of result.data) {
-        queryClient.setQueryData(taskKeys.detail(task.id), task);
+        applyTaskToCache(queryClient, task);
       }
-      invalidateTaskDependentQueries(queryClient);
     },
   });
 }
@@ -263,9 +250,10 @@ export function useDeleteTask() {
   return useMutation({
     mutationFn: async (id: string) => {
       await apiClient.delete(`/tasks/${id}`);
+      return id;
     },
-    onSuccess: () => {
-      invalidateTaskDependentQueries(queryClient);
+    onSuccess: (id) => {
+      removeTaskFromCache(queryClient, id);
     },
   });
 }

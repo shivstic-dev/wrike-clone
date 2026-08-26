@@ -10,6 +10,7 @@ import { RolesGuard } from '../../src/common/guards/roles.guard';
 import { tenantContext } from '../../src/common/tenant-context';
 import { TaskLocationService } from '../../src/task/task-location.service';
 import { TaskCompletionService } from '../../src/task/task-completion.service';
+import { RealtimeService } from '../../src/realtime/realtime.service';
 import { MemoryCacheService } from '../../src/common/cache/memory-cache.service';
 
 function queryBuilder() {
@@ -55,6 +56,7 @@ describe('Department permission checks through the HTTP API', () => {
         TaskLocationService,
         DepartmentAccessService,
         { provide: TaskCompletionService, useValue: {} },
+        { provide: RealtimeService, useValue: { publishTaskEvent: jest.fn() } },
         { provide: DATABASE_PROVIDER, useValue: database },
       ],
     })

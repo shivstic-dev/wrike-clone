@@ -66,11 +66,7 @@ function mountUpdateTaskHook(queryClient: QueryClient) {
 
   act(() => {
     root.render(
-      createElement(
-        QueryClientProvider,
-        { client: queryClient },
-        createElement(Harness),
-      ),
+      createElement(QueryClientProvider, { client: queryClient }, createElement(Harness)),
     );
   });
 
@@ -258,7 +254,7 @@ describe('useUpdateTask', () => {
     expect(cachedTask?.title).toBe('Original Title');
   });
 
-  it('invalidates task queries on settlement', async () => {
+  it('reconciles cache with the server response on settlement without broad invalidation', async () => {
     const queryClient = createTestQueryClient();
     const getHook = mountUpdateTaskHook(queryClient);
 
@@ -268,19 +264,37 @@ describe('useUpdateTask', () => {
     queryClient.setQueryData(detailKey, { id: 'task-1', status: TaskStatus.TODO });
     queryClient.setQueryData(rootKey, [{ id: 'task-1', status: TaskStatus.TODO }]);
 
+    // Server returns a different title than the optimistic input — settlement
+    // must overwrite optimistic state with the authoritative response.
     apiMocks.patch.mockResolvedValue({
-      data: { id: 'task-1', status: TaskStatus.COMPLETED },
+      data: { id: 'task-1', status: TaskStatus.COMPLETED, title: 'Server Title' },
     });
 
     const hook = getHook();
 
     await act(async () => {
-      await hook.mutateAsync({ id: 'task-1', status: TaskStatus.COMPLETED });
+      await hook.mutateAsync({
+        id: 'task-1',
+        status: TaskStatus.COMPLETED,
+        title: 'Optimistic Title',
+      });
     });
 
-    // Check invalidation on settlement
-    expect(queryClient.getQueryState(detailKey)?.isInvalidated).toBe(true);
-    expect(queryClient.getQueryState(rootKey)?.isInvalidated).toBe(true);
+    // Cache reconciled with the server response
+    const detail = queryClient.getQueryData<{ id: string; status: string; title?: string }>(
+      detailKey,
+    );
+    expect(detail?.status).toBe(TaskStatus.COMPLETED);
+    expect(detail?.title).toBe('Server Title');
+
+    const listEntry =
+      queryClient.getQueryData<Array<{ id: string; status: string; title?: string }>>(rootKey);
+    expect(listEntry?.[0]?.status).toBe(TaskStatus.COMPLETED);
+    expect(listEntry?.[0]?.title).toBe('Server Title');
+
+    // No refetch cascade: derived views are kept fresh by realtime/polling
+    expect(queryClient.getQueryState(detailKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(rootKey)?.isInvalidated).toBe(false);
   });
 
   describe('Adversarial & Edge Case Verification', () => {
@@ -334,7 +348,12 @@ describe('useUpdateTask', () => {
         managerGroups: [],
         employeeGroups: [
           {
-            user: { userId: 'emp-1', displayName: 'Emp 1', email: 'emp1@test.com', role: 'employee' },
+            user: {
+              userId: 'emp-1',
+              displayName: 'Emp 1',
+              email: 'emp1@test.com',
+              role: 'employee',
+            },
             tasks: [task1, task2],
           },
         ],
@@ -343,14 +362,20 @@ describe('useUpdateTask', () => {
       });
 
       let resolvePatch!: (v: unknown) => void;
-      apiMocks.patch.mockReturnValue(new Promise((res) => { resolvePatch = res; }));
+      apiMocks.patch.mockReturnValue(
+        new Promise((res) => {
+          resolvePatch = res;
+        }),
+      );
 
       const hook = getHook();
       let mutationPromise: Promise<Task> | undefined;
       act(() => {
         mutationPromise = hook.mutateAsync({ id: 'task-1', title: 'Task 1 Updated' });
       });
-      await act(async () => { await Promise.resolve(); });
+      await act(async () => {
+        await Promise.resolve();
+      });
 
       const cachedGrouped = queryClient.getQueryData<GroupedDepartmentTasks>(groupedKey);
       expect(cachedGrouped?.employeeGroups[0]?.tasks[0]?.title).toBe('Task 1 Updated');
@@ -393,7 +418,11 @@ describe('useUpdateTask', () => {
       const hook = getHook();
       await act(async () => {
         try {
-          await hook.mutateAsync({ id: 'task-1', status: TaskStatus.COMPLETED, title: 'Network Fail Title' });
+          await hook.mutateAsync({
+            id: 'task-1',
+            status: TaskStatus.COMPLETED,
+            title: 'Network Fail Title',
+          });
         } catch (err) {
           expect(err).toBeInstanceOf(TypeError);
         }
@@ -403,12 +432,20 @@ describe('useUpdateTask', () => {
       expect(queryClient.getQueryData<Task>(detailKey)?.title).toBe('Original Task 1');
       expect(queryClient.getQueryData<Task>(detailKey)?.status).toBe(TaskStatus.TODO);
 
-      expect(queryClient.getQueryData<PaginatedResponse<Task>>(listKey)?.data[0]?.title).toBe('Original Task 1');
-      expect(queryClient.getQueryData<PaginatedResponse<Task>>(listKey)?.data[0]?.status).toBe(TaskStatus.TODO);
+      expect(queryClient.getQueryData<PaginatedResponse<Task>>(listKey)?.data[0]?.title).toBe(
+        'Original Task 1',
+      );
+      expect(queryClient.getQueryData<PaginatedResponse<Task>>(listKey)?.data[0]?.status).toBe(
+        TaskStatus.TODO,
+      );
 
       expect(queryClient.getQueryData<Task[]>(mineKey)?.[0]?.title).toBe('Original Task 1');
-      expect(queryClient.getQueryData<GroupedDepartmentTasks>(groupedKey)?.myTasks[0]?.title).toBe('Original Task 1');
-      expect(queryClient.getQueryData<GroupedDepartmentTasks>(groupedKey)?.unassigned[0]?.title).toBe('Original Task 1');
+      expect(queryClient.getQueryData<GroupedDepartmentTasks>(groupedKey)?.myTasks[0]?.title).toBe(
+        'Original Task 1',
+      );
+      expect(
+        queryClient.getQueryData<GroupedDepartmentTasks>(groupedKey)?.unassigned[0]?.title,
+      ).toBe('Original Task 1');
     });
 
     it('accurately rolls back ALL cache shapes on 500 Server Error', async () => {
@@ -462,14 +499,20 @@ describe('useUpdateTask', () => {
       queryClient.setQueryData<Task[]>(mineKey, [task1, task2]);
 
       let resolvePatch!: (v: unknown) => void;
-      apiMocks.patch.mockReturnValue(new Promise((res) => { resolvePatch = res; }));
+      apiMocks.patch.mockReturnValue(
+        new Promise((res) => {
+          resolvePatch = res;
+        }),
+      );
 
       const hook = getHook();
       let mutationPromise: Promise<Task> | undefined;
       act(() => {
         mutationPromise = hook.mutateAsync({ id: 'task-1', title: 'Task 1 Modified' });
       });
-      await act(async () => { await Promise.resolve(); });
+      await act(async () => {
+        await Promise.resolve();
+      });
 
       const mineData = queryClient.getQueryData<Task[]>(mineKey);
       expect(mineData?.[0]?.title).toBe('Task 1 Modified');
@@ -495,14 +538,20 @@ describe('useUpdateTask', () => {
       });
 
       let resolvePatch!: (v: unknown) => void;
-      apiMocks.patch.mockReturnValue(new Promise((res) => { resolvePatch = res; }));
+      apiMocks.patch.mockReturnValue(
+        new Promise((res) => {
+          resolvePatch = res;
+        }),
+      );
 
       const hook = getHook();
       let mutationPromise: Promise<Task> | undefined;
       act(() => {
         mutationPromise = hook.mutateAsync({ id: 'task-1', title: 'Task 1 Partial Update' });
       });
-      await act(async () => { await Promise.resolve(); });
+      await act(async () => {
+        await Promise.resolve();
+      });
 
       const updated = queryClient.getQueryData<GroupedDepartmentTasks>(groupedKey);
       expect(updated?.myTasks[0]?.title).toBe('Task 1 Partial Update');
@@ -527,8 +576,18 @@ describe('useUpdateTask', () => {
       let resolvePatch2!: (v: unknown) => void;
 
       apiMocks.patch
-        .mockImplementationOnce(() => new Promise((res) => { resolvePatch1 = res; }))
-        .mockImplementationOnce(() => new Promise((res) => { resolvePatch2 = res; }));
+        .mockImplementationOnce(
+          () =>
+            new Promise((res) => {
+              resolvePatch1 = res;
+            }),
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise((res) => {
+              resolvePatch2 = res;
+            }),
+        );
 
       const hook = getHook();
       let p1: Promise<Task> | undefined;
@@ -538,11 +597,17 @@ describe('useUpdateTask', () => {
         p1 = hook.mutateAsync({ id: 'task-1', title: 'Task 1 Concurrently Updated' });
         p2 = hook.mutateAsync({ id: 'task-2', title: 'Task 2 Concurrently Updated' });
       });
-      await act(async () => { await Promise.resolve(); });
+      await act(async () => {
+        await Promise.resolve();
+      });
 
       const currentMine = queryClient.getQueryData<Task[]>(mineKey);
-      expect(currentMine?.find((t) => t.id === 'task-1')?.title).toBe('Task 1 Concurrently Updated');
-      expect(currentMine?.find((t) => t.id === 'task-2')?.title).toBe('Task 2 Concurrently Updated');
+      expect(currentMine?.find((t) => t.id === 'task-1')?.title).toBe(
+        'Task 1 Concurrently Updated',
+      );
+      expect(currentMine?.find((t) => t.id === 'task-2')?.title).toBe(
+        'Task 2 Concurrently Updated',
+      );
 
       await act(async () => {
         resolvePatch1({ data: { ...task1, title: 'Task 1 Concurrently Updated' } });
@@ -552,5 +617,3 @@ describe('useUpdateTask', () => {
     });
   });
 });
-
-

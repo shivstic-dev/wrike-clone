@@ -1,11 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Task, UpdateTaskRequest, PaginatedResponse } from '@wrike-clone/shared';
-import {
-  updateTask,
-  taskKeys,
-  invalidateTaskDependentQueries,
-  type GroupedDepartmentTasks,
-} from '../api/tasks';
+import type { Task, UpdateTaskRequest } from '@wrike-clone/shared';
+import { updateTask, taskKeys, type GroupedDepartmentTasks } from '../api/tasks';
+import { applyTaskToCache } from '../lib/taskCache';
 
 export interface OptimisticUpdateContext {
   previousTasks: Array<[readonly unknown[], unknown]>;
@@ -26,58 +22,7 @@ export function useUpdateTask() {
       // Snapshot previous query data for all task query keys to allow rollback
       const previousTasks = queryClient.getQueriesData<unknown>({ queryKey: taskKeys.all });
 
-      // Optimistically update query data in cache
-      queryClient.setQueriesData<unknown>({ queryKey: taskKeys.all }, (oldData: unknown) => {
-        if (!oldData || typeof oldData !== 'object') {
-          return oldData;
-        }
-
-        // Paginated lists (PaginatedResponse<Task>)
-        if ('data' in oldData && Array.isArray((oldData as { data: unknown }).data)) {
-          const paginated = oldData as PaginatedResponse<Task>;
-          return {
-            ...paginated,
-            data: paginated.data.map((t) => (t.id === id ? { ...t, ...input } : t)),
-          };
-        }
-
-        // Grouped department tasks (GroupedDepartmentTasks)
-        if ('myTasks' in oldData && Array.isArray((oldData as GroupedDepartmentTasks).myTasks)) {
-          const grouped = oldData as GroupedDepartmentTasks;
-          return {
-            ...grouped,
-            myTasks: grouped.myTasks ? grouped.myTasks.map((t) => (t.id === id ? { ...t, ...input } : t)) : [],
-            unassigned: grouped.unassigned ? grouped.unassigned.map((t) => (t.id === id ? { ...t, ...input } : t)) : [],
-            managerGroups: grouped.managerGroups
-              ? grouped.managerGroups.map((g) => ({
-                  ...g,
-                  tasks: g.tasks ? g.tasks.map((t) => (t.id === id ? { ...t, ...input } : t)) : [],
-                }))
-              : [],
-            employeeGroups: grouped.employeeGroups
-              ? grouped.employeeGroups.map((g) => ({
-                  ...g,
-                  tasks: g.tasks ? g.tasks.map((t) => (t.id === id ? { ...t, ...input } : t)) : [],
-                }))
-              : [],
-          };
-        }
-
-        // Simple task arrays (Task[])
-        if (Array.isArray(oldData)) {
-          return (oldData as Task[]).map((t) => (t.id === id ? { ...t, ...input } : t));
-        }
-
-        // Single task details (Task)
-        if ('id' in oldData && (oldData as Task).id === id) {
-          return {
-            ...(oldData as Task),
-            ...input,
-          };
-        }
-
-        return oldData;
-      });
+      applyTaskToCache(queryClient, { id, ...input }, { upsert: false });
 
       return { previousTasks };
     },
@@ -90,11 +35,11 @@ export function useUpdateTask() {
       }
     },
 
-    onSettled: (_data, _error, variables) => {
-      invalidateTaskDependentQueries(queryClient);
-      if (variables?.id) {
-        queryClient.invalidateQueries({ queryKey: taskKeys.detail(variables.id) });
-      }
+    onSuccess: (task) => {
+      // Reconcile optimistic state with the authoritative server response.
+      // No broad invalidation — realtime broadcasts and adaptive polling keep
+      // derived views (dashboard/reports/etc.) fresh without a refetch storm.
+      applyTaskToCache(queryClient, task, { upsert: false });
     },
   });
 }

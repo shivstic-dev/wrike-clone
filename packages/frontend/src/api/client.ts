@@ -20,6 +20,10 @@ export function setTenantId(id: string | null) {
   inMemoryTenantId = id;
 }
 
+export function getTenantId(): string | null {
+  return inMemoryTenantId;
+}
+
 export function setTokenRefreshCallback(cb: (token: string) => void) {
   onTokenRefreshed = cb;
 }

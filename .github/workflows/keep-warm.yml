@@ -17,7 +17,7 @@ jobs:
         run: |
           TARGET_URL="${{ secrets.BACKEND_URL || secrets.HEALTH_CHECK_URL }}"
           if [ -z "$TARGET_URL" ]; then
-            TARGET_URL="https://wrike-clone-production-9894.up.railway.app/api/v1/health"
+            TARGET_URL="https://wrike-clone-backend.onrender.com/api/v1/health"
           fi
           echo "Pinging backend health endpoint at $TARGET_URL..."
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$TARGET_URL")

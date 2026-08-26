@@ -32,6 +32,7 @@ import { DepartmentAccessService } from '../rbac/department-access.service';
 import { TaskLocationService } from './task-location.service';
 import { MemoryCacheService } from '../common/cache/memory-cache.service';
 import { TaskCompletionService } from './task-completion.service';
+import { RealtimeService } from '../realtime/realtime.service';
 
 @Injectable()
 export class TaskService {
@@ -108,6 +109,7 @@ export class TaskService {
     private readonly taskLocations: TaskLocationService,
     private readonly taskCompletion: TaskCompletionService,
     private readonly cache: MemoryCacheService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   invalidateTenantCache(tenantId: string): void {
@@ -618,7 +620,11 @@ export class TaskService {
 
     this.logger.log(`Task ${id} created in project ${task.projectId}`);
     this.invalidateTenantCache(ctx.tenantId);
-    return { ...task, assignees: await this.getTaskAssignees(id) };
+    const result = { ...task, assignees: await this.getTaskAssignees(id) };
+    void this.realtime.publishTaskEvent(ctx.tenantId, 'task.created', {
+      task: result as unknown as Record<string, unknown>,
+    });
+    return result;
   }
 
   /**
@@ -792,7 +798,14 @@ export class TaskService {
     }
 
     this.invalidateTenantCache(ctx.tenantId);
-    return { ...updated, assignees: await this.getTaskAssignees(id) };
+    const result = { ...updated, assignees: await this.getTaskAssignees(id) };
+    if (Object.keys(changes).length > 0) {
+      void this.realtime.publishTaskEvent(ctx.tenantId, 'task.updated', {
+        task: result as unknown as Record<string, unknown>,
+        changes,
+      });
+    }
+    return result;
   }
 
   /**
@@ -808,6 +821,7 @@ export class TaskService {
     });
     await this.logActivity(ctx.userId, 'task', id, 'task:deleted', {});
     this.invalidateTenantCache(ctx.tenantId);
+    void this.realtime.publishTaskEvent(ctx.tenantId, 'task.deleted', { id });
     this.logger.log(`Task ${id} soft-deleted`);
   }
 

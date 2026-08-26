@@ -47,6 +47,11 @@ const cachedTaskDependentKeys = [
   ['timeline', 'cached'],
 ] as const;
 
+interface PaginatedLike {
+  data: Array<Record<string, unknown>>;
+  meta: { page: number; perPage: number; total: number; totalPages: number };
+}
+
 const returnedTask: Task = {
   id: 'task-1',
   tenantId: 'tenant-1',
@@ -150,9 +155,15 @@ function mountMutation<TInput>(
   };
 }
 
-function expectTaskDependentCachesInvalidated(queryClient: QueryClient): void {
-  for (const queryKey of cachedTaskDependentKeys) {
-    expect(queryClient.getQueryState(queryKey)?.isInvalidated).toBe(true);
+/**
+ * Mutations now patch caches directly instead of invalidating derived views
+ * (realtime broadcasts / adaptive polling keep those fresh), so only the
+ * ['tasks'] family may be invalidated after creation.
+ */
+function expectNoBroadInvalidation(queryClient: QueryClient): void {
+  for (const dependentKey of cachedTaskDependentKeys.slice(1)) {
+    const state = queryClient.getQueryState(dependentKey);
+    expect(state?.isInvalidated ?? false).toBe(false);
   }
 }
 
@@ -246,64 +257,86 @@ describe('task API contract helpers', () => {
     }
   });
 
-  it('invalidates task-dependent caches after creating a task', async () => {
+  it('caches the created task and refreshes only the task family', async () => {
     apiMocks.post.mockResolvedValue({ data: returnedTask });
     const queryClient = createTaskMutationQueryClient();
+    const listKey = ['tasks', 'list', { page: 1 }] as const;
+    queryClient.setQueryData<PaginatedLike>(listKey, {
+      data: [],
+      meta: { page: 1, perPage: 10, total: 0, totalPages: 0 },
+    });
     const mutate = mountMutation(queryClient, useCreateTask);
 
     await mutate({ title: 'Current task' });
 
-    expectTaskDependentCachesInvalidated(queryClient);
+    // Detail cache seeded, task upserted into the cached list
+    expect(queryClient.getQueryData(taskKeys.detail(returnedTask.id))).toMatchObject({
+      id: returnedTask.id,
+    });
+    expect(queryClient.getQueryData<PaginatedLike>(listKey)?.data).toHaveLength(1);
+    // Only the ['tasks'] family invalidated — no derived-view refetch cascade
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true);
+    expectNoBroadInvalidation(queryClient);
   });
 
-  it('invalidates task-dependent caches and task detail after updating a task', async () => {
+  it('patches caches and skips broad invalidation after updating a task', async () => {
     apiMocks.patch.mockResolvedValue({ data: returnedTask });
     const queryClient = createTaskMutationQueryClient();
-    queryClient.setQueryData(taskKeys.detail(returnedTask.id), { title: 'Old task' });
+    queryClient.setQueryData(taskKeys.detail(returnedTask.id), {
+      id: returnedTask.id,
+      title: 'Old task',
+    });
     const mutate = mountMutation(queryClient, useUpdateTask);
 
     await mutate({ id: returnedTask.id, title: returnedTask.title });
 
-    expectTaskDependentCachesInvalidated(queryClient);
-    expect(queryClient.getQueryState(taskKeys.detail(returnedTask.id))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryData(taskKeys.detail(returnedTask.id))).toEqual(returnedTask);
+    expectNoBroadInvalidation(queryClient);
   });
 
-  it('invalidates task-dependent caches after deleting a task', async () => {
+  it('removes the deleted task from cached lists without broad invalidation', async () => {
     apiMocks.delete.mockResolvedValue({ data: undefined });
     const queryClient = createTaskMutationQueryClient();
+    const mineKey = taskKeys.mine({});
+    queryClient.setQueryData(mineKey, [returnedTask]);
     const mutate = mountMutation(queryClient, useDeleteTask);
 
     await mutate(returnedTask.id);
 
-    expectTaskDependentCachesInvalidated(queryClient);
+    expect(queryClient.getQueryData<Task[]>(mineKey)).toHaveLength(0);
+    expect(queryClient.getQueryData(taskKeys.detail(returnedTask.id))).toBeUndefined();
+    expectNoBroadInvalidation(queryClient);
   });
 
-  it('invalidates task-dependent caches and updates detail after adding an assignee', async () => {
+  it('patches the detail cache after adding an assignee', async () => {
     apiMocks.post.mockResolvedValue({ data: returnedTask });
     const queryClient = createTaskMutationQueryClient();
     const mutate = mountMutation(queryClient, useAddTaskAssignee);
 
     await mutate({ taskId: returnedTask.id, userId: 'user-1' });
 
-    expectTaskDependentCachesInvalidated(queryClient);
+    expectNoBroadInvalidation(queryClient);
     expect(queryClient.getQueryData(taskKeys.detail(returnedTask.id))).toEqual(returnedTask);
   });
 
-  it('invalidates task-dependent caches and updates detail after removing an assignee', async () => {
+  it('patches the detail cache after removing an assignee', async () => {
     apiMocks.delete.mockResolvedValue({ data: returnedTask });
     const queryClient = createTaskMutationQueryClient();
     const mutate = mountMutation(queryClient, useRemoveTaskAssignee);
 
     await mutate({ taskId: returnedTask.id, userId: 'user-1' });
 
-    expectTaskDependentCachesInvalidated(queryClient);
+    expectNoBroadInvalidation(queryClient);
     expect(queryClient.getQueryData(taskKeys.detail(returnedTask.id))).toEqual(returnedTask);
   });
 
-  it('sends the selected handoff outcome and refreshes completion-dependent views', async () => {
+  it('sends the selected handoff outcome and patches the cache on completion', async () => {
     apiMocks.post.mockResolvedValue({ data: returnedTask });
     const queryClient = createTaskMutationQueryClient();
-    queryClient.setQueryData(taskKeys.detail(returnedTask.id), { title: 'Old task' });
+    queryClient.setQueryData(taskKeys.detail(returnedTask.id), {
+      id: returnedTask.id,
+      title: 'Old task',
+    });
     const mutate = mountMutation<{
       taskId: string;
       outcome: TaskCompletionOutcome;
@@ -314,11 +347,11 @@ describe('task API contract helpers', () => {
     expect(apiMocks.post).toHaveBeenCalledWith('/tasks/task-1/completion', {
       outcome: 'not_yet',
     });
-    expectTaskDependentCachesInvalidated(queryClient);
+    expectNoBroadInvalidation(queryClient);
     expect(queryClient.getQueryData(taskKeys.detail(returnedTask.id))).toEqual(returnedTask);
   });
 
-  it('submits every selected task through the bulk completion endpoint', async () => {
+  it('submits every selected task through the bulk completion endpoint and patches caches', async () => {
     apiMocks.post.mockResolvedValue({ data: { data: [returnedTask], errors: [] } });
     const queryClient = createTaskMutationQueryClient();
     const mutate = mountMutation<{
@@ -330,18 +363,18 @@ describe('task API contract helpers', () => {
     expect(apiMocks.post).toHaveBeenCalledWith('/tasks/bulk-completion', {
       items: [{ taskId: 'task-1', outcome: 'confirmed' }],
     });
-    expectTaskDependentCachesInvalidated(queryClient);
+    expectNoBroadInvalidation(queryClient);
     expect(queryClient.getQueryData(taskKeys.detail(returnedTask.id))).toEqual(returnedTask);
   });
 
-  it('invalidates task-dependent caches and updates detail after moving a task', async () => {
+  it('patches caches and updates detail after moving a task', async () => {
     apiMocks.patch.mockResolvedValue({ data: returnedTask });
     const queryClient = createTaskMutationQueryClient();
     const mutate = mountMutation(queryClient, useMoveTaskLocation);
 
     await mutate({ taskId: returnedTask.id, folderId: 'folder-1' });
 
-    expectTaskDependentCachesInvalidated(queryClient);
+    expectNoBroadInvalidation(queryClient);
     expect(queryClient.getQueryData(taskKeys.detail(returnedTask.id))).toEqual(returnedTask);
   });
 });

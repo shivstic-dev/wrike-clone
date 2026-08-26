@@ -9,11 +9,11 @@ services:
     buildCommand: npm install && npm run build -w @wrike-clone/shared && npm run build -w @wrike-clone/backend
     startCommand: cd packages/backend && npm run start:prod
     healthCheckPath: /api/v1/health
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 4000
+      # Render injects its own PORT automatically — do not override it.
       - key: API_PREFIX
         value: api/v1
       - key: DATABASE_URL
@@ -22,5 +22,27 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      # Set to your Vercel frontend origin(s) before going live.
+      # "*" is fine for testing only.
       - key: CORS_ORIGINS
-        value: "*"
+        sync: false
+      # ── Supabase storage + realtime broadcast ──
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: work-management-files
+      - key: REALTIME_BROADCAST_ENABLED
+        value: "true"
+      # ── Optional integrations ──
+      - key: SENTRY_DSN
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false

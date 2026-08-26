@@ -39,6 +39,7 @@ import { CopilotModule } from './copilot/copilot.module';
 import { ReportModule } from './reports/report.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TimelineModule } from './timeline/timeline.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 // Conditionally register BullMQ only when Redis is configured
 const queueImports: any[] = [];
@@ -61,6 +62,7 @@ if (process.env['REDIS_HOST']) {
     // Core
     DatabaseModule,
     CacheModule,
+    RealtimeModule,
 
     // Rate limiting
     ThrottlerModule.forRoot([

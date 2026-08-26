@@ -195,3 +195,54 @@ The repository includes `render.yaml` for infrastructure-as-code:
 ---
 
 **Ready to deploy?** Follow the steps above and your backend will be live in minutes! ðŸš€
+
+---
+
+## Migrating from Railway (existing deployment)
+
+The backend previously ran on Railway (wrike-clone-production-9894.up.railway.app).
+Follow these steps to cut over to Render with zero downtime:
+
+### 1. Deploy on Render first
+
+1. Complete Steps 2–5 above (create service, add env vars, deploy).
+2. Copy your existing values from **Railway ? your service ? Variables** into
+   the matching Render env vars: DATABASE_URL, SUPABASE_URL,
+   SUPABASE_SERVICE_ROLE_KEY, JWT_SECRET, JWT_REFRESH_SECRET,
+   CORS_ORIGINS, SMTP vars, SENTRY_DSN.
+   - Reuse the exact same JWT secrets so existing sessions stay valid.
+3. Wait for the first deploy to go live and verify:
+   \curl https://<your-render-app>.onrender.com/api/v1/health\ returns 200.
+
+### 2. Point the frontend at Render
+
+On **Vercel**, update the environment variable:
+
+| Key | New value |
+|-----|-----------|
+| \VITE_API_URL\ | \https://<your-render-app>.onrender.com/api/v1\ |
+
+Then redeploy the frontend (Vercel bakes \VITE_*\ values at build time).
+
+### 3. Update repo automation
+
+1. Add a repository secret \BACKEND_URL = https://<your-render-app>.onrender.com\
+   so \.github/workflows/keep-warm.yml\ pings the new host (the fallback
+   default in the workflow already targets Render).
+2. The keep-warm ping every 14 minutes also prevents Render free-tier spin-down.
+
+### 4. Retire Railway
+
+1. Keep both backends running for a day or two (they share the same database,
+   so either can serve traffic safely).
+2. Delete the Railway service once confident.
+
+### Free-tier notes
+
+- Render free instances sleep after ~15 min idle; the keep-warm cron covers
+  this, but expect a ~30s cold start if it ever does sleep. Realtime task
+  updates are delivered via Supabase Realtime websockets and cached React
+  Query data, so brief backend cold starts no longer freeze the UI.
+- Supabase Realtime requires nothing extra to enable — the backend publishes
+  broadcasts using \SUPABASE_URL\ + \SUPABASE_SERVICE_ROLE_KEY\, and the
+  frontend subscribes with \VITE_SUPABASE_URL\ + \VITE_SUPABASE_ANON_KEY\.

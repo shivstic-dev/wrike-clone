@@ -23,6 +23,7 @@ import {
 import { Button } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import { navigationForRole, type NavigationItem, type ShellRole } from '../design/navigation';
+import { useTaskRealtime } from '../hooks/useTaskRealtime';
 
 export interface AppShellProps {
   helpContent?: ReactNode;
@@ -485,6 +486,7 @@ function MobileNavigationSheet({
 export default function AppShell({ helpContent }: AppShellProps) {
   const { logout, membership, user } = useAuth();
   const { data: workspaces = [], isPending: workspacesPending } = useWorkspaces();
+  useTaskRealtime(true);
   const { workspaceId } = useParams();
   const location = useLocation();
   const mobile = useIsMobile();

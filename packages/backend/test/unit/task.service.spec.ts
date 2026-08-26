@@ -10,6 +10,7 @@ import { DepartmentAccessService } from '../../src/rbac/department-access.servic
 import { TaskLocationService } from '../../src/task/task-location.service';
 import { TaskCompletionService } from '../../src/task/task-completion.service';
 import { MemoryCacheService } from '../../src/common/cache/memory-cache.service';
+import { RealtimeService } from '../../src/realtime/realtime.service';
 import { TaskStatus } from '@wrike-clone/shared';
 import knex, { type Knex } from 'knex';
 import * as visibilityScope from '../../src/common/visibility.scope';
@@ -97,6 +98,7 @@ describe('TaskService', () => {
         { provide: DepartmentAccessService, useValue: departmentAccess },
         { provide: TaskLocationService, useValue: taskLocations },
         { provide: TaskCompletionService, useValue: taskCompletion },
+        { provide: RealtimeService, useValue: { publishTaskEvent: jest.fn() } },
       ],
     }).compile();
 
